@@ -4,7 +4,7 @@
 ///|
 async fn main raise {
   let config = @mysql.MysqlConfig::from_env()
-  let dao = @mysql.UserMysqlDao::{ config }
+  let dao = @mysql.UserMysqlDao::make(config)
   let svc = @svc.UserServiceImpl::{ dao }
   let root = @mb.Module(ctx => {
     @ctrl.register(ctx, svc) catch {

@@ -65,12 +65,12 @@ pub fn parse_update(body : Json) -> UserSaveReq raise @core.MldongError {
 }
 
 ///|
-/// 分页入参（骨架先支持 m_LIKE_userName / m_LIKE_realName 两条，m_ 通用件后续移植）
+/// 分页入参（过滤键 camelCase 直传，语义=模糊匹配；m_ 通用件后续另做，不占此形状）
 pub(all) struct UserPageReq {
   page_num : Int
   page_size : Int
-  like_user_name : String?
-  like_real_name : String?
+  user_name : String?
+  real_name : String?
 }
 
 ///|
@@ -83,8 +83,8 @@ pub fn parse_page(body : Json) -> UserPageReq raise @core.MldongError {
   {
     page_num,
     page_size,
-    like_user_name: @core.get_text(body, "m_LIKE_userName"),
-    like_real_name: @core.get_text(body, "m_LIKE_realName"),
+    user_name: @core.get_text(body, "userName"),
+    real_name: @core.get_text(body, "realName"),
   }
 }
 

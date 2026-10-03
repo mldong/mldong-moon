@@ -54,7 +54,7 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn save(self,
     dept_id: req.dept_id,
     post_id: None,
     remark: req.remark,
-    create_time: None,
+    create_time: Some(@core.now_str()),
     create_user: None,
     update_time: None,
     update_user: None,
@@ -69,33 +69,40 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update(sel
     Some(msg) => raise @core.MldongError::InvalidInput(msg)
     None => ()
   }
-  // 先读旧值合并（对齐 MyBatis-Plus updateById 的 null 字段不覆盖语义），NOT NULL 列不误伤
-  let cur = match self.dao.find_by_id(req.id) {
+  match self.dao.find_by_id(req.id) {
     None => raise @core.MldongError::NotFound("用户不存在: \{req.id}")
-    Some(cur) => cur
+    Some(_) => ()
   }
+  // 用户名查重（排除自身）
+  match self.dao.find_by_user_name(req.user_name) {
+    Some(other) => if other.id != req.id {
+      raise @core.MldongError::Conflict("用户名已存在: \{req.user_name}")
+    }
+    None => ()
+  }
+  // 未传的可选字段落 N，BaseDao 构建 SET 时跳过（null 不覆盖语义在 builder 层统一）
   let u : @entity.User = {
     id: req.id,
     user_name: req.user_name,
     real_name: req.real_name,
-    nick_name: if req.nick_name is Some(_) { req.nick_name } else { cur.nick_name },
-    avatar: cur.avatar,
-    password: cur.password,
-    salt: cur.salt,
-    mobile_phone: if req.mobile_phone is Some(_) { req.mobile_phone } else { cur.mobile_phone },
-    tel: if req.tel is Some(_) { req.tel } else { cur.tel },
-    email: if req.email is Some(_) { req.email } else { cur.email },
-    admin_type: cur.admin_type,
-    sex: if req.sex is Some(_) { req.sex } else { cur.sex },
-    is_locked: cur.is_locked,
-    dept_id: if req.dept_id is Some(_) { req.dept_id } else { cur.dept_id },
-    post_id: cur.post_id,
-    remark: if req.remark is Some(_) { req.remark } else { cur.remark },
-    create_time: cur.create_time,
-    create_user: cur.create_user,
+    nick_name: req.nick_name,
+    avatar: None,
+    password: None,
+    salt: None,
+    mobile_phone: req.mobile_phone,
+    tel: req.tel,
+    email: req.email,
+    admin_type: None,
+    sex: req.sex,
+    is_locked: None,
+    dept_id: req.dept_id,
+    post_id: None,
+    remark: req.remark,
+    create_time: None,
+    create_user: None,
     update_time: None,
     update_user: None,
-    is_deleted: cur.is_deleted,
+    is_deleted: None,
   }
   self.dao.update(u)
 }
@@ -121,7 +128,15 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn find_by_id
 
 ///|
 pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn page(self, req) {
-  self.dao.page(req)
+  // 业务决定过滤怎么拼（Wrapper 是 core 的零 ORM 条件组）；m_ 通用件后续另做
+  let w = @core.where_()
+  if req.user_name is Some(s) {
+    let _ = w.like("user_name", s)
+  }
+  if req.real_name is Some(s) {
+    let _ = w.like("real_name", s)
+  }
+  self.dao.page(w, req.page_num, req.page_size)
 }
 
 ///|

@@ -171,26 +171,20 @@ fn row_opt_datetime(r : @moondb.Row, col : String) -> String? {
 }
 
 ///|
-/// 可选绑定值：Some(v)→值，None→NULL
-pub fn opt_text(v : String?) -> @moondb.Value {
-  match v {
-    Some(s) => @moondb.Text(s)
-    None => @moondb.Null
+/// SqlValue → moondb 绑定值（builder 的中性值在执行边界转换）
+pub fn to_db_values(vs : Array[@core.SqlValue]) -> Array[@moondb.Value] {
+  let out : Array[@moondb.Value] = []
+  for v in vs {
+    out.push(
+      match v {
+        S(s) => @moondb.Text(s)
+        I(n) => @moondb.Int(n)
+        L(n) => @moondb.Int64(n)
+        D(d) => @moondb.Double(d)
+        B(b) => @moondb.Bool(b)
+        N => @moondb.Null
+      },
+    )
   }
-}
-
-///|
-pub fn opt_i64(v : Int64?) -> @moondb.Value {
-  match v {
-    Some(n) => @moondb.Int64(n)
-    None => @moondb.Null
-  }
-}
-
-///|
-pub fn opt_int(v : Int?) -> @moondb.Value {
-  match v {
-    Some(n) => @moondb.Int(n)
-    None => @moondb.Null
-  }
+  out
 }
