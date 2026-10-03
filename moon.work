@@ -1,0 +1,5 @@
+members = [
+  "./core",
+  "./modules/sys",
+  "./cmd",
+]

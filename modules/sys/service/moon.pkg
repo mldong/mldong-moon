@@ -1,0 +1,6 @@
+import {
+  "mldong/moon-core" @core,
+  "mldong/moon-sys/entity" @entity,
+  "mldong/moon-sys/dto" @dto,
+  "mldong/moon-sys/dao" @dao,
+}

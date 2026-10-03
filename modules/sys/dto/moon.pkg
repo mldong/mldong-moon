@@ -1,0 +1,5 @@
+import {
+  "Betterlol/moon_zod" @moon_zod,
+  "mldong/moon-core" @core,
+  "mldong/moon-sys/entity" @entity,
+}
