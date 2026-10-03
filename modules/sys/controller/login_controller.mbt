@@ -1,5 +1,5 @@
 // 登录/注销控制器 —— 对齐 13 栈：登录在 sys 模块（boot2 SysLoginController 同位）。
-// 骨架不验密码（TODO 接 sys_user 密文校验：password = md5(salt+pwd) 同款规则）；
+// 密文校验对齐 boot2：md5(密码明文 + 盐) 小写 hex（core/password.mbt）；
 // login_id = sys_user.id 字符串（对齐 sa-token StpUtil.login(user.getId())），
 // 锁定/删除用户拒绝登录。
 // 会话级属性走 moon-token extra（appCode/ip/ua，moon-token 0.1.9 起）——不编进 login_id，
@@ -19,7 +19,8 @@ pub fn[S : @port.TokenStore, P, R : @svc.RbacService] register_login(
       _ => raise @core.MldongError::InvalidInput("请求体必须是合法 JSON")
     }
     let user_name = @core.text_or(body, "userName", "")
-    // 骨架不验密码（TODO 接密文校验）；存在性 + 锁定检查
+    let password = @core.text_or(body, "password", "")
+    // 存在性检查；错密与不存在同话术（防枚举，boot2 两支同抛 USER_NOT_EXIST 同设计）
     let ua = rbac.find_user_auth_by_name(user_name)
     let ua = match ua {
       None => {
@@ -30,6 +31,11 @@ pub fn[S : @port.TokenStore, P, R : @svc.RbacService] register_login(
     }
     if ua.is_locked == Some(1) {
       fail_auth(responder, @core.MldongError::Business("用户已锁定"))
+      return
+    }
+    // 密文校验（boot2 同式：md5(密码明文 + 盐) 小写 hex）
+    if !@core.password_matches(password, ua.password, ua.salt) {
+      fail_auth(responder, @core.MldongError::Business("用户名或密码错误"))
       return
     }
     // appCode：登录头（13 栈 APP_CODE_KEY="appCode"），缺省 platform

@@ -37,14 +37,16 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn save(self,
     Some(_) => raise @core.MldongError::Conflict("用户名已存在: \{req.user_name}")
     None => ()
   }
+  // 密码机制对齐 boot2 save：不收用户自报密码，发默认密码 + 8 位随机盐（resetPwd 同式）
+  let salt = @core.random_salt()
   let u : @entity.User = {
     id: @core.next_id(),
     user_name: req.user_name,
     real_name: req.real_name,
     nick_name: req.nick_name,
     avatar: None,
-    password: None,
-    salt: None,
+    password: Some(@core.md5_hex(@core.DEFAULT_PASSWORD + salt)),
+    salt: Some(salt),
     mobile_phone: req.mobile_phone,
     tel: req.tel,
     email: req.email,

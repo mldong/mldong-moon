@@ -22,6 +22,8 @@ let user_table : TableCodec[@entity.User] = TableCodec::{
     { name: "dept_id", get: fn(u) { opt_l(u.dept_id) } },
     { name: "remark", get: fn(u) { opt_s(u.remark) } },
     { name: "create_time", get: fn(u) { S(match u.create_time { Some(s) => s; None => @core.now_str() }) } },
+    { name: "password", get: fn(u) { opt_s(u.password) } },
+    { name: "salt", get: fn(u) { opt_s(u.salt) } },
   ],
   update_cols: [
     { name: "user_name", get: fn(u) { S(u.user_name) } },

@@ -42,4 +42,7 @@ pub(all) struct UserAuth {
   user_name : String
   admin_type : Int?
   is_locked : Int?
+  /// 密文与盐（登录密文校验用；超管/锁定判定不碰）
+  password : String?
+  salt : String?
 }

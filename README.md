@@ -64,10 +64,10 @@ mldong-moon/
 
 | 端点 | 权限码 | 说明 |
 |---|---|---|
-| `/sys/login` | 豁免 | `{userName, password}` → `{token, refreshToken, userId}`；骨架暂不验密码（TODO）；会话 extra 带入 appCode/ip/ua |
+| `/sys/login` | 豁免 | `{userName, password}` → `{token, refreshToken, userId}`；密文校验 `md5(密码+盐)` 对齐 boot2（错密与不存在同话术防枚举，失败 401+99990401）；会话 extra 带入 appCode/ip/ua |
 | `/sys/refreshToken` | 豁免 | `{refreshToken}` → 全新 `{token, refreshToken, userId}`（全量轮转：旧 access+旧 refresh 同时失效；失败统一 `99990410` 不泄露原因） |
 | `/sys/logout` | 豁免 | 注销当前 token |
-| `/sys/user/save` | `sys:user:save` | 新增（用户名查重；雪花 ID 全部字符串出入，防 JS 精度丢失） |
+| `/sys/user/save` | `sys:user:save` | 新增（用户名查重；不收密码，发默认密码 `123456` + 8 位随机盐，boot2 同机制；雪花 ID 全部字符串出入，防 JS 精度丢失） |
 | `/sys/user/update` | `sys:user:update` | 修改（未传字段不覆盖，MyBatis-Plus updateById 语义） |
 | `/sys/user/remove` | `sys:user:remove` | 逻辑删除 `{ids:[..]}` |
 | `/sys/user/detail` | `sys:user:detail` | 单个 `{id}` |
@@ -128,7 +128,7 @@ curl -s -X POST http://127.0.0.1:18680/sys/user/page \
 
 - [x] moon-token 鉴权接入（登录/注销 + 逐路由守卫 + RBAC 真码链 + appCode 多应用，10-03）
 - [x] `m_` 动态查询通用件（core/query.mbt，22 用例过）
-- [ ] 登录密文校验（password = md5(salt+pwd) 对齐 boot2）
+- [x] 登录密文校验（`md5(密码+盐)` 对齐 boot2，mooncrypt md5 + 单测 3 例，10-04）
 - [x] `POST /sys/refreshToken`（rotate 端点，UC-0113 全量轮转 + 登出联动，矩阵 10/10，10-03）
 - [ ] 事务模板（参照 jeeflow-moon `MysqlTxTemplate`：环境连接 + 嵌套复用；现为 grant 局部事务）
 - [ ] 会话存储文件/Redis 后端（moon-token 端口已预留）

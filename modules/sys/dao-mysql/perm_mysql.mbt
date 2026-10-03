@@ -17,7 +17,7 @@ pub impl @dao.RbacDao for RbacDaoMysql with fn find_user_auth_by_name(self, user
   let conn = open_conn(self.config)
   let rows = q(
     conn,
-    "SELECT id, user_name, admin_type, is_locked FROM sys_user WHERE user_name = ? AND is_deleted = 0 LIMIT 1",
+    "SELECT id, user_name, admin_type, is_locked, password, salt FROM sys_user WHERE user_name = ? AND is_deleted = 0 LIMIT 1",
     [@moondb.Text(user_name)],
   )
   conn.close()
@@ -33,7 +33,7 @@ pub impl @dao.RbacDao for RbacDaoMysql with fn find_user_auth_by_id(self, id) {
   let conn = open_conn(self.config)
   let rows = q(
     conn,
-    "SELECT id, user_name, admin_type, is_locked FROM sys_user WHERE id = ? AND is_deleted = 0 LIMIT 1",
+    "SELECT id, user_name, admin_type, is_locked, password, salt FROM sys_user WHERE id = ? AND is_deleted = 0 LIMIT 1",
     [@moondb.Int64(id)],
   )
   conn.close()
@@ -168,5 +168,7 @@ fn user_auth_of(r : @moondb.Row) -> @entity.UserAuth {
     user_name: row_text(r, "user_name", ""),
     admin_type: row_opt_int(r, "admin_type"),
     is_locked: row_opt_int(r, "is_locked"),
+    password: row_opt_text(r, "password"),
+    salt: row_opt_text(r, "salt"),
   }
 }

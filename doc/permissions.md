@@ -18,8 +18,11 @@
 ## 2. 登录 / 注销（`controller/login_controller.mbt`）
 
 - 端点 `POST /sys/login`、`POST /sys/logout`，走**全局豁免面**（main 里 `.exempt(...)`，guard 不拦）；
-- 骨架**不验密码**（TODO：接 `sys_user` 密文校验 `md5(salt+pwd)`），现有校验 = 用户存在 +
-  未锁定（`is_locked=1` 拒绝）；用户不存在与密码错**同话术**"用户名或密码错误"（防枚举）；
+- 密文校验对齐 boot2：**`md5(密码明文 + 盐)` 小写 hex**（注意顺序：密码在前盐在后；
+  `core/password.mbt` 用 mooncrypt md5 + UTF-8，单测对标准向量）；校验顺序 = 存在 →
+  锁定（`is_locked=1` 拒绝）→ 密文；用户不存在与密码错**同话术同码**（401 + 99990401
+  “用户名或密码错误”，防枚举，boot2 两支同抛 USER_NOT_EXIST 同设计；13 栈登录失败码各自
+  为政——boot2=10000001、goframe=99999999，本栈定案 401+99990401 走鉴权失败语义）；
 - `login_id = sys_user.id 字符串`（对齐 sa-token `StpUtil.login(user.getId())`），
   **纯 id，不含任何后缀**——appCode 等会话属性走 extra（§5），别复合进 login_id
   （会污染按 login_id 的搜索面，owner 定过案）；
@@ -150,6 +153,9 @@ sys_user_role ──▶ sys_role (app_code 过滤) ──▶ sys_role_menu ─�
 **回归（4 例）**：login 200 且字段齐（token/refreshToken/userId）→ save/update/detail/grantRole/remove
 全 0 → 负向（非法 JSON/缺字段）99990001 → 未带 token 打受保护端点 401。
 
+**密码（10 例）**：正向 admin/123456 → 错密与不存在同话术同码（防枚举）→ 缺 password 字段 →
+锁定用户拒登（“用户已锁定”）→ save 新用户默认密码可登 → detail 不回显 password/salt → rotate 回归。
+
 **refreshToken（8 例，UC-0113）**：RR0 login 形状恰为 {token,refreshToken,userId} → RR1 rotate 出全新对 →
 RR2 新 access 打受保护端点 200 → RR3 旧 refresh 重放 99990410 → RR4 旧 access 99990401 →
 RR5 垃圾串 99990410 → RR6 rotate 延续 extra（platform 滤空仍 403、超管轮转后仍 200）→
@@ -157,5 +163,4 @@ RR7 登出后其 refresh 联动失效 99990410（moon-token logout 单一漏斗�
 
 ## 8. 已知 TODO
 
-- 登录密文校验（`password = md5(salt+pwd)`，对齐 boot2；接入后 §2 的话术保持）；
 - 会话存储切换文件/Redis 后端（moon-token 端口已预留，等第三方驱动库稳定）。

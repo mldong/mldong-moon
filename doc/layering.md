@@ -121,6 +121,10 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn save(self,
 - 错误码语义：参数错 `InvalidInput`、不存在 `NotFound`、查重冲突 `Conflict`、业务失败 `Business`；
 - **NOT NULL 列必须给业务默认值**（save 时 `admin_type: Some(2)`、`is_locked: Some(0)`）——
   分页过滤 `admin_type <> 1` 会因 NULL 三值逻辑漏行，落 NULL 是事故；
+- **密码机制**（对齐 boot2）：save 不收用户自报密码，发默认密码 + 8 位随机盐
+  （`@core.DEFAULT_PASSWORD` + `random_salt`，散列 `md5(明文+盐)` 小写 hex，见
+  `core/password.mbt`）；TableCodec 只把 password/salt 放进 `insert_cols`，读面 `cols` 不带
+  （detail 不回显密文）；改密是独立端点的活（resetPwd 类，13 栈各自有）；
 - 查询组装：业务硬条件 + `w.append(req.m)`（m_ 动态条件）+ keywords 多列 OR（`w.raw`），
   参考 `UserServiceImpl::page`。
 
