@@ -1,4 +1,7 @@
 import {
   "mldong/moon-core" @core,
+  "mldong/moon-token/guard" @guard,
+  "mldong/moon-token-moonback/guard" @mbguard,
+  "mldong/moon-token-store/port" @port,
   "moonbitlang/moonback" @mb,
 }

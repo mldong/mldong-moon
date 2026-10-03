@@ -4,7 +4,24 @@
 // update=sys:user:update detail=sys:user:detail page=sys:user:page
 
 ///|
-pub fn[T : @svc.UserService] register(ctx : @mb.ModuleContext, svc : T) -> Unit raise {
+/// 权限码片段——与端点同文件声明（对齐 boot2 @SaCheckPermission 注解位置）。
+/// 全部显式 rule：URL 与码不一致的场景（boot2 /sys/user/locked 双码 OR 那类）就改这里，
+/// 推导只作兜底不依赖。guard 下一轮挂时这些码已是最终形状。
+pub fn user_policy() -> @guard.RoutePolicy {
+  @guard.RoutePolicy::new()
+    .rule(@guard.RouteRule::make("/sys/user/save", ["sys:user:save"]))
+    .rule(@guard.RouteRule::make("/sys/user/remove", ["sys:user:remove"]))
+    .rule(@guard.RouteRule::make("/sys/user/update", ["sys:user:update"]))
+    .rule(@guard.RouteRule::make("/sys/user/detail", ["sys:user:detail"]))
+    .rule(@guard.RouteRule::make("/sys/user/page", ["sys:user:page"]))
+}
+
+///|
+pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService] register(
+  ctx : @mb.ModuleContext,
+  svc : T,
+  g : @mbguard.Guard[S, P],
+) -> Unit raise {
   // 添加用户
   let save_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
     let id = svc.save(@dto.parse_save(@web.json_body(request)))
@@ -38,19 +55,19 @@ pub fn[T : @svc.UserService] register(ctx : @mb.ModuleContext, svc : T) -> Unit 
     }
     @core.ok_page(req.page_num, req.page_size, total, arr)
   })
-  ctx.post("/sys/user/save", save_handler) catch {
+  g.post(ctx, "/sys/user/save", save_handler) catch {
     e => raise e
   }
-  ctx.post("/sys/user/remove", remove_handler) catch {
+  g.post(ctx, "/sys/user/remove", remove_handler) catch {
     e => raise e
   }
-  ctx.post("/sys/user/update", update_handler) catch {
+  g.post(ctx, "/sys/user/update", update_handler) catch {
     e => raise e
   }
-  ctx.post("/sys/user/detail", detail_handler) catch {
+  g.post(ctx, "/sys/user/detail", detail_handler) catch {
     e => raise e
   }
-  ctx.post("/sys/user/page", page_handler) catch {
+  g.post(ctx, "/sys/user/page", page_handler) catch {
     e => raise e
   }
 }

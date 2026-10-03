@@ -3,7 +3,22 @@
 // 权限码预留（guard 下一轮挂）：sys:role:save/remove/update/detail/page
 
 ///|
-pub fn[T : @svc.RoleService] register_role(ctx : @mb.ModuleContext, svc : T) -> Unit raise {
+/// 权限码片段（role 五端点；位置与维护规则同 user_policy）
+pub fn role_policy() -> @guard.RoutePolicy {
+  @guard.RoutePolicy::new()
+    .rule(@guard.RouteRule::make("/sys/role/save", ["sys:role:save"]))
+    .rule(@guard.RouteRule::make("/sys/role/remove", ["sys:role:remove"]))
+    .rule(@guard.RouteRule::make("/sys/role/update", ["sys:role:update"]))
+    .rule(@guard.RouteRule::make("/sys/role/detail", ["sys:role:detail"]))
+    .rule(@guard.RouteRule::make("/sys/role/page", ["sys:role:page"]))
+}
+
+///|
+pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.RoleService] register_role(
+  ctx : @mb.ModuleContext,
+  svc : T,
+  g : @mbguard.Guard[S, P],
+) -> Unit raise {
   // 添加角色（code 查重在 service）
   let save_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
     let id = svc.save(@dto.parse_role_save(@web.json_body(request)))
@@ -37,19 +52,19 @@ pub fn[T : @svc.RoleService] register_role(ctx : @mb.ModuleContext, svc : T) -> 
     }
     @core.ok_page(req.page_num, req.page_size, total, arr)
   })
-  ctx.post("/sys/role/save", save_handler) catch {
+  g.post(ctx, "/sys/role/save", save_handler) catch {
     e => raise e
   }
-  ctx.post("/sys/role/remove", remove_handler) catch {
+  g.post(ctx, "/sys/role/remove", remove_handler) catch {
     e => raise e
   }
-  ctx.post("/sys/role/update", update_handler) catch {
+  g.post(ctx, "/sys/role/update", update_handler) catch {
     e => raise e
   }
-  ctx.post("/sys/role/detail", detail_handler) catch {
+  g.post(ctx, "/sys/role/detail", detail_handler) catch {
     e => raise e
   }
-  ctx.post("/sys/role/page", page_handler) catch {
+  g.post(ctx, "/sys/role/page", page_handler) catch {
     e => raise e
   }
 }

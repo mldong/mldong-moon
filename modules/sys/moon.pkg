@@ -1,5 +1,9 @@
 import {
   "mldong/moon-core" @core,
+  "mldong/moon-core-web" @web,
+  "mldong/moon-token/guard" @guard,
+  "mldong/moon-token-moonback/guard" @mbguard,
+  "mldong/moon-token-store/port" @port,
   "mldong/moon-sys/dao-mysql" @mysql,
   "mldong/moon-sys/service" @svc,
   "mldong/moon-sys/controller" @ctrl,
