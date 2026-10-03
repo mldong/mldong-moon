@@ -23,7 +23,7 @@
 - `login_id = sys_user.id 字符串`（对齐 sa-token `StpUtil.login(user.getId())`），
   **纯 id，不含任何后缀**——appCode 等会话属性走 extra（§5），别复合进 login_id
   （会污染按 login_id 的搜索面，owner 定过案）；
-- 响应 data：`token / refreshToken / loginId`（refreshToken 端点尚未建，字段先行）；
+- 响应 data：`token / refreshToken / userId`（契约字段名对齐 13 栈 LoginVO，userId = login_id = sys_user.id 字符串）；
 - **注销手取 token 必须用 `@web.token_of`**（剥 `Bearer ` 前缀 + Authorization cookie 兜底）——
   直接拿 `Authorization` 头会带前缀查不到会话，logout 幂等不报错、**静默失效**（已踩）。
 
@@ -118,7 +118,7 @@ sys_user_role ──▶ sys_role (app_code 过滤) ──▶ sys_role_menu ─�
 - `RbacServiceImpl` **双 impl**：`RbacService`（授权业务，登录端点/user 控制器用）+
   `PermissionProvider`（moon-token 供数，main 装配用）；DAO 的 `MldongError` 在端口边界转
   `TokenError::Store`（供数方故障语义）；
-- login 响应里 `loginId` 就是纯用户 id；guard 鉴权时按 token 找会话 → 用 login_id + extra
+- login 响应里 `userId` 就是纯用户 id（= login_id）；guard 鉴权时按 token 找会话 → 用 login_id + extra
   问供数方要码集（带授权快照缓存，TTL 跟会话窗口同寿）。
 
 ## 7. 验收矩阵（改鉴权/RBAC 后必复跑）
@@ -129,7 +129,7 @@ sys_user_role ──▶ sys_role (app_code 过滤) ──▶ sys_role_menu ─�
 
 | # | 用例 | 预期 |
 |---|---|---|
-| A1 | 登录带 `appCode: app1` | `loginId` = 纯用户 id（无 `@app1` 后缀） |
+| A1 | 登录带 `appCode: app1` | `userId` = 纯用户 id（无 `@app1` 后缀） |
 | A2 | app1 会话打已授权端点 | 200（app1 码链生效） |
 | A3 | 不带 appCode 头登录 | = platform；无权限端点 403 |
 | A4 | 超管 + 任意 appCode | 200（超管跨 app） |
@@ -147,12 +147,15 @@ sys_user_role ──▶ sys_role (app_code 过滤) ──▶ sys_role_menu ─�
 | R3 | 同会话打未授权端点（sys:role:page） | 403（精确单码，不多授） |
 | R4 | 撤码后重登 | 403（撤销生效） |
 
-**回归（4 例）**：login 200 且字段齐（token/refreshToken/loginId）→ save/update/detail/grantRole/remove
+**回归（4 例）**：login 200 且字段齐（token/refreshToken/userId）→ save/update/detail/grantRole/remove
 全 0 → 负向（非法 JSON/缺字段）99990001 → 未带 token 打受保护端点 401。
+
+**refreshToken（8 例，UC-0113）**：RR0 login 形状恰为 {token,refreshToken,userId} → RR1 rotate 出全新对 →
+RR2 新 access 打受保护端点 200 → RR3 旧 refresh 重放 99990410 → RR4 旧 access 99990401 →
+RR5 垃圾串 99990410 → RR6 rotate 延续 extra（platform 滤空仍 403、超管轮转后仍 200）→
+RR7 登出后其 refresh 联动失效 99990410（moon-token logout 单一漏斗内建）。
 
 ## 8. 已知 TODO
 
 - 登录密文校验（`password = md5(salt+pwd)`，对齐 boot2；接入后 §2 的话术保持）；
-- `POST /sys/refreshToken`（rotate 端点；moon-token 引擎已支持，登录响应已带 refreshToken 字段）；
-- 会话存储切换文件/Redis 后端（moon-token 端口已预留，等第三方驱动库稳定）；
-- 登出/踢下线联动 refresh 失效（随 rotate 端点一并落）。
+- 会话存储切换文件/Redis 后端（moon-token 端口已预留，等第三方驱动库稳定）。

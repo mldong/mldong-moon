@@ -19,9 +19,12 @@ async fn main raise {
     @sys.rbac_provider(config),
     @style.opaque_style(),
   )
-  // 总策略 = 全局豁免面（登录/注销）+ 各模块 policy 片段聚合
+  // 总策略 = 全局豁免面（登录/注销/刷新）+ 各模块 policy 片段聚合
   let policy = @web.merge_policy(
-    @guard.RoutePolicy::new().exempt("/sys/login").exempt("/sys/logout"),
+    @guard.RoutePolicy::new()
+      .exempt("/sys/login")
+      .exempt("/sys/logout")
+      .exempt("/sys/refreshToken"),
     @sys.policy(),
   )
   let g = @mbguard.Guard::new(auth, policy).with_on_error(@web.on_error)

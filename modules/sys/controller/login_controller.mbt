@@ -57,7 +57,36 @@ pub fn[S : @port.TokenStore, P, R : @svc.RbacService] register_login(
     let data : Json = {
       "token": result.token,
       "refreshToken": result.refresh_token,
-      "loginId": result.login_id,
+      // 契约字段名 userId（对齐 13 栈 LoginVO；值 = login_id = sys_user.id 字符串）
+      "userId": result.login_id,
+    }
+    responder.send_json(@core.ok_data(data), headers=[("Content-Type", "application/json; charset=utf-8")]) catch {
+      _ => ()
+    }
+  }
+  // 刷新 token（UC-0113 全量轮转，公开端点）：旧 access + 旧 refresh 同时失效，返回全新对；
+  // 轮转延续会话属性（extra 的 appCode/ip/ua 随转，moon-token rotate 内建）
+  let refresh_handler : @mb.Handler = async fn(request, responder) {
+    let body = @web.json_body(request) catch {
+      _ => raise @core.MldongError::InvalidInput("请求体必须是合法 JSON")
+    }
+    let refresh_token = @core.text_or(body, "refreshToken", "")
+    let result = auth.rotate(refresh_token) catch {
+      _ => {
+        // 契约统一业务码 99990410（不存在/已过期/已轮转/已登出，含重放），不泄露具体原因（13 栈同口径）
+        responder.send_json(
+          @core.fail(99990410, "refreshToken无效或已过期"),
+          headers=[("Content-Type", "application/json; charset=utf-8")],
+        ) catch {
+          _ => ()
+        }
+        return
+      }
+    }
+    let data : Json = {
+      "token": result.token,
+      "refreshToken": result.refresh_token,
+      "userId": result.login_id,
     }
     responder.send_json(@core.ok_data(data), headers=[("Content-Type", "application/json; charset=utf-8")]) catch {
       _ => ()
@@ -86,6 +115,9 @@ pub fn[S : @port.TokenStore, P, R : @svc.RbacService] register_login(
   }
   ctx.post("/sys/logout", logout_handler) catch {
     _ => abort("注销路由注册失败（路由冲突?）")
+  }
+  ctx.post("/sys/refreshToken", refresh_handler) catch {
+    _ => abort("刷新路由注册失败（路由冲突?）")
   }
 }
 
