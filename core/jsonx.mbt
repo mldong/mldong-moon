@@ -56,3 +56,30 @@ pub fn text_or(data : Json, key : String, default : String) -> String {
     None => default
   }
 }
+
+///|
+/// 提取 ids 数组（remove 批量入参；雪花 id 兼容字符串/数字两种形态，字符串为准防 JS 精度丢失）
+pub fn get_ids(body : Json) -> Array[Int64] {
+  let out : Array[Int64] = []
+  match body {
+    Object(map) =>
+      match map.get("ids") {
+        Some(Array(arr)) =>
+          for v in arr {
+            match v {
+              Number(n, ..) => out.push(n.to_int64())
+              String(s) =>
+                try {
+                  out.push(@string.parse_int64(s))
+                } catch {
+                  _ => ()
+                }
+              _ => ()
+            }
+          }
+        _ => ()
+      }
+    _ => ()
+  }
+  out
+}
