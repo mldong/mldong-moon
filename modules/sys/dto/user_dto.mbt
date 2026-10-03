@@ -101,6 +101,7 @@ pub fn user_json(u : @entity.User) -> Json {
     "userName": u.user_name,
     "realName": u.real_name,
     "nickName": jstr(u.nick_name),
+    "avatar": jstr(u.avatar),
     "mobilePhone": jstr(u.mobile_phone),
     "tel": jstr(u.tel),
     "email": jstr(u.email),
@@ -124,6 +125,7 @@ pub fn page_row_json(row : @entity.UserPageRow) -> Json {
     "userName": u.user_name,
     "realName": u.real_name,
     "nickName": jstr(u.nick_name),
+    "avatar": jstr(u.avatar),
     "mobilePhone": jstr(u.mobile_phone),
     "tel": jstr(u.tel),
     "email": jstr(u.email),
@@ -164,4 +166,104 @@ fn jsnow(v : Int64?) -> Json {
     Some(n) => Json::string(n.to_string())
     None => Json::null()
   }
+}
+
+
+///|
+/// 在线 token 级行（对齐 boot2 OnlineUserVO 的 tokenList 项）
+pub(all) struct OnlineTokenView {
+  token_value : String
+  device : String
+  is_current : Bool
+  /// 登录时刻（epoch ms）
+  login_time : Int64
+  /// 会话到期时刻（epoch ms）
+  expire_at : Int64
+  login_ip : String
+  login_browser : String
+  super_admin : Bool
+}
+
+///|
+/// 在线用户级行（按登录人分组，boot2 同构：一行一带 tokenList）
+pub(all) struct OnlineUserView {
+  id : String
+  user_name : String
+  real_name : String
+  is_current : Bool
+  super_admin : Bool
+  login_time : Int64
+  expire_at : Int64
+  /// 会话剩余秒数
+  timeout : Int64
+  tokens : Array[OnlineTokenView]
+}
+
+///|
+/// epoch ms → "yyyy-MM-dd HH:mm:ss"（UTC；boot2 用服务器时区，骨架先统一 UTC）
+fn jms(ms : Int64) -> Json {
+  Json::string(@core.format_unix_utc(ms / 1000L))
+}
+
+///|
+pub fn online_token_json(v : OnlineTokenView) -> Json {
+  {
+    "tokenValue": v.token_value,
+    "device": v.device,
+    "isCurrentUser": Json::boolean(v.is_current),
+    "loginTime": jms(v.login_time),
+    "loginTimestamp": Json::number(v.login_time.to_double()),
+    "expireTime": jms(v.expire_at),
+    "loginIp": Json::string(v.login_ip),
+    "loginBrowser": Json::string(v.login_browser),
+    "superAdmin": Json::boolean(v.super_admin),
+  }
+}
+
+///|
+pub fn online_user_json(v : OnlineUserView) -> Json {
+  let arr : Array[Json] = []
+  for t in v.tokens {
+    arr.push(online_token_json(t))
+  }
+  {
+    "id": v.id,
+    "userName": v.user_name,
+    "realName": v.real_name,
+    "isCurrentUser": Json::boolean(v.is_current),
+    "superAdmin": Json::boolean(v.super_admin),
+    "loginTime": jms(v.login_time),
+    "loginTimestamp": Json::number(v.login_time.to_double()),
+    "expireTime": jms(v.expire_at),
+    "timeout": Json::number(v.timeout.to_double()),
+    "tokenList": Json::array(arr),
+  }
+}
+
+
+///|
+/// 个人信息入参（boot2 ValidInfo 组：realName 必填，nickName/sex 可选；其余字段忽略）
+pub fn parse_info(body : Json) -> UserSaveReq raise @core.MldongError {
+  let req = req_of(body)
+  if req.real_name.is_empty() {
+    raise @core.MldongError::InvalidInput("姓名不能为空")
+  }
+  req
+}
+
+///|
+/// 个人信息出参（boot2 /sys/user/info → LoginUser 的骨架子集：用户字段 + 角色/超管位）
+pub fn user_info_json(u : @entity.User, roles : Array[String], super_admin : Bool) -> Json {
+  let base = match user_json(u) {
+    Object(map) => map
+    _ => abort("user_json 恒为 Object")
+  }
+  let role_arr : Array[Json] = []
+  for r in roles {
+    role_arr.push(Json::string(r))
+  }
+  let _ = base.set("roleCodes", Json::array(role_arr))
+  let _ = base.set("roleNames", Json::array(role_arr))
+  let _ = base.set("superAdmin", Json::boolean(super_admin))
+  Json::object(base)
 }

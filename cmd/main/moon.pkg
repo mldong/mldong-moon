@@ -9,6 +9,7 @@ import {
   "mldong/moon-token-store/memory" @mem,
   "mldong/moon-token-moonback/guard" @mbguard,
   "mldong/moon-sys" @sys,
+  "mldong/moon-dev" @dev,
   "moonbitlang/moonback" @mb,
   "moonbitlang/async",
 }

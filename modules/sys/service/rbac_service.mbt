@@ -120,7 +120,7 @@ pub extend RbacServiceImpl with RbacService::{
 const DEFAULT_APP_CODE : String = "platform"
 
 ///|
-fn parse_user_id(login_id : String) -> Int64? {
+pub fn parse_user_id(login_id : String) -> Int64? {
   let id_part = match login_id.split("@").to_array() {
     parts => if parts.length() >= 2 { parts[0].to_owned() } else { login_id }
   }

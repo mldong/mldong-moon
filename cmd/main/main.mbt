@@ -21,20 +21,29 @@ async fn main raise {
   )
   // 总策略 = 全局豁免面（登录/注销/刷新）+ 各模块 policy 片段聚合
   let policy = @web.merge_policy(
-    @guard.RoutePolicy::new()
-      .exempt("/sys/login")
-      .exempt("/sys/logout")
-      .exempt("/sys/refreshToken"),
-    @sys.policy(),
+    @web.merge_policy(
+      @guard.RoutePolicy::new()
+        .exempt("/sys/login")
+        .exempt("/sys/logout")
+        .exempt("/sys/refreshToken"),
+      @sys.policy(),
+    ),
+    @dev.policy(),
   )
+  // 关推导：全显式声明，未列端点一律只验登录（个人中心族 boot2 同语义；
+  // 推导兜底不用——权限码的最终形状一律写在各 controller 的 policy 片段里）
+  policy.by_convention = false
   let g = @mbguard.Guard::new(auth, policy).with_on_error(@web.on_error)
 
   let root = @mb.Module(ctx => {
     ctx.use_(@sys.module(config, g, auth)) catch {
       _ => abort("sys 模块挂载失败")
     }
+    // dev 模块（元数据只读面）
+    ctx.use_(@dev.module(config, g)) catch {
+      _ => abort("dev 模块挂载失败")
+    }
     // 将来新模块各一行：
-    // ctx.use_(@dev.module(config, g)) catch { _ => abort("dev 模块挂载失败") }
     // ctx.use_(@biz.module(config, g)) catch { _ => abort("biz 模块挂载失败") }
   })
   let app = @mb.App(root)

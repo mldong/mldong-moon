@@ -2,7 +2,7 @@
 
 mldong 快速开发框架的 **MoonBit 栈**实现（第 14 栈）。目标是与既有 13 栈（boot2/3/4、fastapi、flask、django、nestjs、laravel、goframe、gin、hertz、salvo、csharp）保持接口契约一致：同样的 URL、同样的 `{"code":0,"msg":"..","data":..}` 信封、同样的分页形状、同样的权限码与鉴权失败码。
 
-当前已落：`sys_user` 全链 CRUD + `sys_role` CRUD + 登录/注销 + moon-token 鉴权（RBAC 真码链 + appCode 多应用）。同时是后续模块与代码生成器的**模板骨架**。
+当前已落：`sys_user` 全链 16 端点（CRUD + 状态/个人中心/在线用户）+ `sys_role` CRUD + 登录/注销/refreshToken + moon-token 鉴权（RBAC 真码链 + appCode 多应用）+ `dev` 模块库元数据底座（gen/dev_schema 共用）。同时是后续模块与代码生成器的**模板骨架**。
 
 ## 技术栈
 
@@ -50,6 +50,7 @@ mldong-moon/
 │   ├── service/               #   UserService trait + Impl[R]；rbac_service.mbt = RBAC + moon-token 供数方
 │   ├── controller/            #   端点注册 + policy() 权限码片段（与端点同文件）
 │   └── module.mbt             #   模块自注册（main 每模块一行）
+├── modules/dev/               # mldong/moon-dev：库元数据底座（MetadataDao 端口 + information_schema 实现 + 只读端点）
 ├── cmd/main/                  # 装配：鉴权（moon-token）+ 模块挂载 + listen :18680
 └── doc/                       # 深入文档
     ├── layering.md            #   分层规范（六件套、依赖规则、BaseDao、sqlbuilder、m_）
@@ -74,6 +75,14 @@ mldong-moon/
 | `/sys/user/page` | `sys:user:page` | 分页：join dept/post 名称 + m_ 动态条件 + keywords |
 | `/sys/user/grantRole` | `sys:user:grantRole` | `{userId, roleIds}` 用户授权角色（全量替换） |
 | `/sys/role/{save,remove,update,detail,page}` | `sys:role:*` | 角色 CRUD |
+| `/sys/user/{locked,unLocked}` | `sys:user:locked` **OR** `sys:user:unLocked` | 批量锁/解锁（双端点共用双码 OR，boot2 SaMode.OR 同构） |
+| `/sys/user/resetPassword` | `sys:user:resetPassword` | 批量重置为默认密码（超管跳过） |
+| `/sys/user/select` | `sys:user:select` | 下拉选项 `[{label,value}]` |
+| `/sys/user/permCode` | 仅登录 | 当前用户权限码数组（守卫快照投影） |
+| `/sys/user/info` / `updateInfo` / `updatePwd` / `updateAvatar` | 仅登录 | 个人中心（id 取自登录主体） |
+| `/sys/user/onlineUserList` / `onlineDevice` | `sys:user:onlineUserList` / 仅登录 | 在线用户（按人分组带 tokenList/ip/ua/剩余时长，moon-token 会话枚举） |
+| `/dev/schema/dbTable` | `dev:schema:dbTable` OR `dev:schema:importTable` | 库表清单（keywords 滤表名/注释） |
+| `/dev/schema/column/list` | `dev:schema:columnList` | 列清单（信息模式 + gen 字段类型映射） |
 
 - 未登录 `HTTP 401 + {"code":99990401}`；无权限 `HTTP 403 + {"code":99990403}`；
 - 分页请求 `{pageNum, pageSize, keywords?, searchKeys?, m_{OP}_{col}?...}`，响应 data 形状
@@ -123,6 +132,7 @@ curl -s -X POST http://127.0.0.1:18680/sys/user/page \
 | [doc/layering.md](doc/layering.md) | 分层规范：六件套职责、依赖规则、BaseDao/TableCodec、sqlbuilder、m_ 查询、事务 |
 | [doc/permissions.md](doc/permissions.md) | 权限鉴权：登录/守卫装配、权限码声明收集、RBAC 真码链、appCode、验收矩阵 |
 | [doc/adding-module.md](doc/adding-module.md) | 新增模块/新表操作手册（六件套清单 + 自检） |
+| [doc/gen-metadata.md](doc/gen-metadata.md) | 库元数据底座：跨库实现要点、类型映射、gen/dev_schema 两条消费路 |
 
 ## 路线图
 
@@ -133,7 +143,9 @@ curl -s -X POST http://127.0.0.1:18680/sys/user/page \
 - [ ] 事务模板（参照 jeeflow-moon `MysqlTxTemplate`：环境连接 + 嵌套复用；现为 grant 局部事务）
 - [ ] 会话存储文件/Redis 后端（moon-token 端口已预留）
 - [ ] `rainbow` 分页导航补齐
-- [ ] dev 模块：代码生成器（一次性脚手架产出六件套源码）
+- [x] dev 模块元数据底座（MetadataDao 端口 + information_schema 实现 + dbTable/column/list 端点，10-04）
+- [ ] dev 模块：代码生成器（读 MetadataDao 产出六件套源码，见 doc/gen-metadata.md §4）
+- [ ] dev_schema 台账（importTable 落库 + disabled 标记，boot2 同位）
 - [ ] CI：GitHub Actions（wasm + native 双档）
 
 ## License

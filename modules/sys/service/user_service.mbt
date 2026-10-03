@@ -19,6 +19,20 @@ pub(open) trait UserService {
   async fn remove_by_ids(Self, Array[Int64]) -> Unit raise @core.MldongError
   async fn find_by_id(Self, Int64) -> @entity.User raise @core.MldongError
   async fn page(Self, @dto.UserPageReq) -> (Int, Array[@entity.UserPageRow]) raise @core.MldongError
+  /// 批量按 id 查（在线列表 join 用户名用，controller 编排 moon-token 枚举时取名称）
+  async fn find_by_ids(Self, Array[Int64]) -> Array[@entity.User] raise @core.MldongError
+  /// 锁定/解锁（locked=1/0）；返回实际处理条数
+  async fn set_locked(Self, Array[Int64], Int) -> Int raise @core.MldongError
+  /// 重置为默认密码（新盐 + md5(默认密码+盐)；超管跳过）；返回实际重置条数（boot2 resetPwd 同语义）
+  async fn reset_password(Self, Array[Int64]) -> Int raise @core.MldongError
+  /// 用户下拉选项（userName/realName LIKE，上限 50）
+  async fn select_options(Self, String) -> Array[@entity.User] raise @core.MldongError
+  /// 修改个人信息（只动 realName/nickName/sex，其余字段忽略；对齐 boot2 ValidInfo 组）
+  async fn update_info(Self, @dto.UserSaveReq) -> Unit raise @core.MldongError
+  /// 修改个人密码（验旧密 md5(旧+盐)；新盐 + md5(新+盐)；boot2 updatePwd 同语义）
+  async fn update_password(Self, Int64, String, String) -> Unit raise @core.MldongError
+  /// 修改个人头像（boot2 updateAvatar：avatar 存 URL 串）
+  async fn update_avatar(Self, Int64, String) -> Unit raise @core.MldongError
 }
 
 ///|
@@ -156,10 +170,154 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn page(self,
 }
 
 ///|
+///|
+pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn find_by_ids(self, ids) {
+  if ids.is_empty() {
+    return []
+  }
+  self.dao.find_by_ids(ids)
+}
+
+///|
+pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn set_locked(
+  self,
+  ids,
+  locked,
+) {
+  if ids.is_empty() {
+    raise @core.MldongError::InvalidInput("ids 不能为空")
+  }
+  self.dao.set_locked(ids, locked)
+  ids.length()
+}
+
+///|
+pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn reset_password(self, ids) {
+  if ids.is_empty() {
+    raise @core.MldongError::InvalidInput("ids 不能为空")
+  }
+  let mut n = 0
+  for id in ids {
+    match self.dao.find_by_id(id) {
+      // 超管不允许重置（boot2 resetPwd 同过滤）
+      Some(u) => if u.admin_type != Some(1) {
+        let salt = @core.random_salt()
+        self.dao.update_password(id, @core.md5_hex(@core.DEFAULT_PASSWORD + salt), salt)
+        n = n + 1
+      }
+      None => ()
+    }
+  }
+  n
+}
+
+///|
+pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn select_options(self, keywords) {
+  self.dao.select_options(keywords)
+}
+
+///|
+pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update_info(self, req) {
+  let old = match self.dao.find_by_id(req.id) {
+    Some(u) => u
+    None => raise @core.MldongError::NotFound("用户不存在: \{req.id}")
+  }
+  // 只动个人信息组字段（boot2 ValidInfo：realName/nickName/sex），其余原样保留
+  //（real_name 不可变字段，重构整记录提交；update_cols 之外的列本就不写）
+  let u : @entity.User = {
+    id: old.id,
+    user_name: old.user_name,
+    real_name: req.real_name,
+    nick_name: req.nick_name,
+    avatar: old.avatar,
+    password: old.password,
+    salt: old.salt,
+    mobile_phone: old.mobile_phone,
+    tel: old.tel,
+    email: old.email,
+    admin_type: old.admin_type,
+    sex: req.sex,
+    is_locked: old.is_locked,
+    dept_id: old.dept_id,
+    post_id: old.post_id,
+    remark: old.remark,
+    create_time: old.create_time,
+    create_user: old.create_user,
+    update_time: Some(@core.now_str()),
+    update_user: None,
+    is_deleted: old.is_deleted,
+  }
+  self.dao.update(u)
+}
+
+///|
+pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update_password(
+  self,
+  id,
+  old_password,
+  new_password,
+) {
+  let u = match self.dao.find_by_id(id) {
+    Some(u) => u
+    None => raise @core.MldongError::NotFound("用户不存在: \{id}")
+  }
+  if !@core.password_matches(old_password, u.password, u.salt) {
+    raise @core.MldongError::Business("旧密码不正确")
+  }
+  if new_password.length() < 6 {
+    raise @core.MldongError::InvalidInput("新密码长度至少 6 位")
+  }
+  let salt = @core.random_salt()
+  self.dao.update_password(id, @core.md5_hex(new_password + salt), salt)
+}
+
+///|
+pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update_avatar(
+  self,
+  id,
+  avatar,
+) {
+  let old = match self.dao.find_by_id(id) {
+    Some(u) => u
+    None => raise @core.MldongError::NotFound("用户不存在: \{id}")
+  }
+  let u : @entity.User = {
+    id: old.id,
+    user_name: old.user_name,
+    real_name: old.real_name,
+    nick_name: old.nick_name,
+    avatar: Some(avatar),
+    password: old.password,
+    salt: old.salt,
+    mobile_phone: old.mobile_phone,
+    tel: old.tel,
+    email: old.email,
+    admin_type: old.admin_type,
+    sex: old.sex,
+    is_locked: old.is_locked,
+    dept_id: old.dept_id,
+    post_id: old.post_id,
+    remark: old.remark,
+    create_time: old.create_time,
+    create_user: old.create_user,
+    update_time: Some(@core.now_str()),
+    update_user: None,
+    is_deleted: old.is_deleted,
+  }
+  self.dao.update(u)
+}
+
 pub extend UserServiceImpl with UserService::{
   page,
   remove_by_ids,
   save,
   find_by_id,
   update,
+  find_by_ids,
+  set_locked,
+  reset_password,
+  select_options,
+  update_info,
+  update_password,
+  update_avatar,
 }

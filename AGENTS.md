@@ -36,6 +36,7 @@ mldong-moon/
 ├── modules/sys/         # mldong/moon-sys —— 业务模块样板（六件套）
 │   ├── entity/ dto/ dao/ dao-mysql/ service/ controller/
 │   └── module.mbt       #   模块自注册 + policy() 聚合 + rbac_provider()
+├── modules/dev/         # mldong/moon-dev —— 库元数据底座（gen/dev_schema 共用，doc/gen-metadata.md）
 ├── cmd/main/            # 装配入口：鉴权 + 模块挂载 + listen :18680
 └── doc/                 # 深入文档（AI 上手按序读）
     ├── layering.md      #   分层规范（六件套、依赖规则、BaseDao、sqlbuilder、m_）
@@ -80,6 +81,7 @@ curl -s -X POST http://127.0.0.1:18680/sys/user/page \
 2. [doc/layering.md](doc/layering.md) —— 分层规范（改代码前必读）；
 3. [doc/permissions.md](doc/permissions.md) —— 权限/鉴权（碰登录、权限码、appCode 前必读）；
 4. [doc/adding-module.md](doc/adding-module.md) —— 加表/加模块时照抄；
+5. [doc/gen-metadata.md](doc/gen-metadata.md) —— 碰 gen/dev_schema/元数据时读；
 5. 模板样板真身在 `modules/sys`（user 全链 + role + RBAC 中间表），文档与源码冲突时**以源码为准**并回来修文档。
 
 ## 5. 关键认知 / 坑（先读再动手）
@@ -103,11 +105,12 @@ curl -s -X POST http://127.0.0.1:18680/sys/user/page \
   `@mb`=moonback、`@mbguard`=moon-token-moonback/guard、`@app`=moon-token/app、
   `@guard`=moon-token/guard、`@port`=moon-token-store/port、`@style`=moon-token/style、
   `@mem`=moon-token-store/memory；模块内 `@entity/@dto/@dao/@mysql/@svc/@ctrl` 指 moon-sys 子包。
-- **已知 warnings 类别**（`moon check` 0 errors / 25 warnings 基线，8 类；改动时别引入新类别）：
-  `fragile_catch_all`（11，`catch { _ => }` 吞错兜底）、`deprecated`（4，core 旧 API）、
-  `reserved_keyword`（3）、`implicit_impl_as_method`（2，trait impl 方法隐式提升，收敛要加
+- **已知 warnings 类别**（`moon check` 0 errors / 42 warnings 基线，9 类；改动时别引入新类别）：
+  `fragile_catch_all`（24，`catch { _ => }`/边界错误转换吞错兜底）、`deprecated`（4，core 旧 API）、
+  `reserved_keyword`（4）、`implicit_impl_as_method`（3，trait impl 方法隐式提升，收敛要加
   `pub extend`）、`ambiguous_block`（1，`{ config }` 歧义，写 `{ id: config }` 或裸 `config`）、
-  `missing_pattern_arguments`（1）、`unused_error_type`（1）、`unused_value`（2，BaseDao::list 预留）。
+  `missing_pattern_arguments`（1）、`unused_async`（1）、`unused_error_type`（2）、
+  `unused_value`（2，BaseDao::list 预留）。
 
 ## 6. 协作约定
 

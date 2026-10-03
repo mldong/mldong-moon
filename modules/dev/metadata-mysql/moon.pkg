@@ -1,0 +1,7 @@
+import {
+  "mldong/moon-core" @core,
+  "mldong/moon-dev/metadata" @meta,
+  "moonbitstack/moondb" @moondb,
+  "moonbitstack/moonmysql/client" @client,
+}
+supported_targets = "+native+wasm"

@@ -1,12 +1,14 @@
 // sys_user 表编解码器 —— BaseDao 模板的每实体配置（gen 代码生成器将来产出的就是这份样板）
 
 ///|
-/// sys_user 表：逻辑删除 is_deleted、默认排序 create_time；avatar/password/salt 等骨架不读写
+/// sys_user 表：逻辑删除 is_deleted、默认排序 create_time；password/salt 可读（改密/校验用）
+// 但出参装配层（dto/user_json）绝不回显；avatar 可读写（个人头像）
 let user_table : TableCodec[@entity.User] = TableCodec::{
   name: "sys_user",
   cols: [
-    "id", "user_name", "real_name", "nick_name", "mobile_phone", "tel", "email", "sex",
+    "id", "user_name", "real_name", "nick_name", "avatar", "mobile_phone", "tel", "email", "sex",
     "admin_type", "is_locked", "dept_id", "remark", "create_time", "update_time", "is_deleted",
+    "password", "salt",
   ],
   insert_cols: [
     { name: "id", get: fn(u) { L(u.id) } },
@@ -29,6 +31,7 @@ let user_table : TableCodec[@entity.User] = TableCodec::{
     { name: "user_name", get: fn(u) { S(u.user_name) } },
     { name: "real_name", get: fn(u) { S(u.real_name) } },
     { name: "nick_name", get: fn(u) { opt_s(u.nick_name) } },
+    { name: "avatar", get: fn(u) { opt_s(u.avatar) } },
     { name: "mobile_phone", get: fn(u) { opt_s(u.mobile_phone) } },
     { name: "tel", get: fn(u) { opt_s(u.tel) } },
     { name: "email", get: fn(u) { opt_s(u.email) } },
@@ -75,9 +78,9 @@ fn row_user(r : @moondb.Row) -> @entity.User {
     user_name: row_text(r, "user_name", ""),
     real_name: row_text(r, "real_name", ""),
     nick_name: row_opt_text(r, "nick_name"),
-    avatar: None,
-    password: None,
-    salt: None,
+    avatar: row_opt_text(r, "avatar"),
+    password: row_opt_text(r, "password"),
+    salt: row_opt_text(r, "salt"),
     mobile_phone: row_opt_text(r, "mobile_phone"),
     tel: row_opt_text(r, "tel"),
     email: row_opt_text(r, "email"),

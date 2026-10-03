@@ -8,6 +8,11 @@
 /// 全部显式 rule：URL 与码不一致的场景（boot2 /sys/user/locked 双码 OR 那类）就改这里，
 /// 推导只作兜底不依赖。guard 下一轮挂时这些码已是最终形状。
 pub fn user_policy() -> @guard.RoutePolicy {
+  // locked/unLocked 双码 OR：RouteRule 多码默认 AND（叠加注解语义），OR 显式置 perm_mode
+  let locked_rule = @guard.RouteRule::make("/sys/user/locked", ["sys:user:locked", "sys:user:unLocked"])
+  locked_rule.perm_mode = @port.Or
+  let un_locked_rule = @guard.RouteRule::make("/sys/user/unLocked", ["sys:user:locked", "sys:user:unLocked"])
+  un_locked_rule.perm_mode = @port.Or
   @guard.RoutePolicy::new()
     .rule(@guard.RouteRule::make("/sys/user/save", ["sys:user:save"]))
     .rule(@guard.RouteRule::make("/sys/user/remove", ["sys:user:remove"]))
@@ -15,6 +20,14 @@ pub fn user_policy() -> @guard.RoutePolicy {
     .rule(@guard.RouteRule::make("/sys/user/detail", ["sys:user:detail"]))
     .rule(@guard.RouteRule::make("/sys/user/page", ["sys:user:page"]))
     .rule(@guard.RouteRule::make("/sys/user/grantRole", ["sys:user:grantRole"]))
+    // locked/unLocked 双端点共用双码 OR（boot2 SaMode.OR 同构）——URL 与码不一致的样板场景
+    .rule(locked_rule)
+    .rule(un_locked_rule)
+    .rule(@guard.RouteRule::make("/sys/user/resetPassword", ["sys:user:resetPassword"]))
+    .rule(@guard.RouteRule::make("/sys/user/select", ["sys:user:select"]))
+    .rule(@guard.RouteRule::make("/sys/user/onlineUserList", ["sys:user:onlineUserList"]))
+    // 个人中心族（permCode/info/updateInfo/updatePwd/updateAvatar/onlineDevice）不在此列：
+    // main 关掉 by_convention 后，未列端点一律只验登录——boot2 同语义（notes 里写 sys:user:xxx 只是文档）
 }
 
 ///|
@@ -23,6 +36,7 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
   svc : T,
   rbac : R,
   g : @mbguard.Guard[S, P],
+  auth : @app.TokenAuth[S, P],
 ) -> Unit raise {
   // 添加用户
   let save_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
@@ -57,6 +71,286 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
     rbac.grant_user_roles(user_id, @core.get_i64_array(body, "roleIds"))
     @core.ok_empty()
   })
+  // ---- 管理-用户状态族（boot2 locked/unLocked/resetPassword/select 同位）----
+
+  // 锁定（is_locked=1）
+  let locked_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let _ = svc.set_locked(@core.get_ids(@web.json_body(request)), 1)
+    @core.ok_empty()
+  })
+  // 解锁（is_locked=0；与 locked 共用双码 OR）
+  let un_locked_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let _ = svc.set_locked(@core.get_ids(@web.json_body(request)), 0)
+    @core.ok_empty()
+  })
+  // 重置为默认密码（超管跳过，boot2 resetPwd 同语义）
+  let reset_password_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let _ = svc.reset_password(@core.get_ids(@web.json_body(request)))
+    @core.ok_empty()
+  })
+  // 用户下拉选项（label=姓名，value=id 串）
+  let select_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let users = svc.select_options(@core.text_or(@web.json_body(request), "keywords", ""))
+    let arr : Array[Json] = []
+    for u in users {
+      arr.push({ "label": u.real_name, "value": u.id.to_string() })
+    }
+    @core.ok_data(Json::array(arr))
+  })
+
+  // ---- 个人中心族（principal_of 取登录主体；main 已关推导，这些端点只验登录）----
+
+  // 当前权限标识（boot2 permCode = StpUtil.getPermissionList()）
+  let perm_code_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let codes = match @mbguard.principal_of(request) {
+      Some(p) => p.permissions
+      None => []
+    }
+    let arr : Array[Json] = []
+    for c in codes {
+      arr.push(Json::string(c))
+    }
+    @core.ok_data(Json::array(arr))
+  })
+  // 个人信息（用户字段 + roleCodes/roleNames/superAdmin）
+  let info_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let p = match @mbguard.principal_of(request) {
+      Some(p) => p
+      None => raise @core.MldongError::NotFound("会话无主体")
+    }
+    let uid = match @svc.parse_user_id(p.login_id) {
+      Some(id) => id
+      None => raise @core.MldongError::NotFound("登录主体非法: \{p.login_id}")
+    }
+    @core.ok_data(@dto.user_info_json(svc.find_by_id(uid), p.roles, p.super_admin))
+  })
+  // 修改个人信息（只动 realName/nickName/sex；id 取自登录主体，body 里的 id 不信任）
+  let update_info_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let p = match @mbguard.principal_of(request) {
+      Some(p) => p
+      None => raise @core.MldongError::NotFound("会话无主体")
+    }
+    let uid = match @svc.parse_user_id(p.login_id) {
+      Some(id) => id
+      None => raise @core.MldongError::NotFound("登录主体非法: \{p.login_id}")
+    }
+    let req = @dto.parse_info(@web.json_body(request))
+    req.id = uid
+    svc.update_info(req)
+    @core.ok_empty()
+  })
+  // 修改个人密码（验旧密）
+  let update_pwd_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let p = match @mbguard.principal_of(request) {
+      Some(p) => p
+      None => raise @core.MldongError::NotFound("会话无主体")
+    }
+    let uid = match @svc.parse_user_id(p.login_id) {
+      Some(id) => id
+      None => raise @core.MldongError::NotFound("登录主体非法: \{p.login_id}")
+    }
+    let body = @web.json_body(request)
+    svc.update_password(uid, @core.text_or(body, "oldPassword", ""), @core.text_or(body, "newPassword", ""))
+    @core.ok_empty()
+  })
+  // 修改个人头像（avatar 存 URL 串）
+  let update_avatar_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let p = match @mbguard.principal_of(request) {
+      Some(p) => p
+      None => raise @core.MldongError::NotFound("会话无主体")
+    }
+    let uid = match @svc.parse_user_id(p.login_id) {
+      Some(id) => id
+      None => raise @core.MldongError::NotFound("登录主体非法: \{p.login_id}")
+    }
+    svc.update_avatar(uid, @core.text_or(@web.json_body(request), "avatar", ""))
+    let _ = uid
+    @core.ok_empty()
+  })
+
+  // ---- 在线用户族（moon-token list_online 枚举 + DB join 名称；boot2 onlineUserList/onlineDevice 同位）----
+
+  // 枚举全部在线行（翻尽游标；moon-token 单页硬上限 100）
+  let all_online = async fn() -> Array[@app.OnlineRow] raise @port.TokenError {
+    let rows : Array[@app.OnlineRow] = []
+    let mut cursor = ""
+    let mut guard_count = 0
+    while guard_count < 100 {
+      let page = auth.list_online(@port.SessionFilter::all(), cursor, 100)
+      for row in auth.load_online(page) {
+        rows.push(row)
+      }
+      if page.next_cursor.is_empty() {
+        break
+      }
+      cursor = page.next_cursor
+      guard_count = guard_count + 1
+    }
+    rows
+  }
+  // 空 User 占位（会话人已删账号时兜底，防在线页 500）
+  let ghost_user = fn(id : Int64) -> @entity.User {
+    {
+      id, user_name: "", real_name: "", nick_name: None, avatar: None,
+      password: None, salt: None, mobile_phone: None, tel: None, email: None,
+      admin_type: None, sex: None, is_locked: None, dept_id: None, post_id: None,
+      remark: None, create_time: None, create_user: None, update_time: None,
+      update_user: None, is_deleted: None,
+    }
+  }
+  // token 级行装配（超管的 token 只对本人可见，其余见 "-"；boot2 同规则）
+  let token_view = fn(row : @app.OnlineRow, users : Map[String, @entity.User], current_token : String, viewer_id : String) -> @dto.OnlineTokenView {
+    let l = row.listing
+    let uid_str = l.login_id
+    let u = match users.get(uid_str) {
+      Some(u) => u
+      None => ghost_user(match @svc.parse_user_id(uid_str) {
+        Some(n) => n
+        None => 0L
+      })
+    }
+    let super_admin = u.admin_type == Some(1)
+    let ip = match row.session {
+      Some(s) =>
+        match s.extra.get("ip") {
+          Some(v) => v
+          None => ""
+        }
+      None => ""
+    }
+    let ua = match row.session {
+      Some(s) =>
+        match s.extra.get("ua") {
+          Some(v) => v
+          None => ""
+        }
+      None => ""
+    }
+    {
+      token_value: if super_admin && uid_str != viewer_id { "-" } else { l.token },
+      device: l.device,
+      is_current: l.token == current_token,
+      login_time: l.login_time,
+      expire_at: l.expire_at,
+      login_ip: ip,
+      login_browser: ua,
+      super_admin,
+    }
+  }
+  // 在线用户列表（按登录人分组；keywords 过滤 = 用户名/姓名子串或数字 id 精确，boot2 同口径——
+  // 过滤在页内做：moon-token 只开放精确字段过滤，全量模糊扫是鉴权库明确不给的口子）
+  let online_user_list_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let keywords = @core.text_or(@web.json_body(request), "keywords", "")
+    let viewer = match @mbguard.principal_of(request) {
+      Some(p) => p
+      None => raise @core.MldongError::NotFound("会话无主体")
+    }
+    let current_token = @web.token_of(request)
+    let rows = all_online() catch {
+      e => raise @core.MldongError::Internal(e.message())
+    }
+    // 登录人集合 → 一次批量取用户
+    let ids : Array[Int64] = []
+    let seen : Map[String, Bool] = Map([], capacity=0)
+    for row in rows {
+      let lid = row.listing.login_id
+      if seen.get(lid) is None {
+        let _ = seen.set(lid, true)
+        match @svc.parse_user_id(lid) {
+          Some(n) => ids.push(n)
+          None => ()
+        }
+      }
+    }
+    let users_map : Map[String, @entity.User] = Map([], capacity=0)
+    for u in svc.find_by_ids(ids) {
+      let _ = users_map.set(u.id.to_string(), u)
+    }
+    // 分组（保持最新在前的枚举序）
+    let order : Array[String] = []
+    let grouped : Map[String, Array[@app.OnlineRow]] = Map([], capacity=0)
+    for row in rows {
+      let lid = row.listing.login_id
+      match grouped.get(lid) {
+        Some(arr) => arr.push(row)
+        None => {
+          let _ = grouped.set(lid, [row])
+          order.push(lid)
+        }
+      }
+    }
+    let out : Array[Json] = []
+    for lid in order {
+      let tokens_rows = match grouped.get(lid) {
+        Some(arr) => arr
+        None => []
+      }
+      if tokens_rows.is_empty() {
+        continue
+      }
+      let u = match users_map.get(lid) {
+        Some(u) => u
+        // 账号已删的会话不展示（boot2 取不到 LoginUser 也是 skip 语义）
+        None => continue
+      }
+      if !keywords.is_empty() {
+        let numeric_hit = match @svc.parse_user_id(keywords) {
+          Some(n) => n == u.id
+          None => false
+        }
+        if !(u.user_name.contains(keywords) || u.real_name.contains(keywords) || numeric_hit) {
+          continue
+        }
+      }
+      let tokens : Array[@dto.OnlineTokenView] = []
+      for row in tokens_rows {
+        tokens.push(token_view(row, users_map, current_token, lid))
+      }
+      let first = tokens_rows[0]
+      let timeout = (first.listing.expire_at - @port.now_ms()) / 1000L
+      out.push(@dto.online_user_json({
+        id: lid,
+        user_name: u.user_name,
+        real_name: u.real_name,
+        is_current: lid == viewer.login_id,
+        super_admin: u.admin_type == Some(1),
+        login_time: first.listing.login_time,
+        expire_at: first.listing.expire_at,
+        timeout: if timeout > 0L { timeout } else { 0L },
+        tokens,
+      }))
+    }
+    @core.ok_data(Json::array(out))
+  })
+  // 当前登录人的在线设备（平铺 token 级行）
+  let online_device_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let viewer = match @mbguard.principal_of(request) {
+      Some(p) => p
+      None => raise @core.MldongError::NotFound("会话无主体")
+    }
+    let current_token = @web.token_of(request)
+    let page = auth.list_online(@port.SessionFilter::make(viewer.login_id, ""), "", 100) catch {
+      e => raise @core.MldongError::Internal(e.message())
+    }
+    let rows = auth.load_online(page) catch {
+      e => raise @core.MldongError::Internal(e.message())
+    }
+    let ids : Array[Int64] = []
+    match @svc.parse_user_id(viewer.login_id) {
+      Some(n) => ids.push(n)
+      None => ()
+    }
+    let users_map : Map[String, @entity.User] = Map([], capacity=0)
+    for u in svc.find_by_ids(ids) {
+      let _ = users_map.set(u.id.to_string(), u)
+    }
+    let out : Array[Json] = []
+    for row in rows {
+      out.push(@dto.online_token_json(token_view(row, users_map, current_token, viewer.login_id)))
+    }
+    @core.ok_data(Json::array(out))
+  })
+
   // 分页查询用户列表（关联 dept/post + m_ 动态条件）
   let page_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
     let req = @dto.parse_page(@web.json_body(request))
@@ -83,6 +377,39 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
     e => raise e
   }
   g.post(ctx, "/sys/user/grantRole", grant_role_handler) catch {
+    e => raise e
+  }
+  g.post(ctx, "/sys/user/locked", locked_handler) catch {
+    e => raise e
+  }
+  g.post(ctx, "/sys/user/unLocked", un_locked_handler) catch {
+    e => raise e
+  }
+  g.post(ctx, "/sys/user/resetPassword", reset_password_handler) catch {
+    e => raise e
+  }
+  g.post(ctx, "/sys/user/select", select_handler) catch {
+    e => raise e
+  }
+  g.post(ctx, "/sys/user/permCode", perm_code_handler) catch {
+    e => raise e
+  }
+  g.post(ctx, "/sys/user/info", info_handler) catch {
+    e => raise e
+  }
+  g.post(ctx, "/sys/user/updateInfo", update_info_handler) catch {
+    e => raise e
+  }
+  g.post(ctx, "/sys/user/updatePwd", update_pwd_handler) catch {
+    e => raise e
+  }
+  g.post(ctx, "/sys/user/updateAvatar", update_avatar_handler) catch {
+    e => raise e
+  }
+  g.post(ctx, "/sys/user/onlineUserList", online_user_list_handler) catch {
+    e => raise e
+  }
+  g.post(ctx, "/sys/user/onlineDevice", online_device_handler) catch {
     e => raise e
   }
 }

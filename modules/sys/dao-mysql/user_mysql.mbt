@@ -42,10 +42,91 @@ pub impl @dao.UserDao for UserMysqlDao with fn find_by_user_name(self, user_name
 }
 
 ///|
+///|
+pub impl @dao.UserDao for UserMysqlDao with fn find_by_ids(self, ids) {
+  let vals : Array[@core.SqlValue] = []
+  for id in ids {
+    vals.push(L(id))
+  }
+  let (sql, params) = @core.build_select(
+    "sys_user",
+    self.base.table.cols,
+    self.base.base_where().in_("id", vals),
+  )
+  let out : Array[@entity.User] = []
+  for r in self.base.query(sql, params) {
+    out.push((self.base.table.from_row)(r))
+  }
+  out
+}
+
+///|
+pub impl @dao.UserDao for UserMysqlDao with fn set_locked(self, ids, locked) {
+  let vals : Array[@core.SqlValue] = []
+  for id in ids {
+    vals.push(L(id))
+  }
+  let w = @core.where_().in_("id", vals)
+  let _ = w.eq("is_deleted", @core.I(0))
+  let (sql, params) = @core.build_update(
+    "sys_user",
+    [
+      @core.SetPair::{ col: "is_locked", val: @core.I(locked) },
+      @core.SetPair::{ col: "update_time", val: S(@core.now_str()) },
+    ],
+    w,
+  )
+  let _ = self.base.exec(sql, params)
+}
+
+///|
+pub impl @dao.UserDao for UserMysqlDao with fn update_password(
+  self,
+  id,
+  password,
+  salt,
+) {
+  let (sql, params) = @core.build_update(
+    "sys_user",
+    [
+      @core.SetPair::{ col: "password", val: S(password) },
+      @core.SetPair::{ col: "salt", val: S(salt) },
+      @core.SetPair::{ col: "update_time", val: S(@core.now_str()) },
+    ],
+    @core.where_().eq("id", L(id)),
+  )
+  let _ = self.base.exec(sql, params)
+}
+
+///|
+pub impl @dao.UserDao for UserMysqlDao with fn select_options(self, keywords) {
+  let w = self.base.base_where()
+  if !keywords.is_empty() {
+    let pat = "%\{keywords}%"
+    let _ = w.raw("(user_name like ? or real_name like ?)", [S(pat), S(pat)])
+  }
+  let (sql, params) = @core.build_select(
+    "sys_user",
+    ["id", "user_name", "real_name"],
+    w,
+    orders=[("create_time", true)],
+    limit=50,
+  )
+  let out : Array[@entity.User] = []
+  for r in self.base.query(sql, params) {
+    out.push((self.base.table.from_row)(r))
+  }
+  out
+}
+
 pub extend UserMysqlDao with @dao.UserDao::{
   remove_by_ids,
   find_by_user_name,
   find_by_id,
   insert,
   update,
+  find_by_ids,
+  set_locked,
+  update_password,
+  select_options,
 }

@@ -18,7 +18,7 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] module(
     }
     let user_dao = @mysql.UserMysqlDao::make(config)
     let user_svc = @svc.UserServiceImpl::{ dao: user_dao }
-    @ctrl.register(ctx, user_svc, rbac_svc, g) catch {
+    @ctrl.register(ctx, user_svc, rbac_svc, g, auth) catch {
       e => abort("sys 模块 user 路由注册失败: \{e}")
     }
     let role_dao = @mysql.RoleMysqlDao::make(config)
