@@ -28,7 +28,13 @@ pub fn[S : @port.TokenStore, P, R : @svc.RbacService] register_login(
       fail_auth(responder, @core.MldongError::Business("用户已锁定"))
       return
     }
-    let result = auth.login(ua.id.to_string(), device="pc") catch {
+    // appCode：登录头（13 栈 APP_CODE_KEY="appCode"），缺省 platform；
+    // 编进 login_id（{id}@{appCode}）——同用户不同 app 独立会话族（boot2 LoginUser 同语义）
+    let app_code = match request.headers.get("appCode") {
+      Some(v) => if v.is_empty() { "platform" } else { v.to_owned() }
+      None => "platform"
+    }
+    let result = auth.login("\{ua.id}@\{app_code}", device="pc") catch {
       err => {
         fail_auth(responder, @core.MldongError::Internal(err.message()))
         return

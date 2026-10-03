@@ -55,9 +55,9 @@ pub impl[D : @dao.RbacDao] @port.PermissionProvider for RbacServiceImpl[D] with 
   _device,
 ) {
   match parse_login_id(login_id) {
-    Some(id) =>
+    Some(lid) =>
       // dao 的 MldongError 在 moon-token 端口边界转 Store（供数方故障语义）
-      self.dao.find_perms_by_user(id) catch {
+      self.dao.find_perms_by_user(lid.user_id, lid.app_code) catch {
         e => raise @port.Store(e.message())
       }
     None => []
@@ -71,8 +71,8 @@ pub impl[D : @dao.RbacDao] @port.PermissionProvider for RbacServiceImpl[D] with 
   _device,
 ) {
   match parse_login_id(login_id) {
-    Some(id) =>
-      self.dao.find_role_codes(id) catch {
+    Some(lid) =>
+      self.dao.find_role_codes(lid.user_id, lid.app_code) catch {
         e => raise @port.Store(e.message())
       }
     None => []
@@ -86,8 +86,9 @@ pub impl[D : @dao.RbacDao] @port.PermissionProvider for RbacServiceImpl[D] with 
   _device,
 ) {
   match parse_login_id(login_id) {
-    Some(id) => {
-      let ua = self.dao.find_user_auth_by_id(id) catch {
+    Some(lid) => {
+      // 超管判定只看用户属性（admin_type），与 appCode 无关（boot2 同）
+      let ua = self.dao.find_user_auth_by_id(lid.user_id) catch {
         e => raise @port.Store(e.message())
       }
       match ua {
@@ -107,13 +108,32 @@ pub extend RbacServiceImpl with RbacService::{
 }
 
 ///|
-/// login_id（user.id 的字符串形态）→ Int64；非数字视为无
-fn parse_login_id(login_id : String) -> Int64? {
-  if login_id.is_empty() {
+/// login_id 复合形态 "{user_id}@{app_code}"（appCode 是会话级属性：登录头定，
+/// 缺省 platform；boot2 LoginUser.appCode 同语义——同用户不同 app 即独立会话族）。
+/// provider 签名只有 login_id/device，appCode 编进 login_id 是不改 moon-token 的唯一干净路。
+/// 缺 "@" 的旧形态按 platform 兼容。
+struct LoginId {
+  user_id : Int64
+  app_code : String
+}
+
+///|
+const DEFAULT_APP_CODE : String = "platform"
+
+///|
+fn parse_login_id(login_id : String) -> LoginId? {
+  let parts = login_id.split("@").to_array()
+  let id_part = parts[0].to_owned()
+  let app = if parts.length() >= 2 {
+    parts[1].to_owned()
+  } else {
+    DEFAULT_APP_CODE
+  }
+  if id_part.is_empty() {
     return None
   }
   try {
-    Some(@string.parse_int64(login_id))
+    Some({ user_id: @string.parse_int64(id_part), app_code: app })
   } catch {
     _ => None
   }

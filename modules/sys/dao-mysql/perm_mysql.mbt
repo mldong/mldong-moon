@@ -45,12 +45,12 @@ pub impl @dao.RbacDao for RbacDaoMysql with fn find_user_auth_by_id(self, id) {
 }
 
 ///|
-pub impl @dao.RbacDao for RbacDaoMysql with fn find_role_codes(self, user_id) {
+pub impl @dao.RbacDao for RbacDaoMysql with fn find_role_codes(self, user_id, app_code) {
   let conn = open_conn(self.config)
   let rows = q(
     conn,
-    "SELECT r.code FROM sys_role r JOIN sys_user_role ur ON ur.role_id = r.id WHERE ur.user_id = ? AND r.is_deleted = 0",
-    [@moondb.Int64(user_id)],
+    "SELECT r.code FROM sys_role r JOIN sys_user_role ur ON ur.role_id = r.id WHERE ur.user_id = ? AND r.app_code = ? AND r.is_deleted = 0",
+    [@moondb.Int64(user_id), @moondb.Text(app_code)],
   )
   conn.close()
   let out : Array[String] = []
@@ -61,12 +61,12 @@ pub impl @dao.RbacDao for RbacDaoMysql with fn find_role_codes(self, user_id) {
 }
 
 ///|
-pub impl @dao.RbacDao for RbacDaoMysql with fn find_perms_by_user(self, user_id) {
+pub impl @dao.RbacDao for RbacDaoMysql with fn find_perms_by_user(self, user_id, app_code) {
   let conn = open_conn(self.config)
   let rows = q(
     conn,
-    "SELECT DISTINCT m.code FROM sys_menu m JOIN sys_role_menu rm ON rm.menu_id = m.id JOIN sys_user_role ur ON ur.role_id = rm.role_id WHERE ur.user_id = ? AND m.is_deleted = 0",
-    [@moondb.Int64(user_id)],
+    "SELECT DISTINCT m.code FROM sys_menu m JOIN sys_role_menu rm ON rm.menu_id = m.id JOIN sys_user_role ur ON ur.role_id = rm.role_id JOIN sys_role r ON r.id = ur.role_id WHERE ur.user_id = ? AND r.app_code = ? AND m.app_code = ? AND m.is_deleted = 0",
+    [@moondb.Int64(user_id), @moondb.Text(app_code), @moondb.Text(app_code)],
   )
   conn.close()
   let out : Array[String] = []
