@@ -141,7 +141,7 @@ async fn[T] BaseDao::list(self : BaseDao[T], w : @core.Wrapper) -> Array[T] rais
     self.table.name,
     self.table.cols,
     full,
-    order_col=self.order_col_of(),
+    orders=[(self.order_col_of(), true)],
   )
   let rows = self.query(sql, params)
   let out : Array[T] = []
@@ -185,7 +185,7 @@ async fn[T] BaseDao::page(
       self.table.name,
       self.table.cols,
       full,
-      order_col=self.order_col_of(),
+      orders=[(self.order_col_of(), true)],
       limit=page_size,
       offset=(page_num - 1) * page_size,
     )

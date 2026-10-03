@@ -24,3 +24,13 @@ pub(all) struct User {
   mut update_user : Int64?
   mut is_deleted : Int?
 }
+
+///|
+/// 关联查询行：user + dept/post 名称（对齐 boot2 selectCustom 的 UserVO 投影）
+pub(all) struct UserPageRow {
+  user : User
+  dept_name : String?
+  dept_code : String?
+  post_name : String?
+  post_code : String?
+}

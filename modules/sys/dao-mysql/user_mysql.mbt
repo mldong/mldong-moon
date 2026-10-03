@@ -42,13 +42,7 @@ pub impl @dao.UserDao for UserMysqlDao with fn find_by_user_name(self, user_name
 }
 
 ///|
-pub impl @dao.UserDao for UserMysqlDao with fn page(self, w, page_num, page_size) {
-  self.base.page(w, page_num, page_size)
-}
-
-///|
 pub extend UserMysqlDao with @dao.UserDao::{
-  page,
   remove_by_ids,
   find_by_user_name,
   find_by_id,

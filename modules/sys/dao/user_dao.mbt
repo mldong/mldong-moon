@@ -10,6 +10,6 @@ pub(open) trait UserDao {
   async fn find_by_id(Self, Int64) -> @entity.User? raise @core.MldongError
   /// 用户名查重（未删除范围内）
   async fn find_by_user_name(Self, String) -> @entity.User? raise @core.MldongError
-  /// 条件分页：Wrapper 由 service 组装（业务说了算），返回 (总数, 当页行)
-  async fn page(Self, @core.Wrapper, Int, Int) -> (Int, Array[@entity.User]) raise @core.MldongError
+  /// 关联分页（user + dept/post 名称）：Wrapper 由 service 组装（业务说了算），返回 (总数, 当页行)
+  async fn page(Self, @core.Wrapper, Int, Int) -> (Int, Array[@entity.UserPageRow]) raise @core.MldongError
 }

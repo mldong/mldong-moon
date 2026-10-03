@@ -89,8 +89,8 @@ pub fn[T : @svc.UserService] register(ctx : @mb.ModuleContext, svc : T) -> Unit 
       let req = @dto.parse_page(json_body(request))
       let (total, rows) = svc.page(req)
       let arr : Array[Json] = []
-      for u in rows {
-        arr.push(@dto.user_json(u))
+      for row in rows {
+        arr.push(@dto.page_row_json(row))
       }
       @core.ok_page(req.page_num, req.page_size, total, arr)
     },

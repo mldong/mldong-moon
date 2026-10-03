@@ -18,7 +18,7 @@ pub(open) trait UserService {
   async fn update(Self, @dto.UserSaveReq) -> Unit raise @core.MldongError
   async fn remove_by_ids(Self, Array[Int64]) -> Unit raise @core.MldongError
   async fn find_by_id(Self, Int64) -> @entity.User raise @core.MldongError
-  async fn page(Self, @dto.UserPageReq) -> (Int, Array[@entity.User]) raise @core.MldongError
+  async fn page(Self, @dto.UserPageReq) -> (Int, Array[@entity.UserPageRow]) raise @core.MldongError
 }
 
 ///|
@@ -48,7 +48,9 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn save(self,
     mobile_phone: req.mobile_phone,
     tel: req.tel,
     email: req.email,
-    admin_type: None,
+    // 业务默认：普通管理员（boot2 AdminTypeEnum.COMMON_ADMIN）——分页"超管不可见"按 admin_type <> 1
+    // 过滤，落 NULL 会因三值逻辑漏行，故 save 必给默认
+    admin_type: Some(2),
     sex: req.sex,
     is_locked: Some(0),
     dept_id: req.dept_id,
@@ -128,13 +130,22 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn find_by_id
 
 ///|
 pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn page(self, req) {
-  // 业务决定过滤怎么拼（Wrapper 是 core 的零 ORM 条件组）；m_ 通用件后续另做
+  // 动态条件 service 拼（对齐 boot2 page 语义：列带表别名前缀；Wrapper 是 core 零 ORM 条件组）
   let w = @core.where_()
+  let _ = w.eq("t.is_deleted", @core.I(0))
+  // 超级管理员不可见（boot2：ne t.admin_type, SUPER_ADMIN(1)）
+  let _ = w.ne("t.admin_type", @core.I(1))
   if req.user_name is Some(s) {
-    let _ = w.like("user_name", s)
+    let _ = w.like("t.user_name", s)
   }
   if req.real_name is Some(s) {
-    let _ = w.like("real_name", s)
+    let _ = w.like("t.real_name", s)
+  }
+  // 关键字：姓名/用户名双列 OR（boot2 keywords 的 apply 片段同款）
+  if req.keywords is Some(kw) {
+    if !kw.is_empty() {
+      let _ = w.raw("(t.real_name like ? or t.user_name like ?)", [@core.S("%\{kw}%"), @core.S("%\{kw}%")])
+    }
   }
   self.dao.page(w, req.page_num, req.page_size)
 }

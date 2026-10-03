@@ -24,6 +24,8 @@ pub(all) enum Cond {
   Lt(String, SqlValue)
   Le(String, SqlValue)
   In(String, Array[SqlValue])
+  /// 原生片段 + 参数（OR 组合等复杂条件；片段里只写 ? 占位，值进参数）
+  Raw(String, Array[SqlValue])
 }
 
 ///|
@@ -80,6 +82,13 @@ pub fn Wrapper::le(self : Wrapper, col : String, v : SqlValue) -> Wrapper {
 }
 
 ///|
+/// 原生条件片段（如 keywords 双列 OR："(t.real_name like ? or t.user_name like ?)"）
+pub fn Wrapper::raw(self : Wrapper, sql : String, params : Array[SqlValue]) -> Wrapper {
+  self.conds.push(Raw(sql, params))
+  self
+}
+
+///|
 pub fn Wrapper::in_(self : Wrapper, col : String, vs : Array[SqlValue]) -> Wrapper {
   self.conds.push(In(col, vs))
   self
@@ -129,6 +138,12 @@ pub fn Wrapper::build(self : Wrapper) -> (String, Array[SqlValue]) {
         parts.push("\{col} <= ?")
         params.push(v)
       }
+      Raw(frag, rparams) => {
+        parts.push(frag)
+        for v in rparams {
+          params.push(v)
+        }
+      }
       In(col, vs) => {
         if vs.is_empty() {
           // IN () 非法：空集合语义为"条件恒假"（对齐 13 栈"空不越权放行"）
@@ -159,21 +174,51 @@ pub(all) struct SetPair {
 }
 
 ///|
-/// SELECT 构建：cols 为空 = SELECT *；order_col 为空不排序；limit/offset 为 None 不分页
+/// JOIN 子句：table 直接写"表 别名"（如 "sys_dept d"），on 手写（别名前缀透传）
+pub(all) enum JoinKind {
+  Left
+  Inner
+}
+
+///|
+pub(all) struct Join {
+  kind : JoinKind
+  /// "sys_dept d" 形式（别名一并写）
+  table : String
+  /// "t.dept_id = d.id"
+  on : String
+}
+
+///|
+/// SELECT 构建：cols 为空 = SELECT *（cols 支持别名表达式 "d.name as dept_name" 透传）；
+/// orders = [(列, 是否倒序)] 多列排序；limit>0 生成分页
 pub fn build_select(
   table : String,
   cols : Array[String],
   w : Wrapper,
-  order_col? : String = "",
-  order_desc? : Bool = true,
+  joins? : Array[Join] = [],
+  orders? : Array[(String, Bool)] = [],
   limit? : Int = 0,
   offset? : Int = 0,
 ) -> (String, Array[SqlValue]) {
   let col_sql = if cols.is_empty() { "*" } else { cols.join(", ") }
   let (where_sql, params) = w.build()
-  let mut sql = "SELECT \{col_sql} FROM \{table} \{where_sql}"
-  if order_col != "" {
-    sql = sql + " ORDER BY \{order_col} \{if order_desc { "DESC" } else { "ASC" }}"
+  let mut sql = "SELECT \{col_sql} FROM \{table}"
+  for j in joins {
+    let kw = match j.kind {
+      Left => "LEFT JOIN"
+      Inner => "INNER JOIN"
+    }
+    sql = sql + " \{kw} \{j.table} ON \{j.on}"
+  }
+  sql = sql + " \{where_sql}"
+  if !orders.is_empty() {
+    let parts : Array[String] = []
+    for o in orders {
+      let (col, desc) = o
+      parts.push("\{col} \{if desc { "DESC" } else { "ASC" }}")
+    }
+    sql = sql + " ORDER BY \{parts.join(", ")}"
   }
   if limit > 0 {
     sql = sql + " LIMIT ? OFFSET ?"

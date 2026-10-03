@@ -6,7 +6,7 @@ let user_table : TableCodec[@entity.User] = TableCodec::{
   name: "sys_user",
   cols: [
     "id", "user_name", "real_name", "nick_name", "mobile_phone", "tel", "email", "sex",
-    "is_locked", "dept_id", "remark", "create_time", "update_time", "is_deleted",
+    "admin_type", "is_locked", "dept_id", "remark", "create_time", "update_time", "is_deleted",
   ],
   insert_cols: [
     { name: "id", get: fn(u) { L(u.id) } },
@@ -17,6 +17,7 @@ let user_table : TableCodec[@entity.User] = TableCodec::{
     { name: "tel", get: fn(u) { opt_s(u.tel) } },
     { name: "email", get: fn(u) { opt_s(u.email) } },
     { name: "sex", get: fn(u) { opt_i(u.sex) } },
+    { name: "admin_type", get: fn(u) { opt_i(u.admin_type) } },
     { name: "is_locked", get: fn(u) { opt_i(u.is_locked) } },
     { name: "dept_id", get: fn(u) { opt_l(u.dept_id) } },
     { name: "remark", get: fn(u) { opt_s(u.remark) } },
@@ -78,7 +79,7 @@ fn row_user(r : @moondb.Row) -> @entity.User {
     mobile_phone: row_opt_text(r, "mobile_phone"),
     tel: row_opt_text(r, "tel"),
     email: row_opt_text(r, "email"),
-    admin_type: None,
+    admin_type: row_opt_int(r, "admin_type"),
     sex: row_opt_int(r, "sex"),
     is_locked: row_opt_int(r, "is_locked"),
     dept_id: row_opt_i64(r, "dept_id"),

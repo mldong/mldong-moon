@@ -71,6 +71,8 @@ pub(all) struct UserPageReq {
   page_size : Int
   user_name : String?
   real_name : String?
+  /// 关键字：real_name / user_name 双列 OR 模糊（对齐 boot2 keywords）
+  keywords : String?
 }
 
 ///|
@@ -85,6 +87,7 @@ pub fn parse_page(body : Json) -> UserPageReq raise @core.MldongError {
     page_size,
     user_name: @core.get_text(body, "userName"),
     real_name: @core.get_text(body, "realName"),
+    keywords: @core.get_text(body, "keywords"),
   }
 }
 
@@ -100,12 +103,39 @@ pub fn user_json(u : @entity.User) -> Json {
     "tel": jstr(u.tel),
     "email": jstr(u.email),
     "sex": jint(u.sex),
+    "adminType": jint(u.admin_type),
     "isLocked": jint(u.is_locked),
     "deptId": jsnow(u.dept_id),
     "remark": jstr(u.remark),
     "createTime": jstr(u.create_time),
     "updateTime": jstr(u.update_time),
     "isDeleted": jint(u.is_deleted),
+  }
+}
+
+///|
+/// 关联行出参：user 全字段 + dept/post 名称编码（对齐 boot2 UserVO 形状）
+pub fn page_row_json(row : @entity.UserPageRow) -> Json {
+  let u = row.user
+  {
+    "id": u.id.to_string(),
+    "userName": u.user_name,
+    "realName": u.real_name,
+    "nickName": jstr(u.nick_name),
+    "mobilePhone": jstr(u.mobile_phone),
+    "tel": jstr(u.tel),
+    "email": jstr(u.email),
+    "sex": jint(u.sex),
+    "adminType": jint(u.admin_type),
+    "isLocked": jint(u.is_locked),
+    "deptId": jsnow(u.dept_id),
+    "deptName": jstr(row.dept_name),
+    "deptCode": jstr(row.dept_code),
+    "postName": jstr(row.post_name),
+    "postCode": jstr(row.post_code),
+    "remark": jstr(u.remark),
+    "createTime": jstr(u.create_time),
+    "updateTime": jstr(u.update_time),
   }
 }
 
