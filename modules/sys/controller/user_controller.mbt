@@ -14,12 +14,14 @@ pub fn user_policy() -> @guard.RoutePolicy {
     .rule(@guard.RouteRule::make("/sys/user/update", ["sys:user:update"]))
     .rule(@guard.RouteRule::make("/sys/user/detail", ["sys:user:detail"]))
     .rule(@guard.RouteRule::make("/sys/user/page", ["sys:user:page"]))
+    .rule(@guard.RouteRule::make("/sys/user/grantRole", ["sys:user:grantRole"]))
 }
 
 ///|
-pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService] register(
+pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService, R : @svc.RbacService] register(
   ctx : @mb.ModuleContext,
   svc : T,
+  rbac : R,
   g : @mbguard.Guard[S, P],
 ) -> Unit raise {
   // 添加用户
@@ -45,6 +47,16 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService]
     }
     @core.ok_data(@dto.user_json(svc.find_by_id(id)))
   })
+  // 用户授权角色（user_role 全量替换）
+  let grant_role_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let body = @web.json_body(request)
+    let user_id = @core.get_i64(body, "userId").unwrap_or(0L)
+    if user_id <= 0L {
+      raise @core.MldongError::InvalidInput("用户ID不能为空")
+    }
+    rbac.grant_user_roles(user_id, @core.get_i64_array(body, "roleIds"))
+    @core.ok_empty()
+  })
   // 分页查询用户列表（关联 dept/post + m_ 动态条件）
   let page_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
     let req = @dto.parse_page(@web.json_body(request))
@@ -68,6 +80,9 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService]
     e => raise e
   }
   g.post(ctx, "/sys/user/page", page_handler) catch {
+    e => raise e
+  }
+  g.post(ctx, "/sys/user/grantRole", grant_role_handler) catch {
     e => raise e
   }
 }

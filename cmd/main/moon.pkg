@@ -7,7 +7,6 @@ import {
   "mldong/moon-token/guard" @guard,
   "mldong/moon-token/style" @style,
   "mldong/moon-token-store/memory" @mem,
-  "mldong/moon-token-store/port" @port,
   "mldong/moon-token-moonback/guard" @mbguard,
   "mldong/moon-sys" @sys,
   "moonbitlang/moonback" @mb,

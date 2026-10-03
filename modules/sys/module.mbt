@@ -5,11 +5,20 @@
 // 返回 moonback Module（ctx.use_ 挂载，或直接在 root 闭包内调用）。
 
 ///|
-pub fn[S : @port.TokenStore, P : @port.PermissionProvider] module(config : @core.MysqlConfig, g : @mbguard.Guard[S, P]) -> @mb.Module {
+pub fn[S : @port.TokenStore, P : @port.PermissionProvider] module(
+  config : @core.MysqlConfig,
+  g : @mbguard.Guard[S, P],
+  auth : @app.TokenAuth[S, P],
+) -> @mb.Module {
   @mb.Module(ctx => {
+    let rbac_dao = @mysql.RbacDaoMysql::make(config)
+    let rbac_svc = @svc.RbacServiceImpl::{ dao: rbac_dao }
+    @ctrl.register_login(ctx, auth, rbac_svc) catch {
+      _ => abort("sys 模块登录路由注册失败（路由冲突?）")
+    }
     let user_dao = @mysql.UserMysqlDao::make(config)
     let user_svc = @svc.UserServiceImpl::{ dao: user_dao }
-    @ctrl.register(ctx, user_svc, g) catch {
+    @ctrl.register(ctx, user_svc, rbac_svc, g) catch {
       e => abort("sys 模块 user 路由注册失败: \{e}")
     }
     let role_dao = @mysql.RoleMysqlDao::make(config)
@@ -18,6 +27,12 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] module(config : @core
       e => abort("sys 模块 role 路由注册失败: \{e}")
     }
   })
+}
+
+///|
+/// RBAC 供数方构造（main 鉴权装配用：PermissionProvider 真实现，码链走库）
+pub fn rbac_provider(config : @core.MysqlConfig) -> @svc.RbacServiceImpl[@mysql.RbacDaoMysql] {
+  { dao: @mysql.RbacDaoMysql::make(config) }
 }
 
 ///|

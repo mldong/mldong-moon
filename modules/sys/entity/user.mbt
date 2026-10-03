@@ -34,3 +34,12 @@ pub(all) struct UserPageRow {
   post_name : String?
   post_code : String?
 }
+
+///|
+/// 登录鉴权用轻量视图：login_id 换算 + 超管判定 + 锁定检查（不拖全量实体）
+pub(all) struct UserAuth {
+  id : Int64
+  user_name : String
+  admin_type : Int?
+  is_locked : Int?
+}
