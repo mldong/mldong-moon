@@ -65,7 +65,15 @@ mldong-moon/
 
 ## 快速启动
 
-前置：[MoonBit 工具链](https://docs.moonbitlang.com)（moon + moonrun），MySQL 5.7+/8.0，库名 `mldong-moon`（表结构可参考 mldong-boot2 的 `doc/sql/mldong-plus1.0.sql`，`sys_user` 一张表即可跑通）。
+前置：[MoonBit 工具链](https://docs.moonbitlang.com)（moon + moonrun），MySQL 5.7+/8.0。
+
+初始化数据库（一条命令，内置建库 + 全表 + 种子数据，已修复 boot2 原版 4+1 张表的 INSERT 列数失配）：
+
+```bash
+mysql -u root -p < doc/sql/mysql-schema-all.sql
+```
+
+启动：
 
 ```bash
 export MLDONG_DB_HOST=127.0.0.1 MLDONG_DB_PORT=3306
