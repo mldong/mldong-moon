@@ -31,7 +31,7 @@ pub(all) struct TableCodec[T] {
 
 ///|
 pub struct BaseDao[T] {
-  config : MysqlConfig
+  config : @core.MysqlConfig
   table : TableCodec[T]
 }
 
@@ -47,7 +47,7 @@ fn[T] BaseDao::base_where(self : BaseDao[T]) -> @core.Wrapper {
 
 ///|
 async fn[T] BaseDao::exec(self : BaseDao[T], sql : String, params : Array[@core.SqlValue]) -> @moondb.ExecResult raise @core.MldongError {
-  let conn = self.config.open_conn()
+  let conn = open_conn(self.config)
   let r = x(conn, sql, to_db_values(params))
   conn.close()
   r
@@ -55,7 +55,7 @@ async fn[T] BaseDao::exec(self : BaseDao[T], sql : String, params : Array[@core.
 
 ///|
 async fn[T] BaseDao::query(self : BaseDao[T], sql : String, params : Array[@core.SqlValue]) -> Array[@moondb.Row] raise @core.MldongError {
-  let conn = self.config.open_conn()
+  let conn = open_conn(self.config)
   let rows = q(conn, sql, to_db_values(params))
   conn.close()
   rows

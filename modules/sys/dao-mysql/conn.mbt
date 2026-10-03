@@ -2,38 +2,10 @@
 // autocommit；凭据只走 MLDONG_DB_* env，默认值不含密码）
 
 ///|
-pub(all) struct MysqlConfig {
-  host : String
-  port : Int
-  user : String
-  password : String
-  database : String
-}
-
-///|
-pub fn MysqlConfig::from_env() -> MysqlConfig {
-  let port = match @env.get_env_var("MLDONG_DB_PORT") {
-    Some(s) =>
-      try {
-        @string.parse_int(s)
-      } catch {
-        _ => 3306
-      }
-    None => 3306
-  }
-  {
-    host: @env.get_env_var("MLDONG_DB_HOST").unwrap_or("127.0.0.1"),
-    port,
-    user: @env.get_env_var("MLDONG_DB_USER").unwrap_or("root"),
-    password: @env.get_env_var("MLDONG_DB_PWD").unwrap_or(""),
-    database: @env.get_env_var("MLDONG_DB_NAME").unwrap_or("mldong-moon"),
-  }
-}
-
-///|
-async fn MysqlConfig::open_conn(self : MysqlConfig) -> @client.MysqlConn raise @core.MldongError {
+/// 建立连接（配置结构在 core；连接动作依赖 moonmysql 驱动，只进本层）
+async fn open_conn(config : @core.MysqlConfig) -> @client.MysqlConn raise @core.MldongError {
   try {
-    @client.MysqlConn::connect(self.host, self.port, self.user, self.password, self.database)
+    @client.MysqlConn::connect(config.host, config.port, config.user, config.password, config.database)
   } catch {
     e => raise @core.MldongError::Internal("mysql connect: \{e}")
   }

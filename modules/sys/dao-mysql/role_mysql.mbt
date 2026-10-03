@@ -6,7 +6,7 @@ pub(all) struct RoleMysqlDao {
 }
 
 ///|
-pub fn RoleMysqlDao::make(config : MysqlConfig) -> RoleMysqlDao {
+pub fn RoleMysqlDao::make(config : @core.MysqlConfig) -> RoleMysqlDao {
   { base: { config, table: role_table } }
 }
 

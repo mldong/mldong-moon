@@ -6,7 +6,6 @@ import {
   "mldong/moon-sys/dao" @dao,
   "moonbitstack/moondb" @moondb,
   "moonbitstack/moonmysql/client" @client,
-  "moonbitlang/core/env" @env,
   "moonbitlang/core/string" @string,
   "moonbitlang/core/encoding/utf8" @utf8,
 }

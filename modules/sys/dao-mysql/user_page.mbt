@@ -31,7 +31,7 @@ fn row_page(r : @moondb.Row) -> @entity.UserPageRow {
 ///|
 pub impl @dao.UserDao for UserMysqlDao with fn page(self, w, page_num, page_size) {
   let joins = user_page_joins()
-  let conn = self.base.config.open_conn()
+  let conn = open_conn(self.base.config)
   // 总数（join 保留：动态条件可能引用 d./p. 列）
   let (where_sql, params) = w.build()
   let count_rows = q(

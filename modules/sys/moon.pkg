@@ -1,0 +1,7 @@
+import {
+  "mldong/moon-core" @core,
+  "mldong/moon-sys/dao-mysql" @mysql,
+  "mldong/moon-sys/service" @svc,
+  "mldong/moon-sys/controller" @ctrl,
+  "moonbitlang/moonback" @mb,
+}

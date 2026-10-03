@@ -7,7 +7,7 @@ pub(all) struct UserMysqlDao {
 }
 
 ///|
-pub fn UserMysqlDao::make(config : MysqlConfig) -> UserMysqlDao {
+pub fn UserMysqlDao::make(config : @core.MysqlConfig) -> UserMysqlDao {
   { base: { config, table: user_table } }
 }
 

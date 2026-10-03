@@ -1,22 +1,16 @@
-// mldong-moon 装配入口 —— MysqlConfig(env) → dao → service → 路由注册 → listen
+// mldong-moon 装配入口 —— 每模块一行（模块自注册：dao/service 构造与路由注册收进模块内）
 // 起法：export MLDONG_DB_PWD=... && moon run --target wasm cmd/main   （默认 127.0.0.1:18680）
 
 ///|
 async fn main raise {
-  let config = @mysql.MysqlConfig::from_env()
-  // user
-  let user_dao = @mysql.UserMysqlDao::make(config)
-  let user_svc = @svc.UserServiceImpl::{ dao: user_dao }
-  // role
-  let role_dao = @mysql.RoleMysqlDao::make(config)
-  let role_svc = @svc.RoleServiceImpl::{ dao: role_dao }
+  let config = @core.MysqlConfig::from_env()
   let root = @mb.Module(ctx => {
-    @ctrl.register(ctx, user_svc) catch {
-      e => println("user 路由注册失败: \{e}")
+    ctx.use_(@sys.module(config)) catch {
+      e => abort("sys 模块挂载失败: \{e}")
     }
-    @ctrl.register_role(ctx, role_svc) catch {
-      e => println("role 路由注册失败: \{e}")
-    }
+    // 将来新模块各一行：
+    // ctx.use_(@dev.module(config)) catch { e => abort("dev 模块挂载失败: \{e}") }
+    // ctx.use_(@biz.module(config)) catch { e => abort("biz 模块挂载失败: \{e}") }
   })
   let app = @mb.App(root)
   defer app.close()
