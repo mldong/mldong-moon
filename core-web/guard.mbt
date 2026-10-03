@@ -39,3 +39,28 @@ pub async fn on_error(
     _ => ()
   }
 }
+
+///|
+/// 从请求取 token（头优先、同名 cookie 兜底），并剥 "Bearer " 前缀——
+/// 与 TokenConfig.token_prefix 同一约定（13 栈：sa-token token-prefix + vben5 发 "Bearer <token>"）。
+/// 豁免面端点（登录/注销）不走 guard 的 extract_token，手取头时必须用本函数对齐，
+/// 否则拿到带前缀的串查不到会话且 logout 幂等不报错（静默失效，已踩）。
+pub fn token_of(request : @mb.Request) -> String {
+  let raw = match request.headers.get("Authorization") {
+    None => ""
+    Some(v) => v.to_owned()
+  }
+  let from_header = if raw.has_prefix("Bearer ") {
+    raw.substring(start=7)
+  } else {
+    raw
+  }
+  if from_header.is_empty() {
+    match request.cookie().get("Authorization") {
+      None => ""
+      Some(v) => v
+    }
+  } else {
+    from_header
+  }
+}

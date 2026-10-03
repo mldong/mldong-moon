@@ -58,12 +58,13 @@ pub fn text_or(data : Json, key : String, default : String) -> String {
 }
 
 ///|
-/// 提取 ids 数组（remove 批量入参；雪花 id 兼容字符串/数字两种形态，字符串为准防 JS 精度丢失）
-pub fn get_ids(body : Json) -> Array[Int64] {
+/// 提取 Int64 数组（remove 的 ids、grantRole 的 roleIds 等批量入参；
+/// 雪花 id 兼容字符串/数字两种形态，字符串为准防 JS 精度丢失）
+pub fn get_i64_array(body : Json, key : String) -> Array[Int64] {
   let out : Array[Int64] = []
   match body {
     Object(map) =>
-      match map.get("ids") {
+      match map.get(key) {
         Some(Array(arr)) =>
           for v in arr {
             match v {
@@ -82,4 +83,10 @@ pub fn get_ids(body : Json) -> Array[Int64] {
     _ => ()
   }
   out
+}
+
+///|
+/// 提取 ids 数组（remove 端点约定键）
+pub fn get_ids(body : Json) -> Array[Int64] {
+  get_i64_array(body, "ids")
 }
