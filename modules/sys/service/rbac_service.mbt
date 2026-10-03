@@ -48,16 +48,19 @@ pub impl[D : @dao.RbacDao] RbacService for RbacServiceImpl[D] with fn grant_role
 
 ///|
 /// moon-token 供数方：同一 struct 实现 PermissionProvider（login_id = sys_user.id 字符串，
-/// 对齐 13 栈 sa-token StpUtil.login(user.getId())）
+/// 对齐 13 栈 sa-token StpUtil.login(user.getId())）。
+/// extra = 登录时会话属性（appCode/ip/ua，登录端点塞入），appCode 从这取——
+/// moon-token 0.1.9 起不再编进 login_id。
 pub impl[D : @dao.RbacDao] @port.PermissionProvider for RbacServiceImpl[D] with fn get_permissions(
   self,
   login_id,
   _device,
+  extra,
 ) {
-  match parse_login_id(login_id) {
-    Some(lid) =>
+  match parse_user_id(login_id) {
+    Some(user_id) =>
       // dao 的 MldongError 在 moon-token 端口边界转 Store（供数方故障语义）
-      self.dao.find_perms_by_user(lid.user_id, lid.app_code) catch {
+      self.dao.find_perms_by_user(user_id, app_code_of(extra)) catch {
         e => raise @port.Store(e.message())
       }
     None => []
@@ -69,10 +72,11 @@ pub impl[D : @dao.RbacDao] @port.PermissionProvider for RbacServiceImpl[D] with 
   self,
   login_id,
   _device,
+  extra,
 ) {
-  match parse_login_id(login_id) {
-    Some(lid) =>
-      self.dao.find_role_codes(lid.user_id, lid.app_code) catch {
+  match parse_user_id(login_id) {
+    Some(user_id) =>
+      self.dao.find_role_codes(user_id, app_code_of(extra)) catch {
         e => raise @port.Store(e.message())
       }
     None => []
@@ -84,11 +88,13 @@ pub impl[D : @dao.RbacDao] @port.PermissionProvider for RbacServiceImpl[D] with 
   self,
   login_id,
   _device,
+  extra,
 ) {
-  match parse_login_id(login_id) {
-    Some(lid) => {
+  match parse_user_id(login_id) {
+    Some(user_id) => {
       // 超管判定只看用户属性（admin_type），与 appCode 无关（boot2 同）
-      let ua = self.dao.find_user_auth_by_id(lid.user_id) catch {
+      let _ = extra
+      let ua = self.dao.find_user_auth_by_id(user_id) catch {
         e => raise @port.Store(e.message())
       }
       match ua {
@@ -108,33 +114,31 @@ pub extend RbacServiceImpl with RbacService::{
 }
 
 ///|
-/// login_id 复合形态 "{user_id}@{app_code}"（appCode 是会话级属性：登录头定，
-/// 缺省 platform；boot2 LoginUser.appCode 同语义——同用户不同 app 即独立会话族）。
-/// provider 签名只有 login_id/device，appCode 编进 login_id 是不改 moon-token 的唯一干净路。
-/// 缺 "@" 的旧形态按 platform 兼容。
-struct LoginId {
-  user_id : Int64
-  app_code : String
-}
-
-///|
+/// login_id 就是 sys_user.id 字符串（appCode 走 extra，不再编进 login_id——
+/// 免污染按 login_id 的搜索面；缺省 platform）。
+/// 兼容形态：带 "@{appCode}" 的旧会话取 "@" 前段。
 const DEFAULT_APP_CODE : String = "platform"
 
 ///|
-fn parse_login_id(login_id : String) -> LoginId? {
-  let parts = login_id.split("@").to_array()
-  let id_part = parts[0].to_owned()
-  let app = if parts.length() >= 2 {
-    parts[1].to_owned()
-  } else {
-    DEFAULT_APP_CODE
+fn parse_user_id(login_id : String) -> Int64? {
+  let id_part = match login_id.split("@").to_array() {
+    parts => if parts.length() >= 2 { parts[0].to_owned() } else { login_id }
   }
   if id_part.is_empty() {
     return None
   }
   try {
-    Some({ user_id: @string.parse_int64(id_part), app_code: app })
+    Some(@string.parse_int64(id_part))
   } catch {
     _ => None
+  }
+}
+
+///|
+/// extra 里取 appCode（登录端点塞的会话属性），缺省 platform
+fn app_code_of(extra : Map[String, String]) -> String {
+  match extra.get("appCode") {
+    Some(v) => if v.is_empty() { DEFAULT_APP_CODE } else { v }
+    None => DEFAULT_APP_CODE
   }
 }
