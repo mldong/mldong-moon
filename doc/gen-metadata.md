@@ -61,10 +61,21 @@ pub(all) struct ColumnMeta {
 
 ## 4. 两条消费路
 
-1. **gen 代码生成器**（未落，路线图）：读 `list_columns(表)` → 按 §2 映射产出六件套源码
-   （entity/dto/dao/dao-mysql/service/controller + module 注册三行 + policy 片段），
-   手册见 [adding-module.md](adding-module.md)。产出物即手写代码进仓，非编译期挂钩子
-   （codegen/dev_build 路线已被 owner 否决，见 hub 调研文档）。
+1. **gen 代码生成器（已落，`cmd/gen`）**：读 `list_columns(表)` → 按 §2 映射产出六件套源码。
+
+   ```bash
+   export MLDONG_DB_* && moon run --target wasm cmd/gen/main -- <表名>... [--out=<目录>]
+   ```
+
+   - 产物 = 手写代码进仓（文件头〔cmd/gen 生成，可手改〕），非编译期挂钩子（codegen/dev_build
+     路线已被 owner 否决）；`gen-out/` 不入仓；
+   - 生成面 = 标准 CRUD 五端点 + 权限码片段；**权限码前缀取表名首段（sys_dept → sys:dept），
+     路由前缀 = 表名首下划线换 /（/sys/dept）**——两者形状相近别混用（已踩）；
+   - **同包多实体防撞名**：生成物 dto 顶层标识符带表内小写前缀（post_parse_save 等）——
+     不加前缀会静默命中同包其它实体的同名符号（编译不报错、运行时校验面张冠李戴，已踩）；
+   - **树表等特性 = 手写扩展面**：独立文件（如 dept_tree.mbt）扩展 list_all/树装配/树端点，
+     重生成不覆盖；dept 树语义 = parent_id 内存建树（root=0，boot2 同），pids 列留档不维护；
+   - 接入三步见 [adding-module.md](adding-module.md)。
 2. **dev_schema 导入**（boot2 同位，未落）：
    `/dev/schema/dbTable`（表清单）→ `/dev/schema/importTable`（落 dev_schema 台账表）→
    台账上改显示名/列表字段/搜索字段 → 生成器从台账读。台账六件套 + disabled 标记
