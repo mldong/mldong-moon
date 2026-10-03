@@ -130,22 +130,25 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn find_by_id
 
 ///|
 pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn page(self, req) {
-  // 动态条件 service 拼（对齐 boot2 page 语义：列带表别名前缀；Wrapper 是 core 零 ORM 条件组）
+  // 业务硬条件（对齐 boot2 page 语义）+ m_ 动态条件（通用查询件解析，13 栈同约定）
   let w = @core.where_()
   let _ = w.eq("t.is_deleted", @core.I(0))
   // 超级管理员不可见（boot2：ne t.admin_type, SUPER_ADMIN(1)）
   let _ = w.ne("t.admin_type", @core.I(1))
-  if req.user_name is Some(s) {
-    let _ = w.like("t.user_name", s)
-  }
-  if req.real_name is Some(s) {
-    let _ = w.like("t.real_name", s)
-  }
-  // 关键字：姓名/用户名双列 OR（boot2 keywords 的 apply 片段同款）
-  if req.keywords is Some(kw) {
-    if !kw.is_empty() {
-      let _ = w.raw("(t.real_name like ? or t.user_name like ?)", [@core.S("%\{kw}%"), @core.S("%\{kw}%")])
+  let _ = w.append(req.m)
+  // 关键字：多列 OR 模糊（searchKeys 前端可带表别名；缺省姓名/用户名双列）
+  let (kw, keys) = @core.parse_keywords_with_raw(
+    req.keywords, req.search_keys,
+    default_search_keys=["t.real_name", "t.user_name"],
+  )
+  if !kw.is_empty() && !keys.is_empty() {
+    let ors : Array[String] = []
+    let params : Array[@core.SqlValue] = []
+    for c in keys {
+      ors.push("\{c} like ?")
+      params.push(@core.S("%\{kw}%"))
     }
+    let _ = w.raw("(\{ors.join(" or ")})", params)
   }
   self.dao.page(w, req.page_num, req.page_size)
 }

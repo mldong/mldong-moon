@@ -19,11 +19,14 @@ pub(all) enum Cond {
   Eq(String, SqlValue)
   Ne(String, SqlValue)
   Like(String, String) // 自动包 %..%
+  /// 完整 pattern 透传（LLIKE "%v"、RLIKE "v%"、NLIKE 反向等由调用方拼 pattern）
+  LikePat(String, String)
   Gt(String, SqlValue)
   Ge(String, SqlValue)
   Lt(String, SqlValue)
   Le(String, SqlValue)
   In(String, Array[SqlValue])
+  NotIn(String, Array[SqlValue])
   /// 原生片段 + 参数（OR 组合等复杂条件；片段里只写 ? 占位，值进参数）
   Raw(String, Array[SqlValue])
 }
@@ -54,6 +57,27 @@ pub fn Wrapper::ne(self : Wrapper, col : String, v : SqlValue) -> Wrapper {
 ///|
 pub fn Wrapper::like(self : Wrapper, col : String, s : String) -> Wrapper {
   self.conds.push(Like(col, s))
+  self
+}
+
+///|
+/// NOT IN（空集合时条件不生效）
+pub fn Wrapper::not_in(self : Wrapper, col : String, vs : Array[SqlValue]) -> Wrapper {
+  self.conds.push(NotIn(col, vs))
+  self
+}
+
+///|
+/// 完整 pattern 的 LIKE（调用方自带通配符）
+pub fn Wrapper::like_pat(self : Wrapper, col : String, pat : String) -> Wrapper {
+  self.conds.push(LikePat(col, pat))
+  self
+}
+
+///|
+/// NOT LIKE %..%
+pub fn Wrapper::not_like(self : Wrapper, col : String, s : String) -> Wrapper {
+  self.conds.push(Raw("\{col} NOT LIKE ?", [S("%\{s}%")]))
   self
 }
 
@@ -95,6 +119,15 @@ pub fn Wrapper::in_(self : Wrapper, col : String, vs : Array[SqlValue]) -> Wrapp
 }
 
 ///|
+/// 并入另一条件组（AND 语义追加；用于"业务硬条件 + m_ 动态条件"叠加）
+pub fn Wrapper::append(self : Wrapper, other : Wrapper) -> Wrapper {
+  for c in other.conds {
+    self.conds.push(c)
+  }
+  self
+}
+
+///|
 /// 条件组是否为空
 pub fn Wrapper::is_empty(self : Wrapper) -> Bool {
   self.conds.is_empty()
@@ -121,6 +154,10 @@ pub fn Wrapper::build(self : Wrapper) -> (String, Array[SqlValue]) {
       Like(col, s) => {
         parts.push("\{col} LIKE ?")
         params.push(S("%\{s}%"))
+      }
+      LikePat(col, pat) => {
+        parts.push("\{col} LIKE ?")
+        params.push(S(pat))
       }
       Gt(col, v) => {
         parts.push("\{col} > ?")
@@ -158,6 +195,20 @@ pub fn Wrapper::build(self : Wrapper) -> (String, Array[SqlValue]) {
             params.push(v)
           }
           parts.push("\{col} IN (\{marks.to_string()})")
+        }
+      }
+      NotIn(col, vs) => {
+        // NOT IN () 恒真：空集合表示"不排除任何行"，条件整个跳过
+        if !vs.is_empty() {
+          let marks = StringBuilder()
+          for i, v in vs {
+            if i > 0 {
+              marks.write_string(",")
+            }
+            marks.write_string("?")
+            params.push(v)
+          }
+          parts.push("\{col} NOT IN (\{marks.to_string()})")
         }
       }
     }

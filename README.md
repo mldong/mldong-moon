@@ -59,7 +59,7 @@ mldong-moon/
 | `/sys/user/update` | `{id, userName, realName, ...}` | 修改（未传字段不覆盖，对齐 MyBatis-Plus updateById 语义） |
 | `/sys/user/remove` | `{ids: [..]}` | 逻辑删除 |
 | `/sys/user/detail` | `{id}` | 单个（id 传字符串） |
-| `/sys/user/page` | `{pageNum, pageSize, m_LIKE_userName?, m_LIKE_realName?}` | 分页（`m_LIKE_*` 为骨架简版，通用 m_ 查询件后续移植） |
+| `/sys/user/page` | `{pageNum, pageSize, keywords?, searchKeys?, m_{OP}_{col}?...}` | 分页：m_ 通用查询 13 操作符（EQ/NE/GT/GE/LT/LE/LIKE/NLIKE/LLIKE/RLIKE/BT/IN/NIN），3 段/4 段（带表别名，如 `m_t_LIKE_userName`）；列名 camelCase 自动转 snake_case，空值跳过、非法操作符跳过、列名形状白名单防注入；keywords+searchKeys 多列 OR 关键字 |
 
 错误码（骨架子集，码表对齐 13 栈契约后续校准）：`99990000` 内部错误 / `99990001` 参数校验失败 / `99990002` 数据不存在 / `99990003` 业务冲突 / `99990004` 业务失败。
 
@@ -83,7 +83,8 @@ curl -X POST http://127.0.0.1:18680/sys/user/page \
 - [ ] 接入 moon-token guard（逐路由守卫 + 登录端点，权限码已按 13 栈预留）
 - [ ] 错误信封全局转换层完善（当前为 wrap 骨架版）
 - [ ] 事务模板（参照 jeeflow-moon `MysqlTxTemplate`：环境连接 + 嵌套复用）
-- [ ] `m_` 动态查询通用件 + `rainbow` 分页导航补齐
+- [x] `m_` 动态查询通用件（core/query.mbt，10-03 落地，22 用例过）
+- [ ] `rainbow` 分页导航补齐
 - [ ] dev 模块：代码生成器（一次性脚手架产出六件套源码）
 - [ ] CI：GitHub Actions（wasm + native 双档）
 

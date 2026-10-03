@@ -65,14 +65,16 @@ pub fn parse_update(body : Json) -> UserSaveReq raise @core.MldongError {
 }
 
 ///|
-/// 分页入参（过滤键 camelCase 直传，语义=模糊匹配；m_ 通用件后续另做，不占此形状）
+/// 分页入参：m_* 动态条件统一由 core 通用查询件解析（13 栈同约定），
+/// 关键字走 keywords+searchKeys（多列 OR）
 pub(all) struct UserPageReq {
   page_num : Int
   page_size : Int
-  user_name : String?
-  real_name : String?
-  /// 关键字：real_name / user_name 双列 OR 模糊（对齐 boot2 keywords）
-  keywords : String?
+  /// m_ 参数解析出的动态条件（13 个操作符 + 表别名 4 段式）
+  m : @core.Wrapper
+  /// keywords/searchKeys 原文（关键字搜索由 service 按列白名单应用）
+  keywords : String
+  search_keys : String
 }
 
 ///|
@@ -85,9 +87,9 @@ pub fn parse_page(body : Json) -> UserPageReq raise @core.MldongError {
   {
     page_num,
     page_size,
-    user_name: @core.get_text(body, "userName"),
-    real_name: @core.get_text(body, "realName"),
-    keywords: @core.get_text(body, "keywords"),
+    m: @core.parse_m_params(body, exclude=["pageNum", "pageSize", "keywords", "searchKeys"]),
+    keywords: @core.text_or(body, "keywords", ""),
+    search_keys: @core.text_or(body, "searchKeys", ""),
   }
 }
 
