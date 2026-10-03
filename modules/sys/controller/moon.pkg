@@ -1,7 +1,7 @@
 import {
   "mldong/moon-core" @core,
+  "mldong/moon-core-web" @web,
   "mldong/moon-sys/dto" @dto,
   "mldong/moon-sys/service" @svc,
   "moonbitlang/moonback" @mb,
-  "moonbitlang/core/string" @string,
 }

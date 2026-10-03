@@ -1,5 +1,6 @@
 members = [
   "./core",
+  "./core-web",
   "./modules/sys",
   "./cmd",
 ]

@@ -5,31 +5,31 @@
 ///|
 pub fn[T : @svc.RoleService] register_role(ctx : @mb.ModuleContext, svc : T) -> Unit raise {
   // 添加角色（code 查重在 service）
-  let save_handler : @mb.Handler = wrap(async fn(request) -> Json raise @core.MldongError {
-    let id = svc.save(@dto.parse_role_save(json_body(request)))
+  let save_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let id = svc.save(@dto.parse_role_save(@web.json_body(request)))
     @core.ok_data(Json::string(id.to_string()))
   })
   // 删除角色
-  let remove_handler : @mb.Handler = wrap(async fn(request) -> Json raise @core.MldongError {
-    svc.remove_by_ids(@core.get_ids(json_body(request)))
+  let remove_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    svc.remove_by_ids(@core.get_ids(@web.json_body(request)))
     @core.ok_empty()
   })
   // 修改角色
-  let update_handler : @mb.Handler = wrap(async fn(request) -> Json raise @core.MldongError {
-    svc.update(@dto.parse_role_update(json_body(request)))
+  let update_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    svc.update(@dto.parse_role_update(@web.json_body(request)))
     @core.ok_empty()
   })
   // 查询单个角色
-  let detail_handler : @mb.Handler = wrap(async fn(request) -> Json raise @core.MldongError {
-    let id : Int64 = match @core.get_i64(json_body(request), "id") {
+  let detail_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let id : Int64 = match @core.get_i64(@web.json_body(request), "id") {
       Some(n) => n
       None => 0L
     }
     @core.ok_data(@dto.role_json(svc.find_by_id(id)))
   })
   // 分页查询角色列表（单表 + m_ 动态条件）
-  let page_handler : @mb.Handler = wrap(async fn(request) -> Json raise @core.MldongError {
-    let req = @dto.parse_role_page(json_body(request))
+  let page_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let req = @dto.parse_role_page(@web.json_body(request))
     let (total, rows) = svc.page(req)
     let arr : Array[Json] = []
     for r in rows {

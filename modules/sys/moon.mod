@@ -16,6 +16,7 @@ description = "mldong-moon 系统管理模块（sys）：user 增删改查骨架
 
 import {
   "mldong/moon-core@0.1.0",
+  "mldong/moon-core-web@0.1.0",
   "Betterlol/moon_zod@0.8.2",
   "moonbitstack/moondb@0.2.0",
   "moonbitstack/moonmysql@0.7.3",
