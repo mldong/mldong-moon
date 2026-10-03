@@ -153,6 +153,14 @@ fn row_opt_int(r : @moondb.Row, col : String) -> Int? {
 }
 
 ///|
+pub fn row_int_d(r : @moondb.Row, col : String, default : Int) -> Int {
+  match row_opt_i64(r, col) {
+    Some(n) => n.to_int()
+    None => default
+  }
+}
+
+///|
 /// DATETIME 文本归一："yyyy-MM-dd HH:mm:ss[.fff]" → 截 19 位
 fn norm_datetime(s : String) -> String {
   if s.length() > 19 {
