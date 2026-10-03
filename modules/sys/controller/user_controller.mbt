@@ -1,5 +1,5 @@
 // sys_user 控制器 —— 手写薄端点（boot2 风格：校验在 dto、业务在 service、响应工具在 core）
-// URL /sys/user/{save,remove,update,detail,page} 对齐 13 栈契约
+// URL /sys/user/{save,remove,update,detail,page} 对齐 mldong 接口契约
 // 权限码预留（guard 下一轮挂）：save=sys:user:save remove=sys:user:remove
 // update=sys:user:update detail=sys:user:detail page=sys:user:page
 

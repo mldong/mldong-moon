@@ -1,4 +1,4 @@
-// 登录/注销控制器 —— 对齐 13 栈：登录在 sys 模块（boot2 SysLoginController 同位）。
+// 登录/注销控制器 —— 对齐 mldong 框架约定：登录在 sys 模块（boot2 SysLoginController 同位）。
 // 密文校验对齐 boot2：md5(密码明文 + 盐) 小写 hex（core/password.mbt）；
 // login_id = sys_user.id 字符串（对齐 sa-token StpUtil.login(user.getId())），
 // 锁定/删除用户拒绝登录。
@@ -38,7 +38,7 @@ pub fn[S : @port.TokenStore, P, R : @svc.RbacService] register_login(
       fail_auth(responder, @core.MldongError::Business("用户名或密码错误"))
       return
     }
-    // appCode：登录头（13 栈 APP_CODE_KEY="appCode"），缺省 platform
+    // appCode：登录头（mldong 框架 APP_CODE_KEY="appCode"），缺省 platform
     let app_code = match request.headers.get("appCode") {
       Some(v) => if v.is_empty() { "platform" } else { v.to_owned() }
       None => "platform"
@@ -63,7 +63,7 @@ pub fn[S : @port.TokenStore, P, R : @svc.RbacService] register_login(
     let data : Json = {
       "token": result.token,
       "refreshToken": result.refresh_token,
-      // 契约字段名 userId（对齐 13 栈 LoginVO；值 = login_id = sys_user.id 字符串）
+      // 契约字段名 userId（对齐 mldong 框架约定 LoginVO；值 = login_id = sys_user.id 字符串）
       "userId": result.login_id,
     }
     responder.send_json(@core.ok_data(data), headers=[("Content-Type", "application/json; charset=utf-8")]) catch {
@@ -79,7 +79,7 @@ pub fn[S : @port.TokenStore, P, R : @svc.RbacService] register_login(
     let refresh_token = @core.text_or(body, "refreshToken", "")
     let result = auth.rotate(refresh_token) catch {
       _ => {
-        // 契约统一业务码 99990410（不存在/已过期/已轮转/已登出，含重放），不泄露具体原因（13 栈同口径）
+        // 契约统一业务码 99990410（不存在/已过期/已轮转/已登出，含重放），不泄露具体原因（mldong 框架同口径）
         responder.send_json(
           @core.fail(99990410, "refreshToken无效或已过期"),
           headers=[("Content-Type", "application/json; charset=utf-8")],

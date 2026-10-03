@@ -1,0 +1,113 @@
+// sys_dept 服务 —— 业务逻辑唯一收口；零 web/ORM 类型〔cmd/gen 生成，可手改〕
+
+///|
+pub(open) trait DeptService {
+  async fn save(Self, @dto.DeptSaveReq) -> Int64 raise @core.MldongError
+  async fn update(Self, @dto.DeptSaveReq) -> Unit raise @core.MldongError
+  async fn remove_by_ids(Self, Array[Int64]) -> Unit raise @core.MldongError
+  async fn find_by_id(Self, Int64) -> @entity.Dept raise @core.MldongError
+  async fn page(Self, @dto.DeptPageReq) -> (Int, Array[@entity.Dept]) raise @core.MldongError
+}
+
+///|
+pub(all) struct DeptServiceImpl[R] {
+  dao : R
+}
+
+///|
+pub impl[R : @dao.DeptDao] DeptService for DeptServiceImpl[R] with fn save(self, req) {
+  // 唯一编码查重（未删除范围内）
+  match self.dao.find_by_code(req.code) {
+    Some(_) => raise @core.MldongError::Conflict("唯一编码已存在: " + req.code)
+    None => ()
+  }
+  let d : @entity.Dept = {
+    id: @core.next_id(),
+    parent_id: req.parent_id,
+    name: req.name,
+    code: req.code,
+    sort: req.sort,
+    enabled: req.enabled,
+    leader_ids: req.leader_ids,
+    main_leader_id: req.main_leader_id,
+    remark: req.remark,
+    pids: None,
+    variable: None,
+    create_time: Some(@core.now_str()),
+    create_user: None,
+    update_time: None,
+    update_user: None,
+    is_deleted: Some(0),
+  }
+  self.dao.insert(d)
+}
+
+///|
+pub impl[R : @dao.DeptDao] DeptService for DeptServiceImpl[R] with fn update(self, req) {
+  match self.dao.find_by_id(req.id) {
+    None => raise @core.MldongError::NotFound("数据不存在: " + req.id.to_string())
+    Some(_) => ()
+  }
+  // 编码查重（排除自身）
+  match self.dao.find_by_code(req.code) {
+    Some(other) => if other.id != req.id {
+      raise @core.MldongError::Conflict("唯一编码已存在: " + req.code)
+    }
+    None => ()
+  }
+  // 未传的可选字段落 N，BaseDao 构建 SET 时跳过（null 不覆盖语义在 builder 层统一）
+  let d : @entity.Dept = {
+    id: req.id,
+    parent_id: req.parent_id,
+    name: req.name,
+    code: req.code,
+    sort: req.sort,
+    enabled: req.enabled,
+    leader_ids: req.leader_ids,
+    main_leader_id: req.main_leader_id,
+    remark: req.remark,
+    pids: None,
+    variable: None,
+    create_time: None,
+    create_user: None,
+    update_time: Some(@core.now_str()),
+    update_user: None,
+    is_deleted: None,
+  }
+  self.dao.update(d)
+}
+
+///|
+pub impl[R : @dao.DeptDao] DeptService for DeptServiceImpl[R] with fn remove_by_ids(self, ids) {
+  if ids.is_empty() {
+    raise @core.MldongError::InvalidInput("ids 不能为空")
+  }
+  self.dao.remove_by_ids(ids)
+}
+
+///|
+pub impl[R : @dao.DeptDao] DeptService for DeptServiceImpl[R] with fn find_by_id(
+  self,
+  id,
+) {
+  match self.dao.find_by_id(id) {
+    Some(d) => d
+    None => raise @core.MldongError::NotFound("数据不存在: " + id.to_string())
+  }
+}
+
+///|
+pub impl[R : @dao.DeptDao] DeptService for DeptServiceImpl[R] with fn page(self, req) {
+  let w = @core.where_()
+  let _ = w.append(req.m)
+  self.dao.page(w, req.page_num, req.page_size)
+}
+
+///|
+pub extend DeptServiceImpl with DeptService::{
+  page,
+  remove_by_ids,
+  save,
+  find_by_id,
+  update,
+}

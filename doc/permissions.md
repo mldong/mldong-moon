@@ -21,12 +21,12 @@
 - 密文校验对齐 boot2：**`md5(密码明文 + 盐)` 小写 hex**（注意顺序：密码在前盐在后；
   `core/password.mbt` 用 mooncrypt md5 + UTF-8，单测对标准向量）；校验顺序 = 存在 →
   锁定（`is_locked=1` 拒绝）→ 密文；用户不存在与密码错**同话术同码**（401 + 99990401
-  “用户名或密码错误”，防枚举，boot2 两支同抛 USER_NOT_EXIST 同设计；13 栈登录失败码各自
-  为政——boot2=10000001、goframe=99999999，本栈定案 401+99990401 走鉴权失败语义）；
+  “用户名或密码错误”，防枚举，boot2 两支同抛 USER_NOT_EXIST 同设计；mldong 框架登录失败码各自
+  为政——boot2=10000001、其余各语言实现自定，本栈定案 401+99990401 走鉴权失败语义）；
 - `login_id = sys_user.id 字符串`（对齐 sa-token `StpUtil.login(user.getId())`），
   **纯 id，不含任何后缀**——appCode 等会话属性走 extra（§5），别复合进 login_id
   （会污染按 login_id 的搜索面，owner 定过案）；
-- 响应 data：`token / refreshToken / userId`（契约字段名对齐 13 栈 LoginVO，userId = login_id = sys_user.id 字符串）；
+- 响应 data：`token / refreshToken / userId`（契约字段名对齐 mldong 框架约定 LoginVO，userId = login_id = sys_user.id 字符串）；
 - **注销手取 token 必须用 `@web.token_of`**（剥 `Bearer ` 前缀 + Authorization cookie 兜底）——
   直接拿 `Authorization` 头会带前缀查不到会话，logout 幂等不报错、**静默失效**（已踩）。
 
@@ -34,7 +34,7 @@
 
 ```moonbit
 let token_cfg = @app.TokenConfig::default()
-token_cfg.token_prefix = "Bearer"                       // 对齐 13 栈（sa-token token-prefix + vben5）
+token_cfg.token_prefix = "Bearer"                       // 对齐 mldong 框架约定（sa-token token-prefix + vben5）
 let auth = @app.TokenAuth::new("user", token_cfg,
   @mem.MemoryStore::new("user"),
   @sys.rbac_provider(config),                            // 供数方 = RBAC 真实现
@@ -86,7 +86,7 @@ moon-token 判定：**豁免 > 例外清单（显式 rule）> 推导（derive_pe
 
 `core-web/guard.mbt` 的 `on_error`：HTTP 401/403 + mldong 信封
 `{"code":99990401,"msg":<TokenError 原因>,"data":null}`（99990401 未登录 / 99990403 无权限 /
-400→99990001 / 其余→99990000）。对齐 13 栈契约，前端按 code 区分跳登录还是报无权限。
+400→99990001 / 其余→99990000）。对齐 mldong 接口契约，前端按 code 区分跳登录还是报无权限。
 
 ## 5. appCode 多应用机制
 
@@ -110,12 +110,12 @@ moon-token 判定：**豁免 > 例外清单（显式 rule）> 推导（derive_pe
 sys_user_role ──▶ sys_role (app_code 过滤) ──▶ sys_role_menu ──▶ sys_menu (type=按钮, app_code 过滤) ──▶ code 去重
 ```
 
-组织定稿（13 栈同构）：
+组织定稿（mldong 框架同构）：
 
 - **中间表 `sys_user_role`/`sys_role_menu` 不立六件套**——boot2 只有 MP 实体无独立
   controller/service；授权挂主表端点（`POST /sys/user/grantRole`，`{userId, roleIds}`），
   **全量替换**式写入（删旧插新，`dao-mysql/perm_mysql.mbt` 局部事务样板）；
-  `sys_role_menu` 写路 dao 层备好、暂无暴露端点（对齐 13 栈）；
+  `sys_role_menu` 写路 dao 层备好、暂无暴露端点（对齐 mldong 框架约定）；
 - 查询归 `RbacDao` 端口（`dao/perm_dao.mbt`）：`find_user_auth_by_name/by_id`（登录身份）、
   `find_role_codes`、`find_perms_by_user`（码链 join）、`grant_roles/grant_menus`（写路）；
 - `RbacServiceImpl` **双 impl**：`RbacService`（授权业务，登录端点/user 控制器用）+

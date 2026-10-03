@@ -1,5 +1,5 @@
 // RBAC 仓储端口 —— 权限链查询（provider 供数）+ 两张中间表（sys_user_role/sys_role_menu）的
-// 授权写路。中间表不立六件套（13 栈同构：boot2 的 UserRole/RoleMenu 只有 MP 实体无独立
+// 授权写路。中间表不立六件套（mldong 框架同构：boot2 的 UserRole/RoleMenu 只有 MP 实体无独立
 // controller/service，授权挂在主表 service，全量替换式写入）——查询归 provider 链、写归主表。
 
 ///|

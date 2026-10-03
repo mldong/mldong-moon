@@ -43,7 +43,7 @@ pub(open) trait MetadataDao {
 }
 
 ///|
-/// 列类型 → MoonBit 实体字段类型（gen 代码生成器的映射表，13 栈同位）。
+/// 列类型 → MoonBit 实体字段类型（gen 代码生成器的映射表，mldong 框架同位）。
 /// 骨架口径：时间一律 String（entity 的 create_time 同物）；数值整数 Int / Int64；
 /// 其余一律 String 兜底。
 pub fn column_to_field_type(c : ColumnMeta) -> String {

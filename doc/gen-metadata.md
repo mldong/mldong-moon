@@ -1,6 +1,6 @@
 # 库元数据底座（gen 代码生成器 / dev_schema 导入共用）
 
-> 13 栈的 gen 工具（laravel `gen:module -t`、gin/salvo 同款）都**直读活库元数据**而非前端台账；
+> mldong 框架各语言实现的 gen 工具都**直读活库元数据**而非前端台账；
 > boot2 的网页版生成器另有 dev_schema 台账（`/dev/schema/importTable` 落库）。本仓把"读库元数据"
 > 抽成一件两用：gen 代码生成器直接调，dev_schema 导入功能也调——这就是 `modules/dev` 的
 > `MetadataDao` 端口 + `metadata-mysql` 实现（已落地，端点 `/dev/schema/dbTable`、
@@ -32,7 +32,7 @@ pub(all) struct ColumnMeta {
 映射工具同文件：`column_to_field_type(ColumnMeta) -> String`（列类型 → 实体字段类型）、
 `column_is_nullable`（→ Option 与否）。
 
-## 2. 类型映射表（gen 产出六件套的依据，13 栈同位）
+## 2. 类型映射表（gen 产出六件套的依据，mldong 框架同位）
 
 | data_type | 实体字段类型 | 说明 |
 |---|---|---|

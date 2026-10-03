@@ -1,6 +1,6 @@
 # 分层规范
 
-> mldong-moon 的分层是 13 栈同构的：业务收 service、dao 解耦 ORM、controller 只做校验与转发。
+> mldong-moon 的分层是 mldong 框架同构的：业务收 service、dao 解耦 ORM、controller 只做校验与转发。
 > 本文是写代码前的必读规范；模板真身在 `modules/sys`（user 全链 + role + RBAC 中间表）。
 
 ## 1. 总览
@@ -50,7 +50,7 @@ core（错误码/信封/sqlbuilder/m_ 查询/雪花/时钟——零 web）   cor
 ### 3.1 entity
 
 - 纯 `struct`，字段与表列一一对应（snake_case 命名字段）；可空列用 `Option`；
-- 雪花主键 `Int64`，**进出 JSON 一律字符串**（JS 53 位精度，13 栈同坑同修）；
+- 雪花主键 `Int64`，**进出 JSON 一律字符串**（JS 53 位精度，同款坑统一修）；
 - 关联查询（分页 join dept/post）另立只读 struct：`UserPageRow { user : User, dept_name : String?, ... }`。
 
 ### 3.2 dto（moon_zod 全工程唯一入口）
@@ -124,7 +124,7 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn save(self,
 - **密码机制**（对齐 boot2）：save 不收用户自报密码，发默认密码 + 8 位随机盐
   （`@core.DEFAULT_PASSWORD` + `random_salt`，散列 `md5(明文+盐)` 小写 hex，见
   `core/password.mbt`）；TableCodec 只把 password/salt 放进 `insert_cols`，读面 `cols` 不带
-  （detail 不回显密文）；改密是独立端点的活（resetPwd 类，13 栈各自有）；
+  （detail 不回显密文）；改密是独立端点的活（resetPwd 类，各语言实现各自有）；
 - 查询组装：业务硬条件 + `w.append(req.m)`（m_ 动态条件）+ keywords 多列 OR（`w.raw`），
   参考 `UserServiceImpl::page`。
 
@@ -164,7 +164,7 @@ let (sql, params) = @core.build_select("sys_user", cols, w, orders=[("create_tim
 - `Wrapper` 条件法：`eq/ne/gt/ge/lt/le/like/not_like/like_pat/in_/not_in/raw/append`；
   `build()` 出 `(where_sql, params)`，`build_select/build_insert/build_update/build_delete` 出整句；
   **N 值在 insert/update 里跳过**（null 不覆盖语义）；
-- `m_` 约定（13 栈同款）：入参键 `m_{OP}_{camelCol}`（3 段）或 `m_{alias}_{OP}_{col}`（4 段带表别名）；
+- `m_` 约定（mldong 框架同款）：入参键 `m_{OP}_{camelCol}`（3 段）或 `m_{alias}_{OP}_{col}`（4 段带表别名）；
   操作符 13 个 `EQ/NE/GT/GE/LT/LE/LIKE/NLIKE/LLIKE/RLIKE/BT/IN/NIN`（LLIKE=`%v`、RLIKE=`v%`，别反）；
   列名 camelCase 自动转 snake_case；空值跳过、非法操作符跳过、列名形状白名单（`is_field_safe`）防注入；
 - keywords 关键字搜索：`keywords + searchKeys`（多列 OR like；searchKeys 可带表别名），

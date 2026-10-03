@@ -48,7 +48,7 @@ pub impl[D : @dao.RbacDao] RbacService for RbacServiceImpl[D] with fn grant_role
 
 ///|
 /// moon-token 供数方：同一 struct 实现 PermissionProvider（login_id = sys_user.id 字符串，
-/// 对齐 13 栈 sa-token StpUtil.login(user.getId())）。
+/// 对齐 mldong 框架约定 sa-token StpUtil.login(user.getId())）。
 /// extra = 登录时会话属性（appCode/ip/ua，登录端点塞入），appCode 从这取——
 /// moon-token 0.1.9 起不再编进 login_id。
 pub impl[D : @dao.RbacDao] @port.PermissionProvider for RbacServiceImpl[D] with fn get_permissions(

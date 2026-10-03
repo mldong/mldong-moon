@@ -8,7 +8,7 @@
 async fn main raise {
   let config = @core.MysqlConfig::from_env()
   // 鉴权装配（熵依赖运行时，必须在 main 内构造）
-  // token_prefix="Bearer"：对齐 13 栈契约（sa-token token-prefix + vben5 发 "Bearer <token>"）
+  // token_prefix="Bearer"：对齐 mldong 接口契约（sa-token token-prefix + vben5 发 "Bearer <token>"）
   // 供数方 = sys 模块的 RBAC 真实现（码链走库：user_role → role_menu → menu.code）
   let token_cfg = @app.TokenConfig::default()
   token_cfg.token_prefix = "Bearer"

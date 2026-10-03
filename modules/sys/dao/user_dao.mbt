@@ -20,4 +20,6 @@ pub(open) trait UserDao {
   async fn update_password(Self, Int64, String, String) -> Unit raise @core.MldongError
   /// 下拉选项（userName/realName LIKE，上限 50，按创建时间倒序）
   async fn select_options(Self, String) -> Array[@entity.User] raise @core.MldongError
+  /// 全量轻量用户（部门用户树用；未删除范围）
+  async fn list_simple(Self) -> Array[@entity.User] raise @core.MldongError
 }

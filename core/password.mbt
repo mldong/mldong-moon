@@ -4,7 +4,7 @@
 
 ///|
 /// 新建/重置用户的默认密码明文（boot2 ConstantContextHolder.getDefaultPassword() 同位；
-/// 13 栈各自有配置机制，骨架先常量，TODO 接 sys_config/env）
+/// 各语言实现各自有配置机制，骨架先常量，TODO 接 sys_config/env）
 pub const DEFAULT_PASSWORD : String = "123456"
 
 ///|

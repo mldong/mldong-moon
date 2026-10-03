@@ -26,6 +26,22 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] module(
     @ctrl.register_role(ctx, role_svc, g) catch {
       e => abort("sys 模块 role 路由注册失败: \{e}")
     }
+    // dept/post —— cmd/gen 生成（重生成可覆盖；树扩展在 dept_tree.mbt 手写面）
+    let dept_dao = @mysql.DeptMysqlDao::make(config)
+    let dept_svc = @svc.DeptServiceImpl::{ dao: dept_dao }
+    @ctrl.register_dept(ctx, dept_svc, g) catch {
+      e => abort("sys 模块 dept 路由注册失败: \{e}")
+    }
+    let post_dao = @mysql.PostMysqlDao::make(config)
+    let post_svc = @svc.PostServiceImpl::{ dao: post_dao }
+    @ctrl.register_post(ctx, post_svc, g) catch {
+      e => abort("sys 模块 post 路由注册失败: \{e}")
+    }
+    // 树端点（取数闭包在此接线，controller 零 dao-mysql 依赖）
+    let user_dao = @mysql.UserMysqlDao::make(config)
+    @ctrl.register_dept_trees(ctx, async fn() raise @core.MldongError { dept_dao.list_all() }, async fn() raise @core.MldongError { user_dao.list_simple() }, g) catch {
+      e => abort("sys 模块树路由注册失败: \{e}")
+    }
   })
 }
 
@@ -38,5 +54,11 @@ pub fn rbac_provider(config : @core.MysqlConfig) -> @svc.RbacServiceImpl[@mysql.
 ///|
 /// sys 模块权限策略聚合——各实体片段合并（main 拿它并进总 policy）
 pub fn policy() -> @guard.RoutePolicy {
-  @web.merge_policy(@ctrl.user_policy(), @ctrl.role_policy())
+  @web.merge_policy(
+    @web.merge_policy(
+      @web.merge_policy(@ctrl.user_policy(), @ctrl.role_policy()),
+      @web.merge_policy(@ctrl.dept_policy(), @ctrl.post_policy()),
+    ),
+    @ctrl.dept_tree_policy(),
+  )
 }

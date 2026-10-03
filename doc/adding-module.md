@@ -53,7 +53,7 @@
 ### ⑦ controller（`controller/post_controller.mbt`）
 
 - `pub fn post_policy() -> @guard.RoutePolicy`——**每个端点一条显式 rule**
-  （`sys:post:{save,remove,update,detail,page}`，对齐 13 栈权限码）；
+  （`sys:post:{save,remove,update,detail,page}`，对齐 mldong 框架约定权限码）；
 - `pub fn[...] register_post(ctx, svc, g)`——每端点 `@web.wrap(async fn(request) -> Json raise @core.MldongError {...})`
   + `g.post(ctx, "/sys/post/save", save_handler)`；URL 约定 `/sys/<entity>/{save,remove,update,detail,page}`。
 
@@ -83,7 +83,7 @@ let post_svc = @svc.PostServiceImpl::{ dao: post_dao }
 ## 自检清单（提交前）
 
 - [ ] `moon check` 0 errors，未引入 [../AGENTS.md](../AGENTS.md) §5 之外的新 warning 类别；
-- [ ] URL / 信封 / 分页形状 / 错误码与 13 栈契约一致（layering §7）；
+- [ ] URL / 信封 / 分页形状 / 错误码与 mldong 接口契约一致（layering §7）；
 - [ ] 所有 id 出入 JSON 都是字符串；HTTP 200 恒定；
 - [ ] 每个端点有显式权限码 rule（漏 = 只验登录态）；
 - [ ] 真库冒烟一轮：login → save → page（含 `m_EQ_xxx` 一发）→ detail → update → remove → 负向；

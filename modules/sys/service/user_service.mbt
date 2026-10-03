@@ -146,7 +146,7 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn find_by_id
 
 ///|
 pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn page(self, req) {
-  // 业务硬条件（对齐 boot2 page 语义）+ m_ 动态条件（通用查询件解析，13 栈同约定）
+  // 业务硬条件（对齐 boot2 page 语义）+ m_ 动态条件（通用查询件解析，mldong 框架同约定）
   let w = @core.where_()
   let _ = w.eq("t.is_deleted", @core.I(0))
   // 超级管理员不可见（boot2：ne t.admin_type, SUPER_ADMIN(1)）

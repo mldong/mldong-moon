@@ -65,7 +65,7 @@ pub fn parse_update(body : Json) -> UserSaveReq raise @core.MldongError {
 }
 
 ///|
-/// 分页入参：m_* 动态条件统一由 core 通用查询件解析（13 栈同约定），
+/// 分页入参：m_* 动态条件统一由 core 通用查询件解析（mldong 框架同约定），
 /// 关键字走 keywords+searchKeys（多列 OR）
 pub(all) struct UserPageReq {
   page_num : Int
@@ -160,7 +160,7 @@ fn jint(v : Int?) -> Json {
 }
 
 ///|
-/// 雪花 id 一律字符串化（JS Number 53 位精度装不下 64 位雪花，13 栈同坑同修）
+/// 雪花 id 一律字符串化（JS Number 53 位精度装不下 64 位雪花，同款坑统一修）
 fn jsnow(v : Int64?) -> Json {
   match v {
     Some(n) => Json::string(n.to_string())

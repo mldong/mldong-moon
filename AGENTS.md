@@ -4,8 +4,7 @@
 
 ## 1. 项目定位
 
-mldong-moon 是 mldong 快速开发框架的 **MoonBit 语言栈**实现，与既有 13 栈（boot2/3/4、fastapi、
-flask、django、nestjs、laravel、goframe、gin、hertz、salvo、csharp）保持**接口契约一致**：
+mldong-moon 是 mldong 快速开发框架的 **MoonBit 语言实现**，与 mldong 框架的接口契约保持**一致**：
 同样的 URL、同样的 `{"code":0,"msg":"..","data":..}` 信封、同样的分页形状、同样的权限码
 （`sys_menu.code`）与鉴权失败码（99990401/99990403）。
 
@@ -38,6 +37,7 @@ mldong-moon/
 │   └── module.mbt       #   模块自注册 + policy() 聚合 + rbac_provider()
 ├── modules/dev/         # mldong/moon-dev —— 库元数据底座（gen/dev_schema 共用，doc/gen-metadata.md）
 ├── cmd/main/            # 装配入口：鉴权 + 模块挂载 + listen :18680
+├── cmd/gen/             # 代码生成器（读 MetadataDao 产六件套，gen-out/ 不入仓）
 └── doc/                 # 深入文档（AI 上手按序读）
     ├── layering.md      #   分层规范（六件套、依赖规则、BaseDao、sqlbuilder、m_）
     ├── permissions.md   #   权限鉴权（moon-token 集成、RBAC 链、appCode）
@@ -92,7 +92,7 @@ curl -s -X POST http://127.0.0.1:18680/sys/user/page \
 - **moon_zod 是 strip 模式**：schema 里没声明的字段会被**丢弃**。id/deptId 这类"不校验但要存活"
   的字段必须写 `"id": @moon_zod.any().optional()` 占位。
 - **雪花 ID 全链字符串化**：JS Number 53 位精度装不下 64 位雪花，入参出参一律 String
-  （`jsnow`/`id.to_string()`），13 栈同坑同修。
+  （`jsnow`/`id.to_string()`），同款坑统一修。
 - **NULL 三值逻辑**：`admin_type <> 1` 会漏掉 NULL 行——save 必须给 NOT NULL 列默认值
   （admin_type=2、role_type=1），查询超管不可见过滤靠它。
 - **moon_zod 的 like 语义**：LLIKE=`%v`（后缀）、RLIKE=`v%`（前缀），写测试断言别搞反。
@@ -105,12 +105,12 @@ curl -s -X POST http://127.0.0.1:18680/sys/user/page \
   `@mb`=moonback、`@mbguard`=moon-token-moonback/guard、`@app`=moon-token/app、
   `@guard`=moon-token/guard、`@port`=moon-token-store/port、`@style`=moon-token/style、
   `@mem`=moon-token-store/memory；模块内 `@entity/@dto/@dao/@mysql/@svc/@ctrl` 指 moon-sys 子包。
-- **已知 warnings 类别**（`moon check` 0 errors / 42 warnings 基线，9 类；改动时别引入新类别）：
-  `fragile_catch_all`（24，`catch { _ => }`/边界错误转换吞错兜底）、`deprecated`（4，core 旧 API）、
+- **已知 warnings 类别**（`moon check` 0 errors / 61 warnings 基线，10 类；改动时别引入新类别）：
+  `fragile_catch_all`（30，`catch { _ => }`/边界错误转换吞错兜底）、`deprecated`（14，core 旧 API）、
   `reserved_keyword`（4）、`implicit_impl_as_method`（3，trait impl 方法隐式提升，收敛要加
-  `pub extend`）、`ambiguous_block`（1，`{ config }` 歧义，写 `{ id: config }` 或裸 `config`）、
-  `missing_pattern_arguments`（1）、`unused_async`（1）、`unused_error_type`（2）、
-  `unused_value`（2，BaseDao::list 预留）。
+  `pub extend`）、`unused_value`（4）、`ambiguous_block`（1，`{ config }` 歧义，写
+  `{ id: config }` 或裸 `config`）、`missing_pattern_arguments`（1）、`unused_async`（1）、
+  `unused_error_type`（2）、`core_package_not_imported`（1，@env 隐式导入）。
 
 ## 6. 协作约定
 
@@ -118,6 +118,6 @@ curl -s -X POST http://127.0.0.1:18680/sys/user/page \
   动了鉴权/RBAC 必须复跑 appCode + 权限码矩阵（用例清单见 doc/permissions.md §7）。
 - **git**：明确路径 `git add <文件>`，禁止 `git add -A`/`git add .`；
   不绕过 hook（无 `--no-verify`）。
-- **接口契约**：URL、信封、错误码、分页形状、权限码以 13 栈契约为准，不私造形状；
+- **接口契约**：URL、信封、错误码、分页形状、权限码以 mldong 接口契约为准，不私造形状；
   字段名一律 camelCase（JSON）/ snake_case（DB 列）。
 - **文档同步**：改分层/权限行为时同步改 doc/ 对应篇，README 路线图勾状态。

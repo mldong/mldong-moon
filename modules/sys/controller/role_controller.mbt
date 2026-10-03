@@ -1,5 +1,5 @@
 // sys_role 控制器 —— 手写薄端点（同 user 形状）
-// URL /sys/role/{save,remove,update,detail,page} 对齐 13 栈契约
+// URL /sys/role/{save,remove,update,detail,page} 对齐 mldong 接口契约
 // 权限码预留（guard 下一轮挂）：sys:role:save/remove/update/detail/page
 
 ///|

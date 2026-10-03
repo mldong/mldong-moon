@@ -1,6 +1,6 @@
 // SQL 构建器 —— MyBatis-Plus QueryWrapper 式的条件组与单表语句构建
 // 绑定值用中性 SqlValue（core 零 ORM 依赖），dao-mysql 侧转 @moondb.Value；
-// 全部值走 ? 占位参数，永不拼进 SQL 文本（注入安全同 13 栈口径）
+// 全部值走 ? 占位参数，永不拼进 SQL 文本（注入安全同 mldong 框架口径）
 
 ///|
 /// 中性绑定值
@@ -183,7 +183,7 @@ pub fn Wrapper::build(self : Wrapper) -> (String, Array[SqlValue]) {
       }
       In(col, vs) => {
         if vs.is_empty() {
-          // IN () 非法：空集合语义为"条件恒假"（对齐 13 栈"空不越权放行"）
+          // IN () 非法：空集合语义为"条件恒假"（对齐 mldong 框架约定"空不越权放行"）
           parts.push("1 = 0")
         } else {
           let marks = StringBuilder()

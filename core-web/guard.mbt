@@ -19,7 +19,7 @@ pub fn merge_policy(total : @guard.RoutePolicy, part : @guard.RoutePolicy) -> @g
 }
 
 ///|
-/// mldong 风格的鉴权失败响应：HTTP 状态码对齐 13 栈（401 未登录/403 无权限），
+/// mldong 风格的鉴权失败响应：HTTP 状态码对齐 mldong 框架约定（401 未登录/403 无权限），
 /// body 用本项目信封（code 99990401/99990403，msg 取 TokenError 精确原因）。
 /// 经 Guard::with_on_error 挂上，替换 moon-token 默认的空体响应。
 pub async fn on_error(
@@ -42,7 +42,7 @@ pub async fn on_error(
 
 ///|
 /// 从请求取 token（头优先、同名 cookie 兜底），并剥 "Bearer " 前缀——
-/// 与 TokenConfig.token_prefix 同一约定（13 栈：sa-token token-prefix + vben5 发 "Bearer <token>"）。
+/// 与 TokenConfig.token_prefix 同一约定（mldong 框架：sa-token token-prefix + vben5 发 "Bearer <token>"）。
 /// 豁免面端点（登录/注销）不走 guard 的 extract_token，手取头时必须用本函数对齐，
 /// 否则拿到带前缀的串查不到会话且 logout 幂等不报错（静默失效，已踩）。
 pub fn token_of(request : @mb.Request) -> String {

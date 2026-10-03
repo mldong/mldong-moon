@@ -1,13 +1,12 @@
-// m_ 通用查询件 —— 13 栈统一约定的 MoonBit 实现（对照 boot2 PageParam.buildQueryWrapper /
-// fastapi low_code_util.build_query / goframe utility.BuildQuery）：
+// m_ 通用查询件 —— mldong 框架统一约定的 MoonBit 实现（对照 boot2 PageParam.buildQueryWrapper）：
 //   键格式 m_{OP}_{camelCol}（3 段）/ m_{alias}_{OP}_{camelCol}（4 段带表别名）
 //   操作符 EQ/NE/GT/GE/LT/LE/LIKE/NLIKE/LLIKE/RLIKE/BT/IN/NIN
 //   列名 camelCase→snake_case；空值（null/空串/空数组）跳过；非法 OP 跳过
-//   列名安全校验（fastapi is_field_safe 同款形状白名单，防注入）
+//   列名安全校验（形状白名单，防注入）
 // 产出 core/sqlbuilder 的 Wrapper（零 ORM 条件组），由 service 叠加业务条件后交 dao
 
 ///|
-/// camelCase → snake_case（同 boot2 toUnderlineCase / fastapi to_snake_case）
+/// camelCase → snake_case（同 boot2 toUnderlineCase）
 pub fn to_underscore(camel : String) -> String {
   let b = StringBuilder()
   for ch in camel {
@@ -24,7 +23,7 @@ pub fn to_underscore(camel : String) -> String {
 
 ///|
 /// 列名安全校验：仅允许 `[alias.]col_name` 形状（字母开头，字母/数字/下划线/点），
-/// 防止 m_ 列名夹带 SQL（fastapi is_field_safe 同款语义）
+/// 防止 m_ 列名夹带 SQL（白名单语义）
 pub fn is_field_safe(col : String) -> Bool {
   if col.is_empty() {
     return false
@@ -73,7 +72,7 @@ fn json_scalar(v : Json) -> SqlValue? {
 }
 
 ///|
-/// m_ 值判空：null / 空串 / 空数组跳过（13 栈 isEmpty 同款）
+/// m_ 值判空：null / 空串 / 空数组跳过（mldong 框架 isEmpty 同款）
 fn is_empty_value(v : Json) -> Bool {
   match v {
     Null => true

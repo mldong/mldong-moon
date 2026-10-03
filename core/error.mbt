@@ -1,4 +1,4 @@
-// mldong-moon 错误定义 —— 业务失败走 9999xxxx 码表（对齐 mldong 13 栈契约，骨架先取子集）
+// mldong-moon 错误定义 —— 业务失败走 9999xxxx 码表（对齐 mldong 接口契约契约，骨架先取子集）
 
 ///|
 /// 统一业务错误：raise 上抛，cmd/main 全局转换成 {code, msg, data} 信封

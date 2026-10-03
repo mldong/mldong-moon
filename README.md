@@ -1,6 +1,6 @@
 # mldong-moon
 
-mldong 快速开发框架的 **MoonBit 栈**实现（第 14 栈）。目标是与既有 13 栈（boot2/3/4、fastapi、flask、django、nestjs、laravel、goframe、gin、hertz、salvo、csharp）保持接口契约一致：同样的 URL、同样的 `{"code":0,"msg":"..","data":..}` 信封、同样的分页形状、同样的权限码与鉴权失败码。
+mldong 快速开发框架的 **MoonBit 语言实现**。目标是与 mldong 框架的接口契约保持一致：同样的 URL、同样的 `{"code":0,"msg":"..","data":..}` 信封、同样的分页形状、同样的权限码与鉴权失败码。
 
 当前已落：`sys_user` 全链 16 端点（CRUD + 状态/个人中心/在线用户）+ `sys_role` CRUD + 登录/注销/refreshToken + moon-token 鉴权（RBAC 真码链 + appCode 多应用）+ `dev` 模块库元数据底座（gen/dev_schema 共用）。同时是后续模块与代码生成器的**模板骨架**。
 
@@ -52,6 +52,7 @@ mldong-moon/
 │   └── module.mbt             #   模块自注册（main 每模块一行）
 ├── modules/dev/               # mldong/moon-dev：库元数据底座（MetadataDao 端口 + information_schema 实现 + 只读端点）
 ├── cmd/main/                  # 装配：鉴权（moon-token）+ 模块挂载 + listen :18680
+├── cmd/gen/                   # 代码生成器：读活库元数据产六件套源码（产物即手写代码进仓）
 └── doc/                       # 深入文档
     ├── layering.md            #   分层规范（六件套、依赖规则、BaseDao、sqlbuilder、m_）
     ├── permissions.md         #   权限鉴权（登录/守卫/RBAC 链/appCode + 验收矩阵）
@@ -59,7 +60,7 @@ mldong-moon/
     └── sql/mysql-schema-all.sql  # 建库 + 全表 + 种子数据（一条命令）
 ```
 
-## 接口（对齐 mldong 13 栈）
+## 接口（对齐 mldong 接口契约）
 
 全部 `POST`，请求/响应 `application/json`，HTTP 恒 200，`code=0` 成功；鉴权端点带 `Authorization: Bearer <token>`。
 
@@ -81,6 +82,10 @@ mldong-moon/
 | `/sys/user/permCode` | 仅登录 | 当前用户权限码数组（守卫快照投影） |
 | `/sys/user/info` / `updateInfo` / `updatePwd` / `updateAvatar` | 仅登录 | 个人中心（id 取自登录主体） |
 | `/sys/user/onlineUserList` / `onlineDevice` | `sys:user:onlineUserList` / 仅登录 | 在线用户（按人分组带 tokenList/ip/ua/剩余时长，moon-token 会话枚举） |
+| `/sys/dept/{save,remove,update,detail,page}` | `sys:dept:*` | 部门 CRUD（**gen 生成**） |
+| `/sys/dept/list` | `sys:dept:list` | 部门树（parent_id 内存建树，root=0；手写扩展面） |
+| `/sys/post/{save,remove,update,detail,page}` | `sys:post:*` | 岗位 CRUD（**gen 生成**） |
+| `/sys/user/getDeptUserTree` | `sys:user:getDeptUserTree` | 部门用户树（部门节点挂用户叶，boot2 DeptUserTreeVO 同形） |
 | `/dev/schema/dbTable` | `dev:schema:dbTable` OR `dev:schema:importTable` | 库表清单（keywords 滤表名/注释） |
 | `/dev/schema/column/list` | `dev:schema:columnList` | 列清单（信息模式 + gen 字段类型映射） |
 
@@ -90,7 +95,7 @@ mldong-moon/
 - `m_` 通用查询 13 操作符（EQ/NE/GT/GE/LT/LE/LIKE/NLIKE/LLIKE/RLIKE/BT/IN/NIN），
   3 段式 `m_EQ_userName` / 4 段式（带表别名）`m_t_LIKE_userName`；列名 camelCase 自动转
   snake_case，空值跳过、非法操作符跳过、列名形状白名单防注入；
-- 错误码（骨架子集，码表对齐 13 栈）：`99990000` 内部 / `99990001` 参数校验失败 /
+- 错误码（骨架子集，码表对齐 mldong 框架约定）：`99990000` 内部 / `99990001` 参数校验失败 /
   `99990002` 数据不存在 / `99990003` 业务冲突 / `99990004` 业务失败；
 - `appCode`：登录头（缺省 `platform`）定会话应用上下文，role/menu 按 `app_code` 双过滤，
   同用户不同 app 会话共存。
@@ -123,6 +128,20 @@ curl -s -X POST http://127.0.0.1:18680/sys/user/page \
 ```
 
 种子账号：`superAdmin`（超管，跨全部权限码）/ `admin`（manage@platform 角色）。
+
+## 代码生成
+
+新表六件套一条命令产出（读活库 `information_schema`，按列类型/可空/注释渲染）：
+
+```bash
+export MLDONG_DB_*   # 同主程序
+moon run --target wasm cmd/gen/main -- sys_dept sys_post   # 产出到 gen-out/，拷进模块即接入
+```
+
+- 产物 = 手写代码（文件头带〔cmd/gen 生成，可手改〕），非编译期挂钩子；
+- 生成面 = 标准 CRUD 五端点 + 权限码片段；**树表/状态机等特性走手写扩展面**（如 dept_tree.mbt，
+  独立文件重生成不覆盖）；dto 顶层标识符带表内小写前缀（同包多实体不撞名）；
+- 接入三步见 [doc/adding-module.md](doc/adding-module.md)；元数据底座见 [doc/gen-metadata.md](doc/gen-metadata.md)。
 
 ## 文档
 

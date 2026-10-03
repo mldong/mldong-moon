@@ -1,0 +1,11 @@
+pkgtype(kind: "executable")
+supported_targets = "+native+wasm"
+
+import {
+  "mldong/moon-core" @core,
+  "mldong/moon-dev/metadata" @meta,
+  "mldong/moon-dev/metadata-mysql" @metamysql,
+  "moonbitlang/async",
+  "moonbitlang/async/fs" @fs,
+  "moonbitlang/core/env" @env,
+}

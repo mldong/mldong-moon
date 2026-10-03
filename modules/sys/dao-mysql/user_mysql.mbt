@@ -119,6 +119,21 @@ pub impl @dao.UserDao for UserMysqlDao with fn select_options(self, keywords) {
   out
 }
 
+///|
+pub impl @dao.UserDao for UserMysqlDao with fn list_simple(self) {
+  let (sql, params) = @core.build_select(
+    "sys_user",
+    ["id", "dept_id", "real_name", "admin_type"],
+    self.base.base_where(),
+    orders=[("id", false)],
+  )
+  let out : Array[@entity.User] = []
+  for r in self.base.query(sql, params) {
+    out.push((self.base.table.from_row)(r))
+  }
+  out
+}
+
 pub extend UserMysqlDao with @dao.UserDao::{
   remove_by_ids,
   find_by_user_name,
@@ -129,4 +144,5 @@ pub extend UserMysqlDao with @dao.UserDao::{
   set_locked,
   update_password,
   select_options,
+  list_simple,
 }
