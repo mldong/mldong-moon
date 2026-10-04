@@ -29,7 +29,7 @@ async fn main raise {
         .exempt("/sys/getCaptchaOpenFlag"),
       @sys.policy(),
     ),
-    @dev.policy(),
+    @web.merge_policy(@dev.policy(), @appmod.policy()),
   )
   // 关推导：全显式声明，未列端点一律只验登录（个人中心族 boot2 同语义；
   // 推导兜底不用——权限码的最终形状一律写在各 controller 的 policy 片段里）
@@ -47,6 +47,10 @@ async fn main raise {
     // dev 模块（元数据只读面）
     ctx.use_(@dev.install(config, g, holder, enum_registry, auth)) catch {
       _ => abort("dev 模块挂载失败")
+    }
+    // app 模块（APP 检查升级，UC-0610 免登录）
+    ctx.use_(@appmod.install(g)) catch {
+      _ => abort("app 模块挂载失败")
     }
     // 将来新模块各一行：
     // ctx.use_(@biz.module(config, g)) catch { _ => abort("biz 模块挂载失败") }

@@ -89,6 +89,19 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] install(
     @ctrl.register_menu(ctx, menu_svc, g) catch {
       e => abort("sys 模块 menu 路由注册失败: \{e}")
     }
+    // message —— cmd/gen 生成 + 接收人/appCode 隔离 + setRead/未读计数二次开发
+    let message_repo = @repo.MessageRepository::make(config)
+    let message_svc = @svc.MessageServiceImpl::{ dao: message_repo }
+    @ctrl.register_message(ctx, message_svc, g) catch {
+      e => abort("sys 模块 message 路由注册失败: \{e}")
+    }
+    // fileInfo —— cmd/gen 生成 + upload/getFileInfoByIds 二次开发（本地盘直写）
+    let fileinfo_svc = @svc.FileInfoServiceImpl::{ dao: @repo.FileInfoRepository::make(config) }
+    @ctrl.register_fileinfo(ctx, fileinfo_svc, g) catch {
+      e => abort("sys 模块 fileInfo 路由注册失败: \{e}")
+    }
+    // sse —— 站内信实时推送面（流式 + 心跳；仅登录无权限码，boot2 同位）
+    @ctrl.register_sse(ctx, g)
     let dict_item_svc = @svc.DictItemServiceImpl::{
       dao: dict_item_dao,
       dict_exists: async fn(dict_id) raise @core.MldongError {
@@ -122,6 +135,8 @@ pub fn policy() -> @guard.RoutePolicy {
     @ctrl.dict_policy(),
     @ctrl.dictitem_policy(),
     @ctrl.menu_policy(),
+    @ctrl.message_policy(),
+    @ctrl.fileinfo_policy(),
   ]
   let mut p = @guard.RoutePolicy::new()
   for f in fragments {

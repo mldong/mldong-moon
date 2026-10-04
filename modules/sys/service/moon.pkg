@@ -1,4 +1,6 @@
 import {
+  "moonbitlang/async/fs" @fs,
+  "moonbitlang/core/env" @env,
   "mldong/moon-core" @core,
   "mldong/moon-token-store/port" @port,
   "mldong/moon-sys/entity" @entity,

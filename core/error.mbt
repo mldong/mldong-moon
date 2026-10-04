@@ -13,6 +13,9 @@ pub(all) suberror MldongError {
   Conflict(String)
   /// 基础设施/内部错误（99990000，对外只说"系统繁忙"档的占位，骨架先透出原因便于调试）
   Internal(String)
+  /// bean 校验失败（99999999，boot2 @Validated MethodArgumentNotValidException
+  /// 由 GlobalExceptionHandler 统一映射 99999999 的同位——UC-0610 精确断此码）
+  InvalidParam(String)
 }
 
 ///|
@@ -23,6 +26,7 @@ pub fn MldongError::code(self : MldongError) -> Int {
     NotFound(_) => 99990002
     Conflict(_) => 99990003
     Business(_) => 99990004
+    InvalidParam(_) => 99999999
   }
 }
 
@@ -34,5 +38,6 @@ pub fn MldongError::message(self : MldongError) -> String {
     NotFound(msg) => msg
     Conflict(msg) => msg
     Internal(msg) => msg
+    InvalidParam(msg) => msg
   }
 }

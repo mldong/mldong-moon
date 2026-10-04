@@ -2,7 +2,7 @@
 
 mldong 快速开发框架的 **MoonBit 语言实现**。目标是与 mldong 框架的接口契约保持一致：同样的 URL、同样的 `{"code":0,"msg":"..","data":..}` 信封、同样的分页形状、同样的权限码与鉴权失败码。
 
-当前已落：`sys_user` 全链 16 端点（CRUD + 状态/个人中心/在线用户）+ `sys_role`/`sys_dept`/`sys_post`/`sys_config` CRUD + **`sys_dict`/`sys_dict_item` 字典全链**（CRUD + getByDictType/enumDictList/customDictList）+ **`sys_menu` 菜单全链**（CRUD + tree/list + appList + 用户路由菜单三版 + syncRoute）+ 登录/注销/refreshToken + moon-token 鉴权（RBAC 真码链 + appCode 多应用）+ `dev` 模块 **dev_schema 台账三件套全量**（schema/schemaGroup/schemaField 共 22 端点：CRUD + dbTable/disabled + importTable 先删重建 + getByTableName 免登录三段自校验 + updateDesigner 全删重插 + updateSort 拖拽 + 列表/搜索键直更 + 元数据裸切面 dbTable/columnList）+ 4 个 dev 字典枚举入册。同时是后续模块与代码生成器的**模板骨架**。
+当前已落：`sys_user` 全链 16 端点（CRUD + 状态/个人中心/在线用户）+ `sys_role`/`sys_dept`/`sys_post`/`sys_config` CRUD + **`sys_dict`/`sys_dict_item` 字典全链**（CRUD + getByDictType/enumDictList/customDictList）+ **`sys_menu` 菜单全链**（CRUD + tree/list + appList + 用户路由菜单三版 + syncRoute）+ 登录/注销/refreshToken + moon-token 鉴权（RBAC 真码链 + appCode 多应用）+ **站内信**（8 端点：接收人隔离 + appCode biz_type 前缀端隔离 + setRead/未读计数）+ **文件上传**（multipart 本地盘直写 + Ant 形状回查）+ **APP 检查升级**（免登录 UC-0610，蒲公英转调降级语义）+ **SSE 实时推送**（首帧 init + 10s 心跳）+ `dev` 模块 **dev_schema 台账三件套全量**（schema/schemaGroup/schemaField 共 22 端点：CRUD + dbTable/disabled + importTable 先删重建 + getByTableName 免登录三段自校验 + updateDesigner 全删重插 + updateSort 拖拽 + 列表/搜索键直更 + 元数据裸切面 dbTable/columnList）+ 4 个 dev 字典枚举入册。同时是后续模块与代码生成器的**模板骨架**。
 
 ## 技术栈
 
@@ -51,6 +51,7 @@ mldong-moon/
 │   ├── controller/            #   端点注册 + policy() 权限码片段（与端点同文件）
 │   └── module.mbt             #   模块自注册（main 每模块一行）
 ├── modules/dev/               # mldong/moon-dev：dev_schema 台账三件套（22 端点，boot2 dev 对齐）+ 库元数据底座（MetadataDao 一件两用：gen 直调 + importTable 导入）
+├── modules/app/               # mldong/moon-app：APP 检查升级（免登录 UC-0610；平台字典 env + 降级 data=null）
 ├── cmd/main/                  # 装配：鉴权（moon-token）+ 模块挂载 + listen :18680
 ├── cmd/gen/                   # 代码生成器：读活库元数据产六件套源码（产物即手写代码进仓）
 └── doc/                       # 深入文档
@@ -107,6 +108,10 @@ mldong-moon/
 | `/dev/schemaGroup/{save,remove,update,detail,page}` | `dev:schemaGroup:*` | 模型分组 CRUD（code 唯一 99990003） |
 | `/dev/schemaField/{save,remove,update,detail,page,updateSort}` | `dev:schemaField:*` | 模型字段 CRUD（page 默认 sort,id 升序；remove 物理删——boot2 @TableLogic 注释同语义）+ updateSort 拖拽换位（boot2 算法逐行 port） |
 | `/dev/schema/column/list` | `dev:schema:columnList` | 列清单裸切面（信息模式 + gen 字段类型映射；与台账面并存，gen 代码生成器专用） |
+| `/sys/message/{save,remove,update,detail,page,setRead,getUnreadCount,getUnreadCountGroupByBizType}` | save/update 挂码，其余仅登录 | 站内信（boot2 8 端点同位）：**接收人隔离**（读写全强制 receiver=当前用户）+ **appCode 端隔离**（biz_type 前缀自动补 + LIKE 过滤，BS/APP 互不可见）；setRead ids 空=本域全部已读；分页 bizTypes 过滤自动补前缀 |
+| `/sys/fileInfo/{save,remove,update,detail,page,upload,getFileInfoByIds}` | CRUD 挂码，upload/byIds 仅登录 | 文件（boot2 同位）：upload multipart 本地盘直写 `{MLDONG_UPLOAD_PATH:-./uploadfiles}/yyyyMM/objectId.ext` 返 `{url,fullUrl,fileInfoId}`；getFileInfoByIds 逗号串回查 Ant 形状 `{id,uid,name,url,status:"done"}`；remove 物理删（family 表无 is_deleted 列） |
+| `POST /app/appVersion/check` | 免登录（豁免面） | APP 检查升级（UC-0610）：platform 1..3 + versionCode 校验失败 **99999999**（boot2 @Validated 同码）；不查库，蒲公英 `apiv2/app/check` 语义（env `PGYER_API_KEY` + `PGYER_APP_KEY_ANDROID/HARMONYOS/IOS`，真值不进仓库）任何失败降级 `data:null`；**moon 档外呼 HTTP/TLS 客户端未接，恒走降级分支**（moontls 成熟后补真比较） |
+| `POST /sse/events` | 仅登录 | SSE 实时推送（UC-0608）：text/event-stream + 首帧 `{userId,type:"init",msg}` + 10s 心跳注释行保活（boot2 SseTaskRunner 同位） |
 
 - 未登录 `HTTP 401 + {"code":99990401}`；无权限 `HTTP 403 + {"code":99990403}`；
 - 分页请求 `{pageNum, pageSize, keywords?, searchKeys?, m_{OP}_{col}?...}`，响应 data 形状
@@ -184,6 +189,7 @@ moon run --target wasm cmd/gen/main -- sys_dept sys_post   # 产出到 gen-out/�
 - [ ] `rainbow` 分页导航补齐
 - [x] dev 模块元数据底座（MetadataDao 端口 + information_schema 实现 + dbTable/column/list 端点，10-04）
 - [x] dev 模块 dev_schema 台账三件套全量（boot2 22 端点 + 4 字典枚举 + 种子 2 模型全字段 + 探针表，runner 12/16 UC-0303 组收口，10-05）
+- [x] **base 首批契约全收口 16/16**：message 8 端点 + fileInfo 上传链 + app 检查升级 + SSE 推送（e2e 十三套 269/269，10-05）
 - [x] 家族契约 runner 首轮：已存在端点 5 组全 pass（认证/refresh/在线/角色页/配置页），缺模块清单见 doc/base-contract.md（10-03）
 - [x] 字典模块（sys_dict + sys_dict_item 全链 + getByDictType/enumDictList/customDictList + ext 空不出键统一到 dept/post）：e2e 9 套 142/142 + 契约 runner **10/16 pass**（10-04）
 - [x] 菜单模块（sys_menu CRUD + tree/list + appList + 用户路由菜单三版 + syncRoute 隔离域验证）：e2e 10 套 **178/178** + 契约 runner **11/16 pass**（10-04）

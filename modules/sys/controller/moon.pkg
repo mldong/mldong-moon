@@ -1,4 +1,7 @@
 import {
+  "moonbitlang/async" @async,
+  "moonbitlang/core/string" @string,
+  "moonbitlang/core/encoding/utf8" @utf8,
   "mldong/moon-core" @core,
   "mldong/moon-core-web" @web,
   "mldong/moon-token/app" @app,

@@ -3,6 +3,7 @@ members = [
   "./core-web",
   "./modules/sys",
   "./modules/dev",
+  "./modules/app",
   "./cmd",
   "./cmd/gen",
 ]
