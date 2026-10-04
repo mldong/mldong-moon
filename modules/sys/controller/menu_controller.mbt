@@ -10,9 +10,10 @@ pub fn menu_policy() -> @guard.RoutePolicy {
     .rule(@guard.RouteRule::make("/sys/menu/update", ["sys:menu:update"]))
     .rule(@guard.RouteRule::make("/sys/menu/detail", ["sys:menu:detail"]))
     .rule(@guard.RouteRule::make("/sys/menu/page", ["sys:menu:page"]))
-    // 二次开发（菜单树）：树/平铺列表
+    // 二次开发（菜单树）：树/平铺列表/路由同步
     .rule(@guard.RouteRule::make("/sys/menu/tree", ["sys:menu:tree"]))
     .rule(@guard.RouteRule::make("/sys/menu/list", ["sys:menu:list"]))
+    .rule(@guard.RouteRule::make("/sys/menu/syncRoute", ["sys:menu:syncRoute"]))
 }
 
 ///|
@@ -80,9 +81,47 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.MenuService]
     }
     @core.ok_data(Json::array(arr))
   })
+  // 应用列表（boot2 无权限注解 = 仅登录）：字典 app_list 域 → 静态回退
+  let app_list_handler : @mb.Handler = @web.wrap(async fn(_request) -> Json raise @core.MldongError {
+    @core.ok_data(Json::array(svc.app_list()))
+  })
+  // 路由同步（boot2 sys:menu:syncRoute；⚠️ 域内清理面，空数组短路）
+  let sync_route_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let ctx = @web.ctx_of(request)
+    svc.sync_route(ctx, @dto.menu_parse_sync(@web.json_body(request)))
+    @core.ok_empty()
+  })
+  // 用户路由菜单装配（boot2 GET /menu/all(v5) | /getMenuList(v2) | /getArtDesignMenu；仅登录）
+  let route_menu_json = async fn(request : @mb.Request, version : String) -> Json raise @core.MldongError {
+    let ctx = @web.ctx_of(request)
+    let super_admin = match @mbguard.principal_of(request) {
+      Some(p) => p.super_admin
+      None => false
+    }
+    let nodes = svc.user_route_menu(ctx, super_admin, version)
+    let arr : Array[Json] = []
+    for n in nodes {
+      arr.push(@dto.route_node_json(n))
+    }
+    @core.ok_data(Json::array(arr))
+  }
+  let menu_all_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    route_menu_json(request, "v5")
+  })
+  let menu_v2_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    route_menu_json(request, "v2")
+  })
+  let menu_art_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    route_menu_json(request, "art-design-pro")
+  })
   g.post(ctx, "/sys/menu/page", page_handler)
   g.post(ctx, "/sys/menu/tree", tree_handler)
   g.post(ctx, "/sys/menu/list", list_handler)
+  g.post(ctx, "/sys/menu/appList", app_list_handler)
+  g.post(ctx, "/sys/menu/syncRoute", sync_route_handler)
+  g.get(ctx, "/menu/all", menu_all_handler)
+  g.get(ctx, "/getMenuList", menu_v2_handler)
+  g.get(ctx, "/getArtDesignMenu", menu_art_handler)
 }
 
 ///|

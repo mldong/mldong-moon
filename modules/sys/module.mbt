@@ -63,9 +63,25 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] install(
     @ctrl.register_dict(ctx, dict_svc, g) catch {
       e => abort("sys 模块 dict 路由注册失败: \{e}")
     }
-    // menu —— cmd/gen 生成 + tree/list 二次开发（菜单树，RBAC 码链数据源的管理面）
+    // menu —— cmd/gen 生成 + tree/list/appList/userRouteMenu/syncRoute 二次开发
+    // （RBAC 码链数据源的管理面；syncRoute 清理面靠闭包跨到 RbacRepository 级联 role_menu）
     let menu_dao = @repo.MenuRepository::make(config)
-    let menu_svc = @svc.MenuServiceImpl::{ dao: menu_dao }
+    let rbac_repo = @repo.RbacRepository::make(config)
+    let menu_svc = @svc.MenuServiceImpl::{
+      dao: menu_dao,
+      app_list_of: async fn() raise @core.MldongError {
+        dict_svc.get_by_dict_type(@core.Ctx::system(), "app_list")
+      },
+      menu_ids_of: async fn(user_id, app_code) raise @core.MldongError {
+        rbac_repo.find_menu_ids_by_user(user_id, app_code)
+      },
+      perms_of: async fn(user_id, app_code) raise @core.MldongError {
+        rbac_repo.find_perms_by_user(user_id, app_code)
+      },
+      purge_role_menus: async fn(menu_ids) raise @core.MldongError {
+        rbac_repo.remove_role_menus_by_menu_ids(menu_ids)
+      },
+    }
     @ctrl.register_menu(ctx, menu_svc, g) catch {
       e => abort("sys 模块 menu 路由注册失败: \{e}")
     }

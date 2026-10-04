@@ -1,6 +1,6 @@
 # base-verify 契约跑测 · 差异清单（2026-10-03 首轮）
 
-> 跑批报告：协调仓 `base-verify/reports/2026-10-04-moon-dict-l2.{json,txt}`（字典轮 10/16）、`base-verify/reports/2026-10-04-moon-menu-l2.{json,txt}`（菜单轮 11/16）。
+> 跑批报告：协调仓 `base-verify/reports/2026-10-04-moon-dict-l2.{json,txt}`（字典轮 10/16）、`base-verify/reports/2026-10-04-moon-menu-l2.{json,txt}`（菜单轮 11/16）、`base-verify/reports/2026-10-04-moon-menu2-l2.json`（菜单缺口补齐轮 11/16 无回归）。boot2 全量 12 端点已对齐（syncRoute 无 base 契约，仓内 e2e 隔离域覆盖）。
 >
 > 用途：对照家族 base 契约 runner（协调仓 `scripts/contract-tests/contract_runner.py`，语言无关纯 HTTP）
 > 逐组给出 mldong-moon 的现状——**已存在端点的契约比对结论 + 未存在端点的按模块清单**。

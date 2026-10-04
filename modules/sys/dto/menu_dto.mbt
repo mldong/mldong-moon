@@ -157,3 +157,133 @@ pub fn menu_json(d : @entity.Menu) -> Json {
   }
   Json::object(base)
 }
+
+///|
+/// 路由菜单节点（boot2 RouteMenuVO / goframe RouteMenuVO 同形）：id/parentId 不出键，
+/// name=菜单 code，meta 组装见 service；children 空不出键（boot2 NON_EMPTY 同语义）
+pub(all) struct RouteNode {
+  mut id : Int64
+  mut parent_id : Int64
+  mut name : String
+  mut path : String?
+  mut redirect : String?
+  mut component : String?
+  mut meta : Map[String, Json]
+  mut children : Array[RouteNode]
+}
+
+///|
+pub fn RouteNode::make(id : Int64, parent_id : Int64, m : @entity.Menu) -> RouteNode {
+  {
+    id,
+    parent_id,
+    name: m.code,
+    path: m.path,
+    redirect: None,
+    component: m.component,
+    meta: Map([], capacity=0),
+    children: [],
+  }
+}
+
+///|
+pub fn route_node_json(n : RouteNode) -> Json {
+  let obj : Json = {
+    "name": Json::string(n.name),
+    "path": jstr(n.path),
+    "redirect": Json::string(n.redirect.unwrap_or("")),
+    "component": jstr(n.component),
+    "meta": Json::object(n.meta),
+    "children": Json::array(n.children.map(route_node_json)),
+  }
+  let base = match obj {
+    Object(map) => map
+    _ => abort("route_node_json 恒为 Object")
+  }
+  // redirect 空出键（boot2 redirect=null 序列化差异取 goframe 口径；children 空出键）
+  match n.redirect {
+    Some(r) => if r.is_empty() {
+      let _ = base.remove("redirect")
+    }
+    None => {
+      let _ = base.remove("redirect")
+    }
+  }
+  if n.children.is_empty() {
+    let _ = base.remove("children")
+  }
+  Json::object(base)
+}
+
+///|
+/// 路由同步入参（boot2 SyncRouteParam 同形；嵌套 children 递归 upsert）
+pub(all) struct SyncRouteReq {
+  mut is_sync : Int?
+  mut name : String
+  mut code : String
+  mut menu_type : Int?
+  mut sort : Int64?
+  mut path : String?
+  mut component : String?
+  mut icon : String?
+  mut is_show : Int?
+  mut is_link : Int?
+  mut url : String?
+  mut enabled : Int?
+  mut open_type : Int?
+  mut is_cache : Int?
+  /// ext 序列化串（前端 ext 对象 → variable JSON 串；不带 = "{}"，boot2 同）
+  mut variable : String?
+  mut children : Array[SyncRouteReq]
+}
+
+///|
+fn sync_route_of(data : Json) -> SyncRouteReq raise @core.MldongError {
+  let children : Array[SyncRouteReq] = []
+  match data {
+    Object(map) =>
+      match map.get("children") {
+        Some(Json::Array(arr)) =>
+          for c in arr {
+            children.push(sync_route_of(c))
+          }
+        _ => ()
+      }
+    _ => ()
+  }
+  {
+    is_sync: @core.get_int(data, "isSync"),
+    name: @core.text_or(data, "name", ""),
+    code: @core.text_or(data, "code", ""),
+    menu_type: @core.get_int(data, "type"),
+    sort: @core.get_i64(data, "sort"),
+    path: @core.get_text(data, "path"),
+    component: @core.get_text(data, "component"),
+    icon: @core.get_text(data, "icon"),
+    is_show: @core.get_int(data, "isShow"),
+    is_link: @core.get_int(data, "isLink"),
+    url: @core.get_text(data, "url"),
+    enabled: @core.get_int(data, "enabled"),
+    open_type: @core.get_int(data, "openType"),
+    is_cache: @core.get_int(data, "isCache"),
+    variable: Some(match @core.get_ext_string(data, "ext") {
+      Some(s) => s
+      None => "{}"
+    }),
+    children,
+  }
+}
+
+///|
+pub fn menu_parse_sync(body : Json) -> Array[SyncRouteReq] raise @core.MldongError {
+  match body {
+    Json::Array(arr) => {
+      let out : Array[SyncRouteReq] = []
+      for c in arr {
+        out.push(sync_route_of(c))
+      }
+      out
+    }
+    _ => raise @core.MldongError::InvalidInput("body 必须是路由数组")
+  }
+}

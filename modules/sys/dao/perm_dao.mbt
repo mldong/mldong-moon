@@ -14,4 +14,8 @@ pub(open) trait RbacDao {
   /// 授权写路：全量替换（删旧插新，repository 实现内局部事务）
   async fn grant_roles(Self, user_id : Int64, role_ids : Array[Int64]) -> Unit raise @core.MldongError
   async fn grant_menus(Self, role_id : Int64, menu_ids : Array[Int64]) -> Unit raise @core.MldongError
+  /// 用户可见菜单 id 链（user_role → role_menu → menu.id；路由菜单非超管过滤用）——二次开发
+  async fn find_menu_ids_by_user(Self, user_id : Int64, app_code : String) -> Array[Int64] raise @core.MldongError
+  /// role_menu 按菜单 id 清理（syncRoute 删菜单时级联）——二次开发
+  async fn remove_role_menus_by_menu_ids(Self, menu_ids : Array[Int64]) -> Unit raise @core.MldongError
 }

@@ -16,4 +16,8 @@ pub(open) trait MenuDao {
   async fn page(Self, @core.Wrapper, Int, Int) -> (Int, Array[@entity.Menu]) raise @core.MldongError
   /// 全量平铺（tree/list 取数；sort,id 升序）——二次开发（菜单树）
   async fn list_flat(Self, @core.Wrapper) -> Array[@entity.Menu] raise @core.MldongError
+  /// 应用域+编码定位（syncRoute upsert 键）——二次开发
+  async fn find_by_app_and_code(Self, app_code : String, code : String) -> @entity.Menu? raise @core.MldongError
+  /// 域内未同步集（app_code 命中 + is_sync=1 + id 不在排除集）——syncRoute 清理面
+  async fn list_unsynced_except(Self, app_code : String, exclude_ids : Array[Int64]) -> Array[@entity.Menu] raise @core.MldongError
 }

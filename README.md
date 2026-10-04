@@ -2,7 +2,7 @@
 
 mldong 快速开发框架的 **MoonBit 语言实现**。目标是与 mldong 框架的接口契约保持一致：同样的 URL、同样的 `{"code":0,"msg":"..","data":..}` 信封、同样的分页形状、同样的权限码与鉴权失败码。
 
-当前已落：`sys_user` 全链 16 端点（CRUD + 状态/个人中心/在线用户）+ `sys_role`/`sys_dept`/`sys_post`/`sys_config` CRUD + **`sys_dict`/`sys_dict_item` 字典全链**（CRUD + getByDictType/enumDictList/customDictList）+ **`sys_menu` 菜单管理面**（CRUD + tree/list）+ 登录/注销/refreshToken + moon-token 鉴权（RBAC 真码链 + appCode 多应用）+ `dev` 模块库元数据底座（gen/dev_schema 共用）。同时是后续模块与代码生成器的**模板骨架**。
+当前已落：`sys_user` 全链 16 端点（CRUD + 状态/个人中心/在线用户）+ `sys_role`/`sys_dept`/`sys_post`/`sys_config` CRUD + **`sys_dict`/`sys_dict_item` 字典全链**（CRUD + getByDictType/enumDictList/customDictList）+ **`sys_menu` 菜单全链**（CRUD + tree/list + appList + 用户路由菜单三版 + syncRoute）+ 登录/注销/refreshToken + moon-token 鉴权（RBAC 真码链 + appCode 多应用）+ `dev` 模块库元数据底座（gen/dev_schema 共用）。同时是后续模块与代码生成器的**模板骨架**。
 
 ## 技术栈
 
@@ -95,6 +95,9 @@ mldong-moon/
 | `/sys/dictItem/{save,remove,update,detail,page}` | `sys:dictItem:*` | 字典项 CRUD（**gen 生成** + 父字典存在性 + dict 内 code 唯一；page 带 m_ 全 13 操作符 + keywords/orderBy 白名单，UC-0430） |
 | `/sys/menu/{save,remove,update,detail,page}` | `sys:menu:*` | 菜单 CRUD（**gen 生成** + code 全局唯一；type 保留字字段名 menu_type，json 键仍 `type`） |
 | `/sys/menu/tree` / `list` | `sys:menu:tree` / `sys:menu:list` | 菜单树/平铺（appCode 缺省取登录上下文、sort 升序建树、孤儿挂回根、children 嵌套 + ext 空不出键，UC-0409） |
+| `/sys/menu/appList` | 仅登录 | 应用列表 `[{label,value}]`：字典 `app_list` 域 → 静态回退（boot2 MenuAppCodeEnum） |
+| `GET /menu/all` / `/getMenuList` / `/getArtDesignMenu` | 仅登录 | 用户路由菜单（vben5 登录流契约）：enabled + 登录域 + type 1/2，超管全量/非超管 RBAC 菜单 id 链过滤；`name=code` + meta(order/title/icon/link/iframeSrc/hideInMenu〔v2=hideMenu〕/keepAlive/variable 合并)；art 版多 isIframe/authList |
+| `/sys/menu/syncRoute` | `sys:menu:syncRoute` | 前端路由同步（**域内清理面，慎用**）：递归 upsert（appCode+code 键、isSync=1 才管、深度上限 8）→ 域内删未同步集（is_sync=1 且不在集合）+ role_menu 级联；**空数组短路不删**；e2e 只在隔离 appCode 域测 |
 | `/dev/schema/dbTable` | `dev:schema:dbTable` OR `dev:schema:importTable` | 库表清单（keywords 滤表名/注释） |
 | `/dev/schema/column/list` | `dev:schema:columnList` | 列清单（信息模式 + gen 字段类型映射） |
 
@@ -175,7 +178,7 @@ moon run --target wasm cmd/gen/main -- sys_dept sys_post   # 产出到 gen-out/�
 - [x] dev 模块元数据底座（MetadataDao 端口 + information_schema 实现 + dbTable/column/list 端点，10-04）
 - [x] 家族契约 runner 首轮：已存在端点 5 组全 pass（认证/refresh/在线/角色页/配置页），缺模块清单见 doc/base-contract.md（10-03）
 - [x] 字典模块（sys_dict + sys_dict_item 全链 + getByDictType/enumDictList/customDictList + ext 空不出键统一到 dept/post）：e2e 9 套 142/142 + 契约 runner **10/16 pass**（10-04）
-- [x] 菜单模块（sys_menu CRUD + tree/list，RBAC 码链数据源管理面）：e2e 10 套 161/161 + 契约 runner **11/16 pass**（10-04）
+- [x] 菜单模块（sys_menu CRUD + tree/list + appList + 用户路由菜单三版 + syncRoute 隔离域验证）：e2e 10 套 **178/178** + 契约 runner **11/16 pass**（10-04）
 - [ ] 事务模板（参照 jeeflow-moon `MysqlTxTemplate`：环境连接 + 嵌套复用；现为 grant 局部事务）
 - [ ] dev 模块：代码生成器（读 MetadataDao 产出六件套源码，见 doc/gen-metadata.md §4）
 - [ ] dev_schema 台账（importTable 落库 + disabled 标记 + /dev/schema/page·getByTableName 契约面，boot2 同位）

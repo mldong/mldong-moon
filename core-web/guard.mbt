@@ -73,8 +73,20 @@ pub fn token_of(request : @mb.Request) -> String {
 /// 当前请求的框架上下文（service 层第一参）：登录主体 → Ctx；
 /// 豁免面/无主体 = Ctx::system()（审计落 NULL，不报错）。
 pub fn ctx_of(request : @mb.Request) -> @core.Ctx {
-  match @mbguard.principal_of(request) {
+  let ctx = match @mbguard.principal_of(request) {
     Some(p) => @core.Ctx::make(@core.parse_user_id(p.login_id), p.login_id)
     None => @core.Ctx::system()
   }
+  // appCode 请求域（boot2 LoginUserHolder.getAppCode 同位）：头缺省 platform——
+  // 菜单树/路由菜单/路由同步按域过滤都从这读；vben5 拦截器每请求都带 appCode 头
+  ctx.app_code = match request.headers.get("appCode") {
+    Some(v) =>
+      if v.is_empty() {
+        Some("platform")
+      } else {
+        Some(v.to_owned())
+      }
+    None => Some("platform")
+  }
+  ctx
 }

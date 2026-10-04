@@ -122,7 +122,9 @@ pub(open) trait UserDao {
 fn validate(req : @dto.UserSaveReq) -> String? { ... }
 
 // ctx 第一参 = 框架请求上下文（core/ctx.mbt：user_id/login_id/app_code；goframe 同位）——
-// 审计操作人与后续业务身份消费（数据权限等）的统一入口，controller 用 @web.ctx_of 装配
+// 审计操作人与后续业务身份消费（数据权限等）的统一入口，controller 用 @web.ctx_of 装配；
+// app_code 由 ctx_of 按请求头装配（缺省 platform，boot2 LoginUserHolder.getAppCode 同位——
+// 菜单树/路由菜单/路由同步按域过滤都从这读）
 pub(open) trait UserService { ... }
 pub(all) struct UserServiceImpl[R] { dao : R }
 pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn save(self, ctx, req) { ... }

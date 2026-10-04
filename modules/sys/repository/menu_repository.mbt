@@ -65,6 +65,20 @@ pub impl @dao.MenuDao for MenuRepository with fn list_flat(self, w) {
   self.base.list(w, orders=[("sort", false), ("id", false)])
 }
 
+///|
+pub impl @dao.MenuDao for MenuRepository with fn find_by_app_and_code(self, app_code, code) {
+  self.base.find_one(@core.where_().eq("app_code", S(app_code)).eq("code", S(code)))
+}
+
+///|
+pub impl @dao.MenuDao for MenuRepository with fn list_unsynced_except(self, app_code, exclude_ids) {
+  let w = @core.where_().eq("app_code", S(app_code)).eq("is_sync", I(1))
+  if !exclude_ids.is_empty() {
+    let _ = w.not_in("id", exclude_ids.map(fn(i) { L(i) }))
+  }
+  self.base.list(w, orders=[("id", false)])
+}
+
 pub extend MenuRepository with @dao.MenuDao::{
   remove_by_ids,
   find_by_id,
@@ -74,4 +88,6 @@ pub extend MenuRepository with @dao.MenuDao::{
   find_by_ids,
   check_unique,
   list_flat,
+  find_by_app_and_code,
+  list_unsynced_except,
 }

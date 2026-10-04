@@ -168,6 +168,45 @@ fn user_auth_of(r : @moondb.Row) -> @entity.UserAuth {
 ///|
 
 ///|
+///|
+pub impl @dao.RbacDao for RbacRepository with fn find_menu_ids_by_user(self, user_id, app_code) {
+  let conn = open_conn(self.config)
+  let rows = q(
+    conn,
+    "SELECT DISTINCT m.id FROM sys_menu m JOIN sys_role_menu rm ON rm.menu_id = m.id JOIN sys_user_role ur ON ur.role_id = rm.role_id JOIN sys_role r ON r.id = ur.role_id WHERE ur.user_id = ? AND r.app_code = ? AND m.app_code = ? AND m.is_deleted = 0",
+    [@moondb.Int64(user_id), @moondb.Text(app_code), @moondb.Text(app_code)],
+  )
+  conn.close()
+  let out : Array[Int64] = []
+  for r in rows {
+    let id = row_i64(r, "id")
+    if id != 0L {
+      out.push(id)
+    }
+  }
+  out
+}
+
+///|
+pub impl @dao.RbacDao for RbacRepository with fn remove_role_menus_by_menu_ids(self, menu_ids) {
+  if menu_ids.is_empty() {
+    return
+  }
+  let conn = open_conn(self.config)
+  let marks : Array[String] = []
+  let params : Array[@moondb.Value] = []
+  for id in menu_ids {
+    marks.push("?")
+    params.push(@moondb.Int64(id))
+  }
+  let _ = x(
+    conn,
+    "DELETE FROM sys_role_menu WHERE menu_id IN (\{marks.join(",")})",
+    params,
+  )
+  conn.close()
+}
+
 pub extend RbacRepository with @dao.RbacDao::{
   find_user_auth_by_name,
   find_user_auth_by_id,
@@ -175,4 +214,6 @@ pub extend RbacRepository with @dao.RbacDao::{
   find_perms_by_user,
   grant_roles,
   grant_menus,
+  find_menu_ids_by_user,
+  remove_role_menus_by_menu_ids,
 }
