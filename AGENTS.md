@@ -39,6 +39,7 @@ mldong-moon/
 ├── modules/dev/         # mldong/moon-dev —— 库元数据底座（gen/dev_schema 共用，doc/gen-metadata.md）
 ├── cmd/main/            # 装配入口：鉴权 + 模块挂载 + listen :18680
 ├── cmd/gen/             # 代码生成器（读 MetadataDao 产六件套，gen-out/ 不入仓）
+├── e2e/                 # 黑盒回归矩阵（run.sh 总入口，八套 113 用例，真库）
 └── doc/                 # 深入文档（AI 上手按序读）
     ├── layering.md      #   分层规范（六件套、依赖规则、BaseDao、sqlbuilder、m_）
     ├── permissions.md   #   权限鉴权（moon-token 集成、RBAC 链、appCode）
@@ -65,7 +66,15 @@ export MLDONG_DB_USER=root MLDONG_DB_PWD=<密码> MLDONG_DB_NAME=mldong-moon
 
 首次建库：`mysql -u root -p < doc/sql/mysql-schema-all.sql`（一条命令：建库 + 全表 + 种子数据）。
 
-冒烟（服务起后）：
+回归（服务起后，真库黑盒矩阵，八套 113 用例）：
+
+```bash
+BASE=http://127.0.0.1:18680 bash e2e/run.sh   # 汇总 "总计: OK n FAIL 0" 为绿
+```
+
+用例即脚本（e2e/*.py，标准库零依赖）；动了鉴权/RBAC 必须全量跑，普通改动跑相关套件。
+
+单端点冒烟（快速探活）：
 
 ```bash
 curl -s -X POST http://127.0.0.1:18680/sys/login \
@@ -106,6 +115,12 @@ curl -s -X POST http://127.0.0.1:18680/sys/user/page \
   `@mb`=moonback、`@mbguard`=moon-token-moonback/guard、`@app`=moon-token/app、
   `@guard`=moon-token/guard、`@port`=moon-token-store/port、`@style`=moon-token/style、
   `@mem`=moon-token-store/memory；模块内 `@entity/@dto/@dao/@mysql/@svc/@ctrl` 指 moon-sys 子包。
+- **审计四件套**（create_time/create_user/update_time/update_user）：时间由 service/codec
+  填；**操作人显式传参**——controller `@web.user_id_of(request)` 取登录主体 → service 方法
+  尾参 `op_user : Int64?` → 实体 create_user/update_user → TableCodec 写路面（insert 双列/
+  update update_user，N 值跳过）。**不要做全局 holder**：moonbitlang/async 无 task-local，
+  协同式 async 请求交错会串号（boot2 ThreadLocal 在此语言无安全对应物）；gen 模板已内置，
+  手写表照 user_service 形状。
 - **已知 warnings 类别**（`moon check` 0 errors / 61 warnings 基线，10 类；改动时别引入新类别）：
   `fragile_catch_all`（30，`catch { _ => }`/边界错误转换吞错兜底）、`deprecated`（14，core 旧 API）、
   `reserved_keyword`（4）、`implicit_impl_as_method`（3，trait impl 方法隐式提升，收敛要加
@@ -115,8 +130,8 @@ curl -s -X POST http://127.0.0.1:18680/sys/user/page \
 
 ## 6. 协作约定
 
-- **commit 前**：`moon check` 0 errors + 至少一轮真库冒烟（登录 → 受保护端点 → 负向 403）；
-  动了鉴权/RBAC 必须复跑 appCode + 权限码矩阵（用例清单见 doc/permissions.md §7）。
+- **commit 前**：`moon check` 0 errors + `bash e2e/run.sh` 全绿（或至少相关套件）；
+  动了鉴权/RBAC 必须全量跑。
 - **git**：明确路径 `git add <文件>`，禁止 `git add -A`/`git add .`；
   不绕过 hook（无 `--no-verify`）。
 - **接口契约**：URL、信封、错误码、分页形状、权限码以 mldong 接口契约为准，不私造形状；
