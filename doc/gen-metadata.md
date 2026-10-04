@@ -69,8 +69,10 @@ pub(all) struct ColumnMeta {
 
    - 产物 = 手写代码进仓（文件头〔cmd/gen 生成，可手改〕），非编译期挂钩子（codegen/dev_build
      路线已被 owner 否决）；`gen-out/` 不入仓；
-   - 生成面 = 标准 CRUD 五端点 + 权限码片段；**权限码前缀取表名首段（sys_dept → sys:dept），
-     路由前缀 = 表名首下划线换 /（/sys/dept）**——两者形状相近别混用（已踩）；
+   - 生成面 = 标准 CRUD 五端点 + 权限码片段 + 唯一编码校验一行调（`check_unique`，BaseDao
+     通用件，boot2 checkUnique 同位）/ 批量查 `find_by_ids`；**权限码前缀取表名首段
+     （sys_dept → sys:dept），路由前缀 = 表名首下划线换 /（/sys/dept）**——两者形状相近
+     别混用（已踩）；
    - **同包多实体防撞名**：生成物 dto 顶层标识符带表内小写前缀（post_parse_save 等）——
      不加前缀会静默命中同包其它实体的同名符号（编译不报错、运行时校验面张冠李戴，已踩）；
    - **树表等特性 = 手写扩展面**：独立文件（如 dept_tree.mbt）扩展 list_all/树装配/树端点，
