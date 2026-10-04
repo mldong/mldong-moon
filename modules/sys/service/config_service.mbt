@@ -2,12 +2,12 @@
 
 ///|
 pub(open) trait ConfigService {
-  /// op_user = 操作人 id（审计 create_user/update_user；controller 从登录主体取）
-  async fn save(Self, @dto.ConfigSaveReq, Int64?) -> Int64 raise @core.MldongError
-  async fn update(Self, @dto.ConfigSaveReq, Int64?) -> Unit raise @core.MldongError
-  async fn remove_by_ids(Self, Array[Int64]) -> Unit raise @core.MldongError
-  async fn find_by_id(Self, Int64) -> @entity.Config raise @core.MldongError
-  async fn page(Self, @dto.ConfigPageReq) -> (Int, Array[@entity.Config]) raise @core.MldongError
+  /// ctx = 请求上下文（审计操作人/后续业务身份传播；controller @web.ctx_of 装配）
+  async fn save(Self, @core.Ctx, @dto.ConfigSaveReq) -> Int64 raise @core.MldongError
+  async fn update(Self, @core.Ctx, @dto.ConfigSaveReq) -> Unit raise @core.MldongError
+  async fn remove_by_ids(Self, @core.Ctx, Array[Int64]) -> Unit raise @core.MldongError
+  async fn find_by_id(Self, @core.Ctx, Int64) -> @entity.Config raise @core.MldongError
+  async fn page(Self, @core.Ctx, @dto.ConfigPageReq) -> (Int, Array[@entity.Config]) raise @core.MldongError
 }
 
 ///|
@@ -19,7 +19,7 @@ pub(all) struct ConfigServiceImpl[R] {
 }
 
 ///|
-pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn save(self, req, op_user) {
+pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn save(self, ctx, req) {
   // 唯一编码校验（boot2 checkUnique 同位一行调）
   self.dao.check_unique(req.code, None, "唯一编码已存在: " + req.code)
   let d : @entity.Config = {
@@ -32,9 +32,9 @@ pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn save
     enabled: req.enabled,
     remark: req.remark,
     create_time: Some(@core.now_str()),
-    create_user: op_user,
+    create_user: ctx.user_id,
     update_time: None,
-    update_user: op_user,
+    update_user: ctx.user_id,
     is_deleted: Some(0),
   }
   match self.holder {
@@ -45,7 +45,7 @@ pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn save
 }
 
 ///|
-pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn update(self, req, op_user) {
+pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn update(self, ctx, req) {
   match self.dao.find_by_id(req.id) {
     None => raise @core.MldongError::NotFound("数据不存在: " + req.id.to_string())
     Some(_) => ()
@@ -65,7 +65,7 @@ pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn upda
     create_time: None,
     create_user: None,
     update_time: Some(@core.now_str()),
-    update_user: op_user,
+    update_user: ctx.user_id,
     is_deleted: None,
   }
   match self.holder {
@@ -76,7 +76,7 @@ pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn upda
 }
 
 ///|
-pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn remove_by_ids(self, ids) {
+pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn remove_by_ids(self, _ctx, ids) {
   if ids.is_empty() {
     raise @core.MldongError::InvalidInput("ids 不能为空")
   }
@@ -95,6 +95,7 @@ pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn remo
 ///|
 pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn find_by_id(
   self,
+  _ctx,
   id,
 ) {
   match self.dao.find_by_id(id) {
@@ -104,7 +105,7 @@ pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn find
 }
 
 ///|
-pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn page(self, req) {
+pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn page(self, _ctx, req) {
   let w = @core.where_()
   let _ = w.append(req.m)
   self.dao.page(w, req.page_num, req.page_size)

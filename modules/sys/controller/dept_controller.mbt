@@ -21,29 +21,32 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.DeptService]
   g : @mbguard.Guard[S, P],
 ) -> Unit raise {
   let save_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
-    let op_user = @web.user_id_of(request)
-    let id = svc.save(@dto.dept_parse_save(@web.json_body(request)), op_user)
+    let ctx = @web.ctx_of(request)
+    let id = svc.save(ctx, @dto.dept_parse_save(@web.json_body(request)))
     @core.ok_data(Json::string(id.to_string()))
   })
   let remove_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
-    svc.remove_by_ids(@core.get_ids(@web.json_body(request)))
+    let ctx = @web.ctx_of(request)
+    svc.remove_by_ids(ctx, @core.get_ids(@web.json_body(request)))
     @core.ok_empty()
   })
   let update_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
-    let op_user = @web.user_id_of(request)
-    svc.update(@dto.dept_parse_update(@web.json_body(request)), op_user)
+    let ctx = @web.ctx_of(request)
+    svc.update(ctx, @dto.dept_parse_update(@web.json_body(request)))
     @core.ok_empty()
   })
   let detail_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let ctx = @web.ctx_of(request)
     let id : Int64 = match @core.get_i64(@web.json_body(request), "id") {
       Some(n) => n
       None => 0L
     }
-    @core.ok_data(@dto.dept_json(svc.find_by_id(id)))
+    @core.ok_data(@dto.dept_json(svc.find_by_id(ctx, id)))
   })
   let page_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let ctx = @web.ctx_of(request)
     let req = @dto.dept_parse_page(@web.json_body(request))
-    let (total, rows) = svc.page(req)
+    let (total, rows) = svc.page(ctx, req)
     let arr : Array[Json] = []
     for row in rows {
       arr.push(@dto.dept_json(row))
@@ -67,7 +70,8 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.DeptService]
   }
   // 部门树（boot2 /sys/dept/list：全量平表 → parent_id 建树）——二次开发（树表）
   let list_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
-    let tree = @svc.build_dept_tree(svc.list_all())
+    let ctx = @web.ctx_of(request)
+    let tree = @svc.build_dept_tree(svc.list_all(ctx))
     let arr : Array[Json] = []
     for n in tree {
       arr.push(dept_node_json(n))

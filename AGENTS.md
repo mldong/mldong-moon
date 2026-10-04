@@ -116,11 +116,13 @@ curl -s -X POST http://127.0.0.1:18680/sys/user/page \
   `@guard`=moon-token/guard、`@port`=moon-token-store/port、`@style`=moon-token/style、
   `@mem`=moon-token-store/memory；模块内 `@entity/@dto/@dao/@mysql/@svc/@ctrl` 指 moon-sys 子包。
 - **审计四件套**（create_time/create_user/update_time/update_user）：时间由 service/codec
-  填；**操作人显式传参**——controller `@web.user_id_of(request)` 取登录主体 → service 方法
-  尾参 `op_user : Int64?` → 实体 create_user/update_user → TableCodec 写路面（insert 双列/
-  update update_user，N 值跳过）。**不要做全局 holder**：moonbitlang/async 无 task-local，
-  协同式 async 请求交错会串号（boot2 ThreadLocal 在此语言无安全对应物）；gen 模板已内置，
-  手写表照 user_service 形状。
+  填；**操作人走框架 Ctx**——`core/ctx.mbt`（goframe ctx 显式第一参同位）：controller
+  `@web.ctx_of(request)` 从登录主体装配 → **service 全方法第一参 `ctx : @core.Ctx`** →
+  实体 create_user/update_user 取 `ctx.user_id` → TableCodec 写路面（insert 双列/update
+  update_user，N 值跳过）。**不要做全局 holder**：moonbitlang/async 无 task-local，协同式
+  async 请求交错会串号（boot2 ThreadLocal 无安全对应物；goframe 的 ctx 同样是显式传参，
+  不是隐式全局）。后续业务身份消费（数据权限/appCode 过滤/trace）一律扩 Ctx 字段；
+  gen 模板已内置，手写表照 user_service 形状。
 - **已知 warnings 类别**（`moon check` 0 errors / 61 warnings 基线，10 类；改动时别引入新类别）：
   `fragile_catch_all`（30，`catch { _ => }`/边界错误转换吞错兜底）、`deprecated`（14，core 旧 API）、
   `reserved_keyword`（4）、`implicit_impl_as_method`（3，trait impl 方法隐式提升，收敛要加

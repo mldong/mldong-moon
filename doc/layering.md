@@ -114,9 +114,11 @@ pub(open) trait UserDao {
 // 纯规则抽纯函数（零 IO 零 async，moon test 不连库直跑）
 fn validate(req : @dto.UserSaveReq) -> String? { ... }
 
+// ctx 第一参 = 框架请求上下文（core/ctx.mbt：user_id/login_id/app_code；goframe 同位）——
+// 审计操作人与后续业务身份消费（数据权限等）的统一入口，controller 用 @web.ctx_of 装配
 pub(open) trait UserService { ... }
 pub(all) struct UserServiceImpl[R] { dao : R }
-pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn save(self, req) { ... }
+pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn save(self, ctx, req) { ... }
 ```
 
 - 错误码语义：参数错 `InvalidInput`、不存在 `NotFound`、查重冲突 `Conflict`、业务失败 `Business`；

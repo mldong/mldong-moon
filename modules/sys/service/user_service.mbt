@@ -14,28 +14,28 @@ fn validate(req : @dto.UserSaveReq) -> String? {
 
 ///|
 pub(open) trait UserService {
-  /// op_user = 操作人 id（审计 create_user/update_user；controller 从登录主体取）
-  async fn save(Self, @dto.UserSaveReq, Int64?) -> Int64 raise @core.MldongError
-  async fn update(Self, @dto.UserSaveReq, Int64?) -> Unit raise @core.MldongError
-  async fn remove_by_ids(Self, Array[Int64]) -> Unit raise @core.MldongError
-  async fn find_by_id(Self, Int64) -> @entity.User raise @core.MldongError
-  async fn page(Self, @dto.UserPageReq) -> (Int, Array[@entity.UserPageRow]) raise @core.MldongError
+  /// ctx = 请求上下文（审计操作人/后续业务身份传播；controller @web.ctx_of 装配）
+  async fn save(Self, @core.Ctx, @dto.UserSaveReq) -> Int64 raise @core.MldongError
+  async fn update(Self, @core.Ctx, @dto.UserSaveReq) -> Unit raise @core.MldongError
+  async fn remove_by_ids(Self, @core.Ctx, Array[Int64]) -> Unit raise @core.MldongError
+  async fn find_by_id(Self, @core.Ctx, Int64) -> @entity.User raise @core.MldongError
+  async fn page(Self, @core.Ctx, @dto.UserPageReq) -> (Int, Array[@entity.UserPageRow]) raise @core.MldongError
   /// 批量按 id 查（在线列表 join 用户名用，controller 编排 moon-token 枚举时取名称）
-  async fn find_by_ids(Self, Array[Int64]) -> Array[@entity.User] raise @core.MldongError
+  async fn find_by_ids(Self, @core.Ctx, Array[Int64]) -> Array[@entity.User] raise @core.MldongError
   /// 锁定/解锁（locked=1/0）；返回实际处理条数
-  async fn set_locked(Self, Array[Int64], Int) -> Int raise @core.MldongError
+  async fn set_locked(Self, @core.Ctx, Array[Int64], Int) -> Int raise @core.MldongError
   /// 重置为默认密码（新盐 + md5(默认密码+盐)；超管跳过）；返回实际重置条数（boot2 resetPwd 同语义）
-  async fn reset_password(Self, Array[Int64]) -> Int raise @core.MldongError
+  async fn reset_password(Self, @core.Ctx, Array[Int64]) -> Int raise @core.MldongError
   /// 用户下拉选项（userName/realName LIKE，上限 50）
-  async fn select_options(Self, String) -> Array[@entity.User] raise @core.MldongError
+  async fn select_options(Self, @core.Ctx, String) -> Array[@entity.User] raise @core.MldongError
   /// 全量轻量用户（部门用户树用；未删除范围）
-  async fn list_simple(Self) -> Array[@entity.User] raise @core.MldongError
+  async fn list_simple(Self, @core.Ctx) -> Array[@entity.User] raise @core.MldongError
   /// 修改个人信息（只动 realName/nickName/sex，其余字段忽略；对齐 boot2 ValidInfo 组）
-  async fn update_info(Self, @dto.UserSaveReq, Int64?) -> Unit raise @core.MldongError
+  async fn update_info(Self, @core.Ctx, @dto.UserSaveReq) -> Unit raise @core.MldongError
   /// 修改个人密码（验旧密 md5(旧+盐)；新盐 + md5(新+盐)；boot2 updatePwd 同语义）
-  async fn update_password(Self, Int64, String, String) -> Unit raise @core.MldongError
+  async fn update_password(Self, @core.Ctx, Int64, String, String) -> Unit raise @core.MldongError
   /// 修改个人头像（boot2 updateAvatar：avatar 存 URL 串）
-  async fn update_avatar(Self, Int64, String, Int64?) -> Unit raise @core.MldongError
+  async fn update_avatar(Self, @core.Ctx, Int64, String) -> Unit raise @core.MldongError
 }
 
 ///|
@@ -47,7 +47,7 @@ pub(all) struct UserServiceImpl[R] {
 }
 
 ///|
-pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn save(self, req, op_user) {
+pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn save(self, ctx, req) {
   match validate(req) {
     Some(msg) => raise @core.MldongError::InvalidInput(msg)
     None => ()
@@ -80,16 +80,16 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn save(self,
     post_id: None,
     remark: req.remark,
     create_time: Some(@core.now_str()),
-    create_user: op_user,
+    create_user: ctx.user_id,
     update_time: None,
-    update_user: op_user,
+    update_user: ctx.user_id,
     is_deleted: Some(0),
   }
   self.dao.insert(u)
 }
 
 ///|
-pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update(self, req, op_user) {
+pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update(self, ctx, req) {
   match validate(req) {
     Some(msg) => raise @core.MldongError::InvalidInput(msg)
     None => ()
@@ -126,14 +126,14 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update(sel
     create_time: None,
     create_user: None,
     update_time: None,
-    update_user: op_user,
+    update_user: ctx.user_id,
     is_deleted: None,
   }
   self.dao.update(u)
 }
 
 ///|
-pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn remove_by_ids(self, ids) {
+pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn remove_by_ids(self, _ctx, ids) {
   if ids.is_empty() {
     raise @core.MldongError::InvalidInput("ids 不能为空")
   }
@@ -143,6 +143,7 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn remove_by_
 ///|
 pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn find_by_id(
   self,
+  _ctx,
   id,
 ) {
   match self.dao.find_by_id(id) {
@@ -152,7 +153,7 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn find_by_id
 }
 
 ///|
-pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn page(self, req) {
+pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn page(self, _ctx, req) {
   // 业务硬条件（对齐 boot2 page 语义）+ m_ 动态条件（通用查询件解析，mldong 框架同约定）
   let w = @core.where_()
   let _ = w.eq("t.is_deleted", @core.I(0))
@@ -178,7 +179,7 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn page(self,
 
 ///|
 ///|
-pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn find_by_ids(self, ids) {
+pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn find_by_ids(self, _ctx, ids) {
   if ids.is_empty() {
     return []
   }
@@ -188,6 +189,7 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn find_by_id
 ///|
 pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn set_locked(
   self,
+  _ctx,
   ids,
   locked,
 ) {
@@ -199,7 +201,7 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn set_locked
 }
 
 ///|
-pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn reset_password(self, ids) {
+pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn reset_password(self, _ctx, ids) {
   if ids.is_empty() {
     raise @core.MldongError::InvalidInput("ids 不能为空")
   }
@@ -219,17 +221,17 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn reset_pass
 }
 
 ///|
-pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn select_options(self, keywords) {
+pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn select_options(self, _ctx, keywords) {
   self.dao.select_options(keywords)
 }
 
 ///|
-pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn list_simple(self) {
+pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn list_simple(self, _ctx) {
   self.dao.list_simple()
 }
 
 ///|
-pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update_info(self, req, op_user) {
+pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update_info(self, ctx, req) {
   let old = match self.dao.find_by_id(req.id) {
     Some(u) => u
     None => raise @core.MldongError::NotFound("用户不存在: \{req.id}")
@@ -256,7 +258,7 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update_inf
     create_time: old.create_time,
     create_user: old.create_user,
     update_time: Some(@core.now_str()),
-    update_user: op_user,
+    update_user: ctx.user_id,
     is_deleted: old.is_deleted,
   }
   self.dao.update(u)
@@ -265,6 +267,7 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update_inf
 ///|
 pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update_password(
   self,
+  _ctx,
   id,
   old_password,
   new_password,
@@ -286,9 +289,9 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update_pas
 ///|
 pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update_avatar(
   self,
+  ctx,
   id,
   avatar,
-  op_user,
 ) {
   let old = match self.dao.find_by_id(id) {
     Some(u) => u
@@ -314,7 +317,7 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update_ava
     create_time: old.create_time,
     create_user: old.create_user,
     update_time: Some(@core.now_str()),
-    update_user: op_user,
+    update_user: ctx.user_id,
     is_deleted: old.is_deleted,
   }
   self.dao.update(u)

@@ -43,28 +43,30 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
 ) -> Unit raise {
   // 添加用户
   let save_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
-    let op_user = @web.user_id_of(request)
-    let id = svc.save(@dto.parse_save(@web.json_body(request)), op_user)
+    let ctx = @web.ctx_of(request)
+    let id = svc.save(ctx, @dto.parse_save(@web.json_body(request)))
     @core.ok_data(Json::string(id.to_string()))
   })
   // 删除用户（逻辑删，ids 支持字符串/数字）
   let remove_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
-    svc.remove_by_ids(@core.get_ids(@web.json_body(request)))
+    let ctx = @web.ctx_of(request)
+    svc.remove_by_ids(ctx, @core.get_ids(@web.json_body(request)))
     @core.ok_empty()
   })
   // 修改用户
   let update_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
-    let op_user = @web.user_id_of(request)
-    svc.update(@dto.parse_update(@web.json_body(request)), op_user)
+    let ctx = @web.ctx_of(request)
+    svc.update(ctx, @dto.parse_update(@web.json_body(request)))
     @core.ok_empty()
   })
   // 查询单个用户
   let detail_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let ctx = @web.ctx_of(request)
     let id : Int64 = match @core.get_i64(@web.json_body(request), "id") {
       Some(n) => n
       None => 0L
     }
-    @core.ok_data(@dto.user_json(svc.find_by_id(id)))
+    @core.ok_data(@dto.user_json(svc.find_by_id(ctx, id)))
   })
   // 用户授权角色（user_role 全量替换）
   let grant_role_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
@@ -80,22 +82,26 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
 
   // 锁定（is_locked=1）
   let locked_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
-    let _ = svc.set_locked(@core.get_ids(@web.json_body(request)), 1)
+    let ctx = @web.ctx_of(request)
+    let _ = svc.set_locked(ctx, @core.get_ids(@web.json_body(request)), 1)
     @core.ok_empty()
   })
   // 解锁（is_locked=0；与 locked 共用双码 OR）
   let un_locked_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
-    let _ = svc.set_locked(@core.get_ids(@web.json_body(request)), 0)
+    let ctx = @web.ctx_of(request)
+    let _ = svc.set_locked(ctx, @core.get_ids(@web.json_body(request)), 0)
     @core.ok_empty()
   })
   // 重置为默认密码（超管跳过，boot2 resetPwd 同语义）
   let reset_password_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
-    let _ = svc.reset_password(@core.get_ids(@web.json_body(request)))
+    let ctx = @web.ctx_of(request)
+    let _ = svc.reset_password(ctx, @core.get_ids(@web.json_body(request)))
     @core.ok_empty()
   })
   // 用户下拉选项（label=姓名，value=id 串）
   let select_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
-    let users = svc.select_options(@core.text_or(@web.json_body(request), "keywords", ""))
+    let ctx = @web.ctx_of(request)
+    let users = svc.select_options(ctx, @core.text_or(@web.json_body(request), "keywords", ""))
     let arr : Array[Json] = []
     for u in users {
       arr.push({ "label": u.real_name, "value": u.id.to_string() })
@@ -119,6 +125,7 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
   })
   // 个人信息（用户字段 + roleCodes/roleNames/superAdmin）
   let info_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let ctx = @web.ctx_of(request)
     let p = match @mbguard.principal_of(request) {
       Some(p) => p
       None => raise @core.MldongError::NotFound("会话无主体")
@@ -127,10 +134,11 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
       Some(id) => id
       None => raise @core.MldongError::NotFound("登录主体非法: \{p.login_id}")
     }
-    @core.ok_data(@dto.user_info_json(svc.find_by_id(uid), p.roles, p.super_admin))
+    @core.ok_data(@dto.user_info_json(svc.find_by_id(ctx, uid), p.roles, p.super_admin))
   })
   // 修改个人信息（只动 realName/nickName/sex；id 取自登录主体，body 里的 id 不信任）
   let update_info_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let ctx = @web.ctx_of(request)
     let p = match @mbguard.principal_of(request) {
       Some(p) => p
       None => raise @core.MldongError::NotFound("会话无主体")
@@ -141,11 +149,12 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
     }
     let req = @dto.parse_info(@web.json_body(request))
     req.id = uid
-    svc.update_info(req, Some(uid))
+    svc.update_info(ctx, req)
     @core.ok_empty()
   })
   // 修改个人密码（验旧密）
   let update_pwd_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let ctx = @web.ctx_of(request)
     let p = match @mbguard.principal_of(request) {
       Some(p) => p
       None => raise @core.MldongError::NotFound("会话无主体")
@@ -155,11 +164,12 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
       None => raise @core.MldongError::NotFound("登录主体非法: \{p.login_id}")
     }
     let body = @web.json_body(request)
-    svc.update_password(uid, @core.text_or(body, "oldPassword", ""), @core.text_or(body, "newPassword", ""))
+    svc.update_password(ctx, uid, @core.text_or(body, "oldPassword", ""), @core.text_or(body, "newPassword", ""))
     @core.ok_empty()
   })
   // 修改个人头像（avatar 存 URL 串）
   let update_avatar_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let ctx = @web.ctx_of(request)
     let p = match @mbguard.principal_of(request) {
       Some(p) => p
       None => raise @core.MldongError::NotFound("会话无主体")
@@ -168,7 +178,7 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
       Some(id) => id
       None => raise @core.MldongError::NotFound("登录主体非法: \{p.login_id}")
     }
-        svc.update_avatar(uid, @core.text_or(@web.json_body(request), "avatar", ""), Some(uid))
+        svc.update_avatar(ctx, uid, @core.text_or(@web.json_body(request), "avatar", ""))
     let _ = uid
     @core.ok_empty()
   })
@@ -245,6 +255,7 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
   // 在线用户列表（按登录人分组；keywords 过滤 = 用户名/姓名子串或数字 id 精确，boot2 同口径——
   // 过滤在页内做：moon-token 只开放精确字段过滤，全量模糊扫是鉴权库明确不给的口子）
   let online_user_list_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let ctx = @web.ctx_of(request)
     let keywords = @core.text_or(@web.json_body(request), "keywords", "")
     let viewer = match @mbguard.principal_of(request) {
       Some(p) => p
@@ -268,7 +279,7 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
       }
     }
     let users_map : Map[String, @entity.User] = Map([], capacity=0)
-    for u in svc.find_by_ids(ids) {
+    for u in svc.find_by_ids(ctx, ids) {
       let _ = users_map.set(u.id.to_string(), u)
     }
     // 分组（保持最新在前的枚举序）
@@ -329,6 +340,7 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
   })
   // 当前登录人的在线设备（平铺 token 级行）
   let online_device_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let ctx = @web.ctx_of(request)
     let viewer = match @mbguard.principal_of(request) {
       Some(p) => p
       None => raise @core.MldongError::NotFound("会话无主体")
@@ -346,7 +358,7 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
       None => ()
     }
     let users_map : Map[String, @entity.User] = Map([], capacity=0)
-    for u in svc.find_by_ids(ids) {
+    for u in svc.find_by_ids(ctx, ids) {
       let _ = users_map.set(u.id.to_string(), u)
     }
     let out : Array[Json] = []
@@ -358,8 +370,9 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
 
   // 分页查询用户列表（关联 dept/post + m_ 动态条件）
   let page_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let ctx = @web.ctx_of(request)
     let req = @dto.parse_page(@web.json_body(request))
-    let (total, rows) = svc.page(req)
+    let (total, rows) = svc.page(ctx, req)
     let arr : Array[Json] = []
     for row in rows {
       arr.push(@dto.page_row_json(row))
@@ -420,9 +433,10 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
   // 部门用户树（boot2 /sys/user/getDeptUserTree 同位）：部门节点（nodeType=1，disabled 不可选）
   // 挂用户叶（nodeType=2）；用户按部门分组一次取全量，避免逐部门 N 查
   let dept_user_tree_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let ctx = @web.ctx_of(request)
     let tree = @svc.build_dept_tree(dept_list())
     let users_by_dept : Map[String, Array[Json]] = Map([], capacity=0)
-    for u in svc.list_simple() {
+    for u in svc.list_simple(ctx) {
       let key = match u.dept_id {
         Some(d) => d.to_string()
         None => continue

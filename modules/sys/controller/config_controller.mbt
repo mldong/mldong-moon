@@ -23,29 +23,32 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.ConfigServic
   list_public : async () -> Array[@entity.Config] raise @core.MldongError,
 ) -> Unit raise {
   let save_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
-    let op_user = @web.user_id_of(request)
-    let id = svc.save(@dto.config_parse_save(@web.json_body(request)), op_user)
+    let ctx = @web.ctx_of(request)
+    let id = svc.save(ctx, @dto.config_parse_save(@web.json_body(request)))
     @core.ok_data(Json::string(id.to_string()))
   })
   let remove_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
-    svc.remove_by_ids(@core.get_ids(@web.json_body(request)))
+    let ctx = @web.ctx_of(request)
+    svc.remove_by_ids(ctx, @core.get_ids(@web.json_body(request)))
     @core.ok_empty()
   })
   let update_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
-    let op_user = @web.user_id_of(request)
-    svc.update(@dto.config_parse_update(@web.json_body(request)), op_user)
+    let ctx = @web.ctx_of(request)
+    svc.update(ctx, @dto.config_parse_update(@web.json_body(request)))
     @core.ok_empty()
   })
   let detail_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let ctx = @web.ctx_of(request)
     let id : Int64 = match @core.get_i64(@web.json_body(request), "id") {
       Some(n) => n
       None => 0L
     }
-    @core.ok_data(@dto.config_json(svc.find_by_id(id)))
+    @core.ok_data(@dto.config_json(svc.find_by_id(ctx, id)))
   })
   let page_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let ctx = @web.ctx_of(request)
     let req = @dto.config_parse_page(@web.json_body(request))
-    let (total, rows) = svc.page(req)
+    let (total, rows) = svc.page(ctx, req)
     let arr : Array[Json] = []
     for row in rows {
       arr.push(@dto.config_json(row))
