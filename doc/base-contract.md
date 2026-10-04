@@ -1,6 +1,6 @@
 # base-verify 契约跑测 · 差异清单（2026-10-03 首轮）
 
-> 跑批报告：协调仓 `base-verify/reports/2026-10-04-moon-dict-l2.{json,txt}`（字典轮 10/16）。
+> 跑批报告：协调仓 `base-verify/reports/2026-10-04-moon-dict-l2.{json,txt}`（字典轮 10/16）、`base-verify/reports/2026-10-04-moon-menu-l2.{json,txt}`（菜单轮 11/16）。
 >
 > 用途：对照家族 base 契约 runner（协调仓 `scripts/contract-tests/contract_runner.py`，语言无关纯 HTTP）
 > 逐组给出 mldong-moon 的现状——**已存在端点的契约比对结论 + 未存在端点的按模块清单**。
@@ -20,7 +20,7 @@ python scripts/contract-tests/contract_runner.py \
   --report base-verify/reports/2026-10-03-moon-l2.json
 ```
 
-## 2. 最新结果（2026-10-04 字典轮：**10 pass / 6 fail**，fail 全部是 404 缺模块）
+## 2. 最新结果（2026-10-04 菜单轮：**11 pass / 5 fail**，fail 全部是 404 缺模块）
 
 | 用例组 | 端点 | 结果 | 说明 |
 |---|---|---|---|
@@ -31,7 +31,7 @@ python scripts/contract-tests/contract_runner.py \
 | UC-0417 | /sys/config/page | ✅ pass | 分页五字段 |
 | UC-0610 | /app/appVersion/check | ❌ 404 | app 模块整缺 |
 | UC-0303/0306/0310 | /dev/schema/page, /dev/schema/getByTableName | ❌ 404 | dev_schema 前端生成元数据模型整缺（见 §4 说明） |
-| UC-0409 | /sys/menu/tree | ❌ 404 | menu 模块整缺 |
+| UC-0409 | /sys/menu/tree | ✅ pass（10-04） | 直返数组、根节点 id(str)/name、children 嵌套、ext 空不出键 |
 | UC-0411/0413 | /sys/dict/page, /sys/dict/getByDictType | ✅ pass（10-04） | getByDictType 直返 `[{label,value}]`、dataType coerce、未知类型空数组 |
 | UC-0431 | /sys/dict/enumDictList | ✅ pass（10-04） | 枚举注册表 yes_no，dataType 整型码表；getByDictType 出口无 dataType 键 |
 | UC-0432 | /sys/dict/customDictList | ✅ pass（10-04） | 基础仓零实现空清单，两域分离 ∩ = ∅ |
@@ -60,7 +60,6 @@ python scripts/contract-tests/contract_runner.py \
 
 | 模块（表） | runner 消费的端点 | 备注 |
 |---|---|---|
-| **sys_menu**（菜单） | `/sys/menu/tree` | UC-0409；menu 同时是权限码链数据源（rbac provider 已消费 sys_menu.code，表已在 schema，缺 CRUD/tree 端点） |
 | **sys_message**（站内信） | `/sys/message/page` | UC-0501；分页五字段 + 行按前端消费口径 |
 | **sys_file_info**（文件） | `/sys/fileInfo/{upload,getFileInfoByIds,remove}` | UC-0601/0602/0606：upload 返 `{url,fileInfoId}`（id 字符串）、回查 `{id,uid,name,url,status}` |
 | **app 模块**（APP 检查升级） | `/app/appVersion/check` | UC-0610：免登录、不查库、转调蒲公英自比较 `buildVersionNo`、任何失败降级 `data:null`（家族 13 栈 2026-09-20 已全量对齐，goframe `fd88b94` 为基准） |

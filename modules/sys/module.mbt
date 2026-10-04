@@ -63,6 +63,12 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] install(
     @ctrl.register_dict(ctx, dict_svc, g) catch {
       e => abort("sys 模块 dict 路由注册失败: \{e}")
     }
+    // menu —— cmd/gen 生成 + tree/list 二次开发（菜单树，RBAC 码链数据源的管理面）
+    let menu_dao = @repo.MenuRepository::make(config)
+    let menu_svc = @svc.MenuServiceImpl::{ dao: menu_dao }
+    @ctrl.register_menu(ctx, menu_svc, g) catch {
+      e => abort("sys 模块 menu 路由注册失败: \{e}")
+    }
     let dict_item_svc = @svc.DictItemServiceImpl::{
       dao: dict_item_dao,
       dict_exists: async fn(dict_id) raise @core.MldongError {
@@ -95,6 +101,7 @@ pub fn policy() -> @guard.RoutePolicy {
     @ctrl.config_policy(),
     @ctrl.dict_policy(),
     @ctrl.dictitem_policy(),
+    @ctrl.menu_policy(),
   ]
   let mut p = @guard.RoutePolicy::new()
   for f in fragments {

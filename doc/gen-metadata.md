@@ -76,6 +76,8 @@ pub(all) struct ColumnMeta {
      sys:dictItem，直接下划线透传是错的，已踩）；**非可选列 json/req 装配分家**
      （String 非可选用 Json::string、Int64 非可选用 to_string/unwrap_or(0L)——
      jstr/jsnow 只吃可选，首遇 NOT NULL 业务列即撞，已踩）；
+   - **保留字列名改字段不改编译产物 json 键**（sys_menu.type → 实体字段 menu_type、
+     json 键仍 "type"——MoonBit 保留字当字段名直接编不过，已踩）；
    - **同包多实体防撞名**：生成物 dto 顶层标识符带表内小写前缀（post_parse_save 等）——
      不加前缀会静默命中同包其它实体的同名符号（编译不报错、运行时校验面张冠李戴，已踩）；
    - **二次开发 = 直接改生成物**（boot2/各栈同做法，一处一文件不另立）：生成器**默认跳过
