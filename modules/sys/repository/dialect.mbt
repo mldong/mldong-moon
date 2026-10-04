@@ -254,3 +254,13 @@ pub fn to_db_values(vs : Array[@core.SqlValue]) -> Array[@moondb.Value] {
   }
   out
 }
+
+///|
+pub extend MysqlBox with Conn::{
+  query,
+  execute,
+  begin,
+  commit,
+  rollback,
+  close,
+}

@@ -23,7 +23,7 @@ pub fn merge_policy(total : @guard.RoutePolicy, part : @guard.RoutePolicy) -> @g
 /// body 用本项目信封（code 99990401/99990403，msg 取 TokenError 精确原因）。
 /// 经 Guard::with_on_error 挂上，替换 moon-token 默认的空体响应。
 pub async fn on_error(
-  request : @mb.Request,
+  _request : @mb.Request,
   responder : @mb.Responder,
   err : @port.TokenError,
 ) -> Unit {
@@ -51,7 +51,7 @@ pub fn token_of(request : @mb.Request) -> String {
     Some(v) => v.to_owned()
   }
   let from_header = if raw.has_prefix("Bearer ") {
-    raw.substring(start=7)
+    raw[7:].to_owned()
   } else {
     raw
   }

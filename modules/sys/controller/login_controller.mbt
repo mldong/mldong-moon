@@ -12,12 +12,10 @@ pub fn[S : @port.TokenStore, P, R : @svc.RbacService] register_login(
   ctx : @mb.ModuleContext,
   auth : @app.TokenAuth[S, P],
   rbac : R,
-) -> Unit raise {
+) -> Unit {
   // 登录（豁免面直挂）
   let login_handler : @mb.Handler = async fn(request, responder) {
-    let body = @web.json_body(request) catch {
-      _ => raise @core.MldongError::InvalidInput("请求体必须是合法 JSON")
-    }
+    let body = @web.json_body(request)
     let user_name = @core.text_or(body, "userName", "")
     let password = @core.text_or(body, "password", "")
     // 存在性检查；错密与不存在同话术（防枚举，boot2 两支同抛 USER_NOT_EXIST 同设计）
@@ -73,9 +71,7 @@ pub fn[S : @port.TokenStore, P, R : @svc.RbacService] register_login(
   // 刷新 token（UC-0113 全量轮转，公开端点）：旧 access + 旧 refresh 同时失效，返回全新对；
   // 轮转延续会话属性（extra 的 appCode/ip/ua 随转，moon-token rotate 内建）
   let refresh_handler : @mb.Handler = async fn(request, responder) {
-    let body = @web.json_body(request) catch {
-      _ => raise @core.MldongError::InvalidInput("请求体必须是合法 JSON")
-    }
+    let body = @web.json_body(request)
     let refresh_token = @core.text_or(body, "refreshToken", "")
     let result = auth.rotate(refresh_token) catch {
       _ => {

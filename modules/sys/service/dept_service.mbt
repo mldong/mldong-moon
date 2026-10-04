@@ -158,4 +158,5 @@ pub extend DeptServiceImpl with DeptService::{
   save,
   find_by_id,
   update,
+  list_all,
 }

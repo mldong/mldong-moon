@@ -56,7 +56,7 @@ pub fn is_field_safe(col : String) -> Bool {
 /// Json 值 → 绑定值（Number 整数走 I、带小数走 D；String→S；Bool→B；其余 None）
 fn json_scalar(v : Json) -> SqlValue? {
   match v {
-    Number(n) => {
+    Number(n, ..) => {
       let d = n
       if d == d.to_int().to_double() {
         Some(I(d.to_int()))
@@ -117,12 +117,12 @@ pub fn parse_m_params(body : Json, exclude? : Array[String] = []) -> Wrapper {
         if parts.length() != 3 && parts.length() != 4 {
           continue
         }
-        let (alias, op, camel_col) = if parts.length() == 3 {
+        let (tbl, op, camel_col) = if parts.length() == 3 {
           ("", parts[1], parts[2])
         } else {
           (parts[1] + ".", parts[2], parts[3])
         }
-        let col = alias + to_underscore(camel_col)
+        let col = tbl + to_underscore(camel_col)
         if !is_field_safe(col) {
           continue
         }
@@ -138,10 +138,10 @@ pub fn parse_m_params(body : Json, exclude? : Array[String] = []) -> Wrapper {
 /// 按 "_" 切段（m_ 后的段数决定 3/4 段式）
 fn split_segments(k : String) -> Array[String] {
   // k 形如 m_EQ_userName / m_t_EQ_userName：去掉 "m_" 后按 "_" 切
-  let rest = k.substring(start=2)
+  let rest = k[2:].to_owned()
   let out : Array[String] = ["m"]
   for seg in rest.split("_") {
-    out.push(seg.to_string())
+    out.push(seg.to_owned())
   }
   out
 }
@@ -311,7 +311,7 @@ pub fn parse_keywords_with_raw(
   let keys : Array[String] = []
   if !search_keys.is_empty() {
     for seg in search_keys.split(",") {
-      let col = seg.to_string()
+      let col = seg.to_owned()
       if !col.is_empty() && is_field_safe(col) {
         keys.push(col)
       }

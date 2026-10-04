@@ -134,12 +134,17 @@ pub impl @dao.UserDao for UserRepository with fn list_simple(self) {
   out
 }
 
+
+///|
+
+///|
 pub extend UserRepository with @dao.UserDao::{
-  remove_by_ids,
-  find_by_user_name,
-  find_by_id,
   insert,
   update,
+  remove_by_ids,
+  find_by_id,
+  find_by_user_name,
+  page,
   find_by_ids,
   set_locked,
   update_password,

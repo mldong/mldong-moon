@@ -123,12 +123,18 @@ curl -s -X POST http://127.0.0.1:18680/sys/user/page \
   async 请求交错会串号（boot2 ThreadLocal 无安全对应物；goframe 的 ctx 同样是显式传参，
   不是隐式全局）。后续业务身份消费（数据权限/appCode 过滤/trace）一律扩 Ctx 字段；
   gen 模板已内置，手写表照 user_service 形状。
-- **已知 warnings 类别**（`moon check` 0 errors / 61 warnings 基线，10 类；改动时别引入新类别）：
-  `fragile_catch_all`（30，`catch { _ => }`/边界错误转换吞错兜底）、`deprecated`（14，core 旧 API）、
-  `reserved_keyword`（4）、`implicit_impl_as_method`（3，trait impl 方法隐式提升，收敛要加
-  `pub extend`）、`unused_value`（4）、`ambiguous_block`（1，`{ config }` 歧义，写
-  `{ id: config }` 或裸 `config`）、`missing_pattern_arguments`（1）、`unused_async`（1）、
-  `unused_error_type`（2）、`core_package_not_imported`（1，@env 隐式导入）。
+- **warnings 基线 = 0**（`moon check` 0 errors 0 warnings，10-05 全量清零）：改动后出现任何
+  新告警就地修掉，常见修法——
+  * `fragile_catch_all`：路由注册的 `catch { e => raise e }` 透传**直接删**（register 本身带
+    raise，module.mbt 组合根统一 abort）；错误转换处绑 `e` 并转 `MldongError`；
+  * `implicit_impl_as_method`：trait impl 的方法被具体类型直调时补 `pub extend Type with Trait::{..}`
+    （每个 repository/service 文件的 extend 必须**全量**列出 impl 方法，漏一个就还告警）；
+  * `deprecated`：`substring(start=e)` → `s[e:].to_owned()`、`substring(start=0,end=i)` →
+    `s[:i].to_owned()`、StringView `.to_string()` → `.to_owned()`、大写化 `Char::from_int(i-32)` →
+    `(i-32).unsafe_to_char()`（ASCII 区间安全）；
+  * `reserved_keyword`：`alias`/`module` 是保留字（query.mbt 用 `tbl`，模块装配函数叫 `install`）；
+  * `async` 无 await 点会报 `unused_async`：纯同步闭包直接写 `fn(request)`（sync 可用在 async 位）；
+  * 包根 moon.pkg 声明 `supported_targets`（否则向上游包传播提示）。
 
 ## 6. 协作约定
 

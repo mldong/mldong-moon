@@ -1,7 +1,7 @@
 // dev 模块自注册 —— 元数据只读面（gen/dev_schema 共用底座）；后续 dev_schema 台账进本模块
 
 ///|
-pub fn[S : @port.TokenStore, P : @port.PermissionProvider] module(
+pub fn[S : @port.TokenStore, P : @port.PermissionProvider] install(
   config : @core.MysqlConfig,
   g : @mbguard.Guard[S, P],
 ) -> @mb.Module {

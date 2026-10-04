@@ -60,14 +60,6 @@ pub impl @dao.ConfigDao for ConfigRepository with fn page(self, w, page_num, pag
   self.base.page(w, page_num, page_size)
 }
 
-pub extend ConfigRepository with @dao.ConfigDao::{
-  remove_by_ids,
-  find_by_id,
-  insert,
-  update,
-  page,
-  find_by_ids,
-}
 
 ///|
 /// PUBLIC 前缀且启用的配置（like_pat 原样通配：前缀匹配 PUBLIC%）——二次开发（公开配置）
@@ -96,4 +88,17 @@ pub async fn ConfigRepository::list_all(self : ConfigRepository) -> Array[@entit
     out.push((self.base.table.from_row)(r))
   }
   out
+}
+
+///|
+
+///|
+pub extend ConfigRepository with @dao.ConfigDao::{
+  insert,
+  update,
+  remove_by_ids,
+  find_by_id,
+  find_by_ids,
+  page,
+  check_unique,
 }

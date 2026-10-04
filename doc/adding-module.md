@@ -99,5 +99,5 @@ let post_svc = @svc.PostServiceImpl::{ dao: post_dao }
 - [ ] 真库冒烟一轮：login → save → page（含 `m_EQ_xxx` 一发）→ detail → update → remove → 负向；
 - [ ] 动了鉴权/RBAC → 复跑 [permissions.md](permissions.md) §7 矩阵；
 - [ ] 建表 SQL 已进 `doc/sql/mysql-schema-all.sql`；
-- [ ] 文件名带层后缀（`*_dto.mbt`/`*_dao.mbt`/`*_mysql.mbt`/`*_table.mbt`/`*_controller.mbt`），
+- [ ] 文件名带层后缀（`*_dto.mbt`/`*_dao.mbt`/`*_repository.mbt`/`*_table.mbt`/`*_controller.mbt`），
       类名去表前缀，JSON camelCase / DB snake_case。

@@ -5,7 +5,7 @@
 // 返回 moonback Module（ctx.use_ 挂载，或直接在 root 闭包内调用）。
 
 ///|
-pub fn[S : @port.TokenStore, P : @port.PermissionProvider] module(
+pub fn[S : @port.TokenStore, P : @port.PermissionProvider] install(
   config : @core.MysqlConfig,
   g : @mbguard.Guard[S, P],
   auth : @app.TokenAuth[S, P],
@@ -15,9 +15,7 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] module(
   @mb.Module(ctx => {
     let rbac_dao = @repo.RbacRepository::make(config)
     let rbac_svc = @svc.RbacServiceImpl::{ dao: rbac_dao }
-    @ctrl.register_login(ctx, auth, rbac_svc) catch {
-      _ => abort("sys 模块登录路由注册失败（路由冲突?）")
-    }
+    @ctrl.register_login(ctx, auth, rbac_svc)
     // 常量 holder（boot2 ConstantContext 同位）：启动灌入，config 写路刷新；
     // 默认密码等系统参数从这读（env 优先），user service 经闭包注入不依赖 holder 类型
     let user_dao = @repo.UserRepository::make(config)

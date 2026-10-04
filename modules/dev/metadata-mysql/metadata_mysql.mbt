@@ -115,3 +115,9 @@ pub impl @meta.MetadataDao for MetadataMysqlDao with fn list_columns(self, table
   }
   out
 }
+
+///|
+pub extend MetadataMysqlDao with @meta.MetadataDao::{
+  list_tables,
+  list_columns,
+}

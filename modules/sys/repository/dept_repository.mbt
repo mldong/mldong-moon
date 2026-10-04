@@ -60,14 +60,6 @@ pub impl @dao.DeptDao for DeptRepository with fn page(self, w, page_num, page_si
   self.base.page(w, page_num, page_size)
 }
 
-pub extend DeptRepository with @dao.DeptDao::{
-  remove_by_ids,
-  find_by_id,
-  insert,
-  update,
-  page,
-  find_by_ids,
-}
 
 ///|
 /// 全量部门（树装配取数；sort 升序、同序按 id）——二次开发（树表），重生成 --force 时需并回
@@ -83,4 +75,18 @@ pub impl @dao.DeptDao for DeptRepository with fn list_all(self) {
     out.push((self.base.table.from_row)(r))
   }
   out
+}
+
+///|
+
+///|
+pub extend DeptRepository with @dao.DeptDao::{
+  insert,
+  update,
+  remove_by_ids,
+  find_by_id,
+  find_by_ids,
+  page,
+  check_unique,
+  list_all,
 }

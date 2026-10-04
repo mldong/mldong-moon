@@ -51,19 +51,9 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.PostService]
     }
     @core.ok_page(req.page_num, req.page_size, total, arr)
   })
-  g.post(ctx, "/sys/post/save", save_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/post/remove", remove_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/post/update", update_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/post/detail", detail_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/post/page", page_handler) catch {
-    e => raise e
-  }
+  g.post(ctx, "/sys/post/save", save_handler)
+  g.post(ctx, "/sys/post/remove", remove_handler)
+  g.post(ctx, "/sys/post/update", update_handler)
+  g.post(ctx, "/sys/post/detail", detail_handler)
+  g.post(ctx, "/sys/post/page", page_handler)
 }

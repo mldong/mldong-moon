@@ -60,11 +60,16 @@ pub impl @dao.PostDao for PostRepository with fn page(self, w, page_num, page_si
   self.base.page(w, page_num, page_size)
 }
 
+
+///|
+
+///|
 pub extend PostRepository with @dao.PostDao::{
-  remove_by_ids,
-  find_by_id,
   insert,
   update,
-  page,
+  remove_by_ids,
+  find_by_id,
   find_by_ids,
+  page,
+  check_unique,
 }

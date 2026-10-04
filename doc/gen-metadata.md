@@ -77,7 +77,7 @@ pub(all) struct ColumnMeta {
      不加前缀会静默命中同包其它实体的同名符号（编译不报错、运行时校验面张冠李戴，已踩）；
    - **二次开发 = 直接改生成物**（boot2/各栈同做法，一处一文件不另立）：生成器**默认跳过
      已存在文件**防覆盖手改，`--force` 才整体重生成（先 diff 自己的手改）；树表等特性
-     （dept 的树端点/list_all/树装配）就长在 dept_controller/dept_service/dept_mysql 各自
+     （dept 的树端点/list_all/树装配）就长在 dept_controller/dept_service/dept_repository 各自
      文件内并以"二次开发"注释标注；dept 树语义 = parent_id 内存建树（root=0，boot2 同），
      pids 列留档不维护；
    - **跨模块件**：ConfigHolder 是 core 框架件（`core/config_holder.mbt`）——main 装配处建

@@ -47,7 +47,7 @@ pub fn to_camel(s : String) -> String {
         if c == '_' {
           upper_next = true
         } else if upper_next {
-          buf.write_char(Char::from_int(c.to_int() - 32))
+          buf.write_char((c.to_int() - 32).unsafe_to_char())
           upper_next = false
         } else {
           buf.write_char(c)
@@ -62,7 +62,7 @@ pub fn to_camel(s : String) -> String {
 /// 表名 → 类名（sys_dept → Dept：去模块前缀 + 驼峰）
 pub fn table_to_class(table : String) -> String {
   let stripped = match table.find("_") {
-    Some(i) => table.substring(start=i + 1)
+    Some(i) => table[i + 1:].to_owned()
     None => table
   }
   let buf = StringBuilder()
@@ -73,7 +73,7 @@ pub fn table_to_class(table : String) -> String {
         if c == '_' {
           upper_next = true
         } else if upper_next {
-          buf.write_char(Char::from_int(c.to_int() - 32))
+          buf.write_char((c.to_int() - 32).unsafe_to_char())
           upper_next = false
         } else {
           buf.write_char(c)
@@ -103,7 +103,7 @@ fn parse_max_len(column_type : String) -> Int? {
   if close <= open + 1 {
     return None
   }
-  let digits = column_type.substring(start=open + 1, end=close)
+  let digits = column_type[open + 1:close].to_owned()
   try {
     Some(@string.parse_int(digits))
   } catch {

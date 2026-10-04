@@ -114,7 +114,7 @@ sys_user_role ──▶ sys_role (app_code 过滤) ──▶ sys_role_menu ─�
 
 - **中间表 `sys_user_role`/`sys_role_menu` 不立六件套**——boot2 只有 MP 实体无独立
   controller/service；授权挂主表端点（`POST /sys/user/grantRole`，`{userId, roleIds}`），
-  **全量替换**式写入（删旧插新，`dao-mysql/perm_mysql.mbt` 局部事务样板）；
+  **全量替换**式写入（删旧插新，`repository/perm_repository.mbt` 局部事务样板）；
   `sys_role_menu` 写路 dao 层备好、暂无暴露端点（对齐 mldong 框架约定）；
 - 查询归 `RbacDao` 端口（`dao/perm_dao.mbt`）：`find_user_auth_by_name/by_id`（登录身份）、
   `find_role_codes`、`find_perms_by_user`（码链 join）、`grant_roles/grant_menus`（写路）；

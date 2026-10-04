@@ -46,11 +46,15 @@ pub impl @dao.RoleDao for RoleRepository with fn page(self, w, page_num, page_si
 }
 
 ///|
+
+///|
+
+///|
 pub extend RoleRepository with @dao.RoleDao::{
-  page,
-  remove_by_ids,
-  find_by_code,
-  find_by_id,
   insert,
   update,
+  remove_by_ids,
+  find_by_id,
+  find_by_code,
+  page,
 }

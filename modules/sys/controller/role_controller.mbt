@@ -57,19 +57,9 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.RoleService]
     }
     @core.ok_page(req.page_num, req.page_size, total, arr)
   })
-  g.post(ctx, "/sys/role/save", save_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/role/remove", remove_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/role/update", update_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/role/detail", detail_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/role/page", page_handler) catch {
-    e => raise e
-  }
+  g.post(ctx, "/sys/role/save", save_handler)
+  g.post(ctx, "/sys/role/remove", remove_handler)
+  g.post(ctx, "/sys/role/update", update_handler)
+  g.post(ctx, "/sys/role/detail", detail_handler)
+  g.post(ctx, "/sys/role/page", page_handler)
 }

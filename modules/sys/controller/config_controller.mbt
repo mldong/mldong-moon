@@ -55,24 +55,14 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.ConfigServic
     }
     @core.ok_page(req.page_num, req.page_size, total, arr)
   })
-  g.post(ctx, "/sys/config/save", save_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/config/remove", remove_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/config/update", update_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/config/detail", detail_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/config/page", page_handler) catch {
-    e => raise e
-  }
+  g.post(ctx, "/sys/config/save", save_handler)
+  g.post(ctx, "/sys/config/remove", remove_handler)
+  g.post(ctx, "/sys/config/update", update_handler)
+  g.post(ctx, "/sys/config/detail", detail_handler)
+  g.post(ctx, "/sys/config/page", page_handler)
   // 公开配置（boot2 /sys/config/public @SaIgnore 同位）：PUBLIC 前缀且启用的 {code: content} map，
   // 登录页/版权等免登录读——豁免面路由（ctx.post 不经守卫，取数闭包由 module 接线）——二次开发
-  let public_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+  let public_handler : @mb.Handler = @web.wrap(async fn(_request) -> Json raise @core.MldongError {
     let m : Map[String, Json] = Map([], capacity=0)
     for c in list_public() {
       let _ = m.set(c.code, Json::string(match c.content {
@@ -82,7 +72,5 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.ConfigServic
     }
     @core.ok_data(Json::object(m))
   })
-  ctx.post("/sys/config/public", public_handler) catch {
-    e => raise e
-  }
+  ctx.post("/sys/config/public", public_handler)
 }

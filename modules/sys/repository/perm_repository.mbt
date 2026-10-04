@@ -9,7 +9,7 @@ pub(all) struct RbacRepository {
 
 ///|
 pub fn RbacRepository::make(config : @core.MysqlConfig) -> RbacRepository {
-  { config }
+  { config: config }
 }
 
 ///|
@@ -152,14 +152,6 @@ pub impl @dao.RbacDao for RbacRepository with fn grant_menus(self, role_id, menu
 }
 
 ///|
-pub extend RbacRepository with @dao.RbacDao::{
-  grant_roles,
-  grant_menus,
-  find_perms_by_user,
-  find_role_codes,
-  find_user_auth_by_name,
-  find_user_auth_by_id,
-}
 
 ///|
 fn user_auth_of(r : @moondb.Row) -> @entity.UserAuth {
@@ -171,4 +163,16 @@ fn user_auth_of(r : @moondb.Row) -> @entity.UserAuth {
     password: row_opt_text(r, "password"),
     salt: row_opt_text(r, "salt"),
   }
+}
+
+///|
+
+///|
+pub extend RbacRepository with @dao.RbacDao::{
+  find_user_auth_by_name,
+  find_user_auth_by_id,
+  find_role_codes,
+  find_perms_by_user,
+  grant_roles,
+  grant_menus,
 }

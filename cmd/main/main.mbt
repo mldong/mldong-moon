@@ -38,11 +38,11 @@ async fn main raise {
   // 框架级常量 holder：全进程一个实例，sys 灌入 sys_config 并在写路刷新，dev/biz 只读注入
   let holder = @core.ConfigHolder::new()
   let root = @mb.Module(ctx => {
-    ctx.use_(@sys.module(config, g, auth, holder)) catch {
+    ctx.use_(@sys.install(config, g, auth, holder)) catch {
       _ => abort("sys 模块挂载失败")
     }
     // dev 模块（元数据只读面）
-    ctx.use_(@dev.module(config, g)) catch {
+    ctx.use_(@dev.install(config, g)) catch {
       _ => abort("dev 模块挂载失败")
     }
     // 将来新模块各一行：

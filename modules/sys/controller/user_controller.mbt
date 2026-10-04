@@ -112,10 +112,10 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
   // ---- 个人中心族（principal_of 取登录主体；main 已关推导，这些端点只验登录）----
 
   // 当前权限标识（boot2 permCode = StpUtil.getPermissionList()）
-  let perm_code_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+  let perm_code_handler : @mb.Handler = @web.wrap(fn(request) -> Json raise @core.MldongError {
     let codes = match @mbguard.principal_of(request) {
       Some(p) => p.permissions
-      None => []
+      None => raise @core.MldongError::NotFound("会话无主体")
     }
     let arr : Array[Json] = []
     for c in codes {
@@ -379,57 +379,23 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
     }
     @core.ok_page(req.page_num, req.page_size, total, arr)
   })
-  g.post(ctx, "/sys/user/save", save_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/user/remove", remove_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/user/update", update_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/user/detail", detail_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/user/page", page_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/user/grantRole", grant_role_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/user/locked", locked_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/user/unLocked", un_locked_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/user/resetPassword", reset_password_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/user/select", select_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/user/permCode", perm_code_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/user/info", info_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/user/updateInfo", update_info_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/user/updatePwd", update_pwd_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/user/updateAvatar", update_avatar_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/user/onlineUserList", online_user_list_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/user/onlineDevice", online_device_handler) catch {
-    e => raise e
-  }
+  g.post(ctx, "/sys/user/save", save_handler)
+  g.post(ctx, "/sys/user/remove", remove_handler)
+  g.post(ctx, "/sys/user/update", update_handler)
+  g.post(ctx, "/sys/user/detail", detail_handler)
+  g.post(ctx, "/sys/user/page", page_handler)
+  g.post(ctx, "/sys/user/grantRole", grant_role_handler)
+  g.post(ctx, "/sys/user/locked", locked_handler)
+  g.post(ctx, "/sys/user/unLocked", un_locked_handler)
+  g.post(ctx, "/sys/user/resetPassword", reset_password_handler)
+  g.post(ctx, "/sys/user/select", select_handler)
+  g.post(ctx, "/sys/user/permCode", perm_code_handler)
+  g.post(ctx, "/sys/user/info", info_handler)
+  g.post(ctx, "/sys/user/updateInfo", update_info_handler)
+  g.post(ctx, "/sys/user/updatePwd", update_pwd_handler)
+  g.post(ctx, "/sys/user/updateAvatar", update_avatar_handler)
+  g.post(ctx, "/sys/user/onlineUserList", online_user_list_handler)
+  g.post(ctx, "/sys/user/onlineDevice", online_device_handler)
   // 部门用户树（boot2 /sys/user/getDeptUserTree 同位）：部门节点（nodeType=1，disabled 不可选）
   // 挂用户叶（nodeType=2）；用户按部门分组一次取全量，避免逐部门 N 查
   let dept_user_tree_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
@@ -461,9 +427,7 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
     }
     @core.ok_data(Json::array(arr))
   })
-  g.post(ctx, "/sys/user/getDeptUserTree", dept_user_tree_handler) catch {
-    e => raise e
-  }
+  g.post(ctx, "/sys/user/getDeptUserTree", dept_user_tree_handler)
 }
 
 ///|

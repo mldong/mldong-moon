@@ -551,7 +551,7 @@ pub fn render_controller(plan : TablePlan) -> String {
   // 路由前缀 = 表名首下划线换 /（sys_dept → /sys/dept）；权限码前缀另算（sys:dept）
   let route_base = match plan.table.find("_") {
     Some(i) =>
-      "/" + plan.table.substring(start=0, end=i) + "/" + plan.table.substring(start=i + 1)
+      "/" + plan.table[:i].to_owned() + "/" + plan.table[i + 1:].to_owned()
     None => "/" + plan.table
   }
   o.line("// " + plan.table + " 控制器 —— 手写薄端点（校验在 dto、业务在 service、响应工具在 core）")

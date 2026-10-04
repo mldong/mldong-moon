@@ -44,10 +44,6 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, M : @meta.MetadataDao
     }
     @core.ok_data(Json::array(arr))
   })
-  g.post(ctx, "/dev/schema/dbTable", db_table_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/dev/schema/column/list", column_list_handler) catch {
-    e => raise e
-  }
+  g.post(ctx, "/dev/schema/dbTable", db_table_handler)
+  g.post(ctx, "/dev/schema/column/list", column_list_handler)
 }

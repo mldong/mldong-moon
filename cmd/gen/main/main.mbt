@@ -22,7 +22,7 @@ async fn main raise {
     if a == "--force" {
       force = true
     } else if a.has_prefix("--out=") {
-      out_root = a.substring(start=6).to_string()
+      out_root = a[6:].to_owned()
     } else if a != "--" {
       tables.push(a)
     }
@@ -56,7 +56,7 @@ async fn[M : @meta.MetadataDao] gen_all(
     // 权限码前缀：sys_dept → sys:dept
     let perm = match table.find("_") {
       Some(i) =>
-        table.substring(start=0, end=i) + ":" + table.substring(start=i + 1)
+        table[:i].to_owned() + ":" + table[i + 1:].to_owned()
       None => table
     }
     let has_code = cols_meta.filter(fn(c) { c.name == "code" }).length() > 0
@@ -72,7 +72,7 @@ async fn[M : @meta.MetadataDao] gen_all(
       let rel = files.0
       let path = out_root + "/" + rel
       let dir = match rel.find("/") {
-        Some(i) => out_root + "/" + rel.substring(start=0, end=i)
+        Some(i) => out_root + "/" + rel[:i].to_owned()
         None => out_root
       }
       @fs.mkdir(dir, recursive=true, allow_exist=true)

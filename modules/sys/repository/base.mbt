@@ -132,25 +132,6 @@ async fn[T] BaseDao::find_one(self : BaseDao[T], w : @core.Wrapper) -> T? raise 
 
 ///|
 /// 条件查列表
-async fn[T] BaseDao::list(self : BaseDao[T], w : @core.Wrapper) -> Array[T] raise @core.MldongError {
-  let full = self.base_where()
-  for c in w.conds {
-    full.conds.push(c)
-  }
-  let (sql, params) = @core.build_select(
-    self.table.name,
-    self.table.cols,
-    full,
-    orders=[(self.order_col_of(), true)],
-  )
-  let rows = self.query(sql, params)
-  let out : Array[T] = []
-  for r in rows {
-    out.push((self.table.from_row)(r))
-  }
-  out
-}
-
 ///|
 /// 批量按主键查（remove 前收 code 刷新 holder 等场景）
 pub async fn[T] BaseDao::find_by_ids(self : BaseDao[T], vals : Array[@core.SqlValue]) -> Array[T] raise @core.MldongError {

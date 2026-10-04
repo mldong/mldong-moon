@@ -53,21 +53,11 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.DeptService]
     }
     @core.ok_page(req.page_num, req.page_size, total, arr)
   })
-  g.post(ctx, "/sys/dept/save", save_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/dept/remove", remove_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/dept/update", update_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/dept/detail", detail_handler) catch {
-    e => raise e
-  }
-  g.post(ctx, "/sys/dept/page", page_handler) catch {
-    e => raise e
-  }
+  g.post(ctx, "/sys/dept/save", save_handler)
+  g.post(ctx, "/sys/dept/remove", remove_handler)
+  g.post(ctx, "/sys/dept/update", update_handler)
+  g.post(ctx, "/sys/dept/detail", detail_handler)
+  g.post(ctx, "/sys/dept/page", page_handler)
   // 部门树（boot2 /sys/dept/list：全量平表 → parent_id 建树）——二次开发（树表）
   let list_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
     let ctx = @web.ctx_of(request)
@@ -78,9 +68,7 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.DeptService]
     }
     @core.ok_data(Json::array(arr))
   })
-  g.post(ctx, "/sys/dept/list", list_handler) catch {
-    e => raise e
-  }
+  g.post(ctx, "/sys/dept/list", list_handler)
 }
 
 ///|
