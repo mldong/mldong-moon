@@ -309,6 +309,7 @@ pub fn render_table(plan : TablePlan) -> String {
     o.line("    { name: \"" + c.name + "\", get: fn(d) { " + wrapper_of(c) + "(d." + c.name + ") } },")
   }
   o.line("    { name: \"create_time\", get: fn(d) { S(match d.create_time { Some(s) => s; None => @core.now_str() }) } },")
+  o.line("    { name: \"update_time\", get: fn(d) { S(match d.update_time { Some(s) => s; None => @core.now_str() }) } },")
   o.line("    { name: \"create_user\", get: fn(d) { opt_l(d.create_user) } },")
   o.line("    { name: \"update_user\", get: fn(d) { opt_l(d.update_user) } },")
   o.line("  ],")

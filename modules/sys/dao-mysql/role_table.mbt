@@ -19,6 +19,7 @@ let role_table : TableCodec[@entity.Role] = TableCodec::{
     { name: "data_scope", get: fn(r) { opt_i(r.data_scope) } },
     { name: "remark", get: fn(r) { opt_s(r.remark) } },
     { name: "create_time", get: fn(r) { S(match r.create_time { Some(s) => s; None => @core.now_str() }) } },
+    { name: "update_time", get: fn(r) { S(match r.update_time { Some(s) => s; None => @core.now_str() }) } },
     { name: "create_user", get: fn(r) { opt_l(r.create_user) } },
     { name: "update_user", get: fn(r) { opt_l(r.update_user) } },
   ],
