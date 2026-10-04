@@ -43,13 +43,13 @@
   分页 `page(Wrapper, Int, Int) -> (Int, Array[...])`）；
 - 签名只用 entity/@core 类型，零 ORM。
 
-### ⑤ dao-db（`dao-db/post_table.mbt` + `post_db.mbt`）
+### ⑤ repository（`repository/post_table.mbt` + `post_repository.mbt`）
 
 - `TableCodec[Post]`：`name/cols/insert_cols/update_cols/from_row/id_of/del_col/order_col`
   （照抄 `user_table.mbt`；`update_cols` 放"可覆盖列 + update_time"；
   `del_col: Some("is_deleted")`）；
 - 行映射 `row_post`（`row_text/row_i64/row_opt_*` 按列名取）；不回显的列不进 `cols`；
-- `PostDbDao::make(config)` + `pub impl @dao.PostDao for PostDbDao with ...`
+- `PostRepository::make(config)` + `pub impl @dao.PostDao for PostRepository with ...`
   ——单表 CRUD 直接调 `BaseDao` 方法（`base.mbt`），业务查询手写 SQL 用
   `@core.build_select(...)` + `self.query/query_one`。
 
@@ -70,7 +70,7 @@
 ### ⑧ 注册（`module.mbt`）
 
 ```moonbit
-let post_dao = @db.PostDbDao::make(config)
+let post_dao = @repo.PostRepository::make(config)
 let post_svc = @svc.PostServiceImpl::{ dao: post_dao }
 @ctrl.register_post(ctx, post_svc, g) catch { e => abort("sys 模块 post 路由注册失败: \{e}") }
 ```

@@ -3,17 +3,17 @@
 // 最小原地实现，模板就位后收敛过去）
 
 ///|
-pub(all) struct RbacDaoDb {
+pub(all) struct RbacRepository {
   config : @core.MysqlConfig
 }
 
 ///|
-pub fn RbacDaoDb::make(config : @core.MysqlConfig) -> RbacDaoDb {
+pub fn RbacRepository::make(config : @core.MysqlConfig) -> RbacRepository {
   { config }
 }
 
 ///|
-pub impl @dao.RbacDao for RbacDaoDb with fn find_user_auth_by_name(self, user_name) {
+pub impl @dao.RbacDao for RbacRepository with fn find_user_auth_by_name(self, user_name) {
   let conn = open_conn(self.config)
   let rows = q(
     conn,
@@ -29,7 +29,7 @@ pub impl @dao.RbacDao for RbacDaoDb with fn find_user_auth_by_name(self, user_na
 }
 
 ///|
-pub impl @dao.RbacDao for RbacDaoDb with fn find_user_auth_by_id(self, id) {
+pub impl @dao.RbacDao for RbacRepository with fn find_user_auth_by_id(self, id) {
   let conn = open_conn(self.config)
   let rows = q(
     conn,
@@ -45,7 +45,7 @@ pub impl @dao.RbacDao for RbacDaoDb with fn find_user_auth_by_id(self, id) {
 }
 
 ///|
-pub impl @dao.RbacDao for RbacDaoDb with fn find_role_codes(self, user_id, app_code) {
+pub impl @dao.RbacDao for RbacRepository with fn find_role_codes(self, user_id, app_code) {
   let conn = open_conn(self.config)
   let rows = q(
     conn,
@@ -61,7 +61,7 @@ pub impl @dao.RbacDao for RbacDaoDb with fn find_role_codes(self, user_id, app_c
 }
 
 ///|
-pub impl @dao.RbacDao for RbacDaoDb with fn find_perms_by_user(self, user_id, app_code) {
+pub impl @dao.RbacDao for RbacRepository with fn find_perms_by_user(self, user_id, app_code) {
   let conn = open_conn(self.config)
   let rows = q(
     conn,
@@ -81,7 +81,7 @@ pub impl @dao.RbacDao for RbacDaoDb with fn find_perms_by_user(self, user_id, ap
 
 ///|
 /// 全量替换：DELETE 旧关系 → 批量 INSERT 新关系（局部事务保证不留半态）
-pub impl @dao.RbacDao for RbacDaoDb with fn grant_roles(self, user_id, role_ids) {
+pub impl @dao.RbacDao for RbacRepository with fn grant_roles(self, user_id, role_ids) {
   let conn = open_conn(self.config)
   // 局部事务（模板就位前先原地实现）
   try {
@@ -117,7 +117,7 @@ pub impl @dao.RbacDao for RbacDaoDb with fn grant_roles(self, user_id, role_ids)
 }
 
 ///|
-pub impl @dao.RbacDao for RbacDaoDb with fn grant_menus(self, role_id, menu_ids) {
+pub impl @dao.RbacDao for RbacRepository with fn grant_menus(self, role_id, menu_ids) {
   let conn = open_conn(self.config)
   try {
     tx_begin(conn)
@@ -152,7 +152,7 @@ pub impl @dao.RbacDao for RbacDaoDb with fn grant_menus(self, role_id, menu_ids)
 }
 
 ///|
-pub extend RbacDaoDb with @dao.RbacDao::{
+pub extend RbacRepository with @dao.RbacDao::{
   grant_roles,
   grant_menus,
   find_perms_by_user,

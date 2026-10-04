@@ -29,7 +29,7 @@ fn row_page(r : @moondb.Row) -> @entity.UserPageRow {
 }
 
 ///|
-pub impl @dao.UserDao for UserDbDao with fn page(self, w, page_num, page_size) {
+pub impl @dao.UserDao for UserRepository with fn page(self, w, page_num, page_size) {
   let joins = user_page_joins()
   let conn = open_conn(self.base.config)
   // 总数（join 保留：动态条件可能引用 d./p. 列）

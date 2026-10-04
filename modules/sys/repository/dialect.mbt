@@ -74,7 +74,7 @@ pub impl Conn for MysqlBox with fn close(self) {
 /// 连接工厂（按 config.driver 分发；新方言 = 新 Box + 新分支）
 pub async fn open_conn(config : @core.MysqlConfig) -> MysqlBox raise @core.MldongError {
   if config.driver != "mysql" {
-    abort("方言未接入: \{config.driver}（当前仅 mysql；新方言按 conn.mbt 的 Box 模式扩展）")
+    abort("方言未接入: \{config.driver}（当前仅 mysql；新方言按 dialect.mbt 的 Box 模式扩展）")
   }
   try {
     { conn: @client.MysqlConn::connect(config.host, config.port, config.user, config.password, config.database) }
@@ -110,7 +110,7 @@ pub fn[T : Conn] close_conn(conn : T) -> Unit {
 }
 
 ///|
-/// 事务开（配 tx_commit/tx_rollback 用；错误处理样板见 perm_db.mbt grant_*）
+/// 事务开（配 tx_commit/tx_rollback 用；错误处理样板见 perm_repository.mbt grant_*）
 pub async fn[T : Conn] tx_begin(conn : T) -> Unit raise @core.MldongError {
   conn.begin()
 }

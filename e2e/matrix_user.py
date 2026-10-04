@@ -83,4 +83,6 @@ check('U23 onlineDevice 自身行', r['code']==0 and len(r['data'])>=1 and all(x
 r=post('/sys/user/info',{},'garbage-token')
 check('U24 无效 token 401', r['code']==99990401)
 
+# 自清理（本套新建用户；不清理会霸占分页首页，殃及别的套件的分页断言）
+post('/sys/user/remove',{'ids':[uid]},t)
 print('OK %d FAIL %d'%(ok,bad))

@@ -61,18 +61,22 @@ r=post('/sys/dept/page',{'pageNum':1,'pageSize':10,'m_EQ_code':UN+'hq'},t)
 check('D8 dept page + m_EQ', r['code']==0 and r['data']['recordCount']==1)
 # 部门用户树：把 u0011 挂到 child 部门下
 import urllib.request as _u
-r=post('/sys/user/update',{'id':'1711661958608584706','userName':'u0011','realName':'王强','deptId':str(child)},t)
-check('D9 挪 u0011 进子部门', r['code']==0, str(r))
+# 建自有用户挂子部门（不碰种子数据；跨套件残留依赖已两次假红，教训入册）
+r=post('/sys/user/save',{'userName':UN+'du','realName':'树验证','deptId':str(child),'mobilePhone':'13899990002'},t)
+duid=r['data']; check('D9 建用户挂子部门', r['code']==0 and duid, str(r))
 r=post('/sys/user/getDeptUserTree',{},t)
-du=json.dumps(r['data'],ensure_ascii=False)
 rnode2=[n for n in walk(r['data']) if n.get('nodeType')=='1' and n['value']==str(child)]
-check('D10 部门用户树含部门节点+用户叶', r['code']==0 and len(rnode2)==1 and any(x['nodeType']=='2' and x['label']=='王强' for x in rnode2[0]['children']), du[:150])
-# 还原 u0011
-r=post('/sys/user/update',{'id':'1711661958608584706','userName':'u0011','realName':'王强'},t)
-# 清理
+check('D10 部门用户树含部门节点+用户叶', r['code']==0 and len(rnode2)==1 and any(x['nodeType']=='2' and x['label']=='树验证' for x in rnode2[0]['children']))
 r=post('/sys/dept/remove',{'ids':[root,child,child2]},t)
 check('D11 dept remove 批量', r['code']==0)
-r=post('/sys/user/page',{'pageNum':1,'pageSize':3},t)
-check('D12 用户页 join dept 名称仍在', r['code']==0 and any(x.get('deptName') for x in r['data']['rows']))
+# join 核验：自建部门+自建用户，按 userName 精确定位（不依赖全局分页序）
+r=post('/sys/dept/save',{'name':UN+'d12','code':UN+'d12','parentId':'0'},t)
+d12=r['data']
+r=post('/sys/user/save',{'userName':UN+'u12','realName':'join验证','deptId':str(d12),'mobilePhone':'13899990001'},t)
+u12=r['data']
+r=post('/sys/user/page',{'pageNum':1,'pageSize':5,'m_EQ_userName':UN+'u12'},t)
+check('D12 用户页 join deptName', r['code']==0 and len(r['data']['rows'])==1 and r['data']['rows'][0]['deptName']==UN+'d12', str(r['data']['rows'])[:120])
+post('/sys/user/remove',{'ids':[u12]},t)
+post('/sys/dept/remove',{'ids':[d12]},t)
 
 print('OK %d FAIL %d'%(ok,bad))

@@ -13,16 +13,16 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] module(
   holder : @core.ConfigHolder,
 ) -> @mb.Module {
   @mb.Module(ctx => {
-    let rbac_dao = @db.RbacDaoDb::make(config)
+    let rbac_dao = @repo.RbacRepository::make(config)
     let rbac_svc = @svc.RbacServiceImpl::{ dao: rbac_dao }
     @ctrl.register_login(ctx, auth, rbac_svc) catch {
       _ => abort("sys 模块登录路由注册失败（路由冲突?）")
     }
     // 常量 holder（boot2 ConstantContext 同位）：启动灌入，config 写路刷新；
     // 默认密码等系统参数从这读（env 优先），user service 经闭包注入不依赖 holder 类型
-    let user_dao = @db.UserDbDao::make(config)
-    let dept_dao = @db.DeptDbDao::make(config)
-    let config_dao = @db.ConfigDbDao::make(config)
+    let user_dao = @repo.UserRepository::make(config)
+    let dept_dao = @repo.DeptRepository::make(config)
+    let config_dao = @repo.ConfigRepository::make(config)
     // holder 由 main 建实例传入（本模块只灌入/刷新）
     holder.load_items(config_dao.list_all().map(fn(c) { (c.code, c.content) }))
     let user_svc = @svc.UserServiceImpl::{
@@ -32,7 +32,7 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] module(
     @ctrl.register(ctx, user_svc, rbac_svc, g, auth, async fn() raise @core.MldongError { dept_dao.list_all() }) catch {
       e => abort("sys 模块 user 路由注册失败: \{e}")
     }
-    let role_dao = @db.RoleDbDao::make(config)
+    let role_dao = @repo.RoleRepository::make(config)
     let role_svc = @svc.RoleServiceImpl::{ dao: role_dao }
     @ctrl.register_role(ctx, role_svc, g) catch {
       e => abort("sys 模块 role 路由注册失败: \{e}")
@@ -42,7 +42,7 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] module(
     @ctrl.register_dept(ctx, dept_svc, g) catch {
       e => abort("sys 模块 dept 路由注册失败: \{e}")
     }
-    let post_dao = @db.PostDbDao::make(config)
+    let post_dao = @repo.PostRepository::make(config)
     let post_svc = @svc.PostServiceImpl::{ dao: post_dao }
     @ctrl.register_post(ctx, post_svc, g) catch {
       e => abort("sys 模块 post 路由注册失败: \{e}")
@@ -57,8 +57,8 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] module(
 
 ///|
 /// RBAC 供数方构造（main 鉴权装配用：PermissionProvider 真实现，码链走库）
-pub fn rbac_provider(config : @core.MysqlConfig) -> @svc.RbacServiceImpl[@db.RbacDaoDb] {
-  { dao: @db.RbacDaoDb::make(config) }
+pub fn rbac_provider(config : @core.MysqlConfig) -> @svc.RbacServiceImpl[@repo.RbacRepository] {
+  { dao: @repo.RbacRepository::make(config) }
 }
 
 ///|

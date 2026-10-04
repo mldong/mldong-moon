@@ -15,7 +15,7 @@ service（业务逻辑唯一收口：trait + Impl[R]；纯规则抽纯函数；�
 dao（端口 trait：签名只用 entity/dto/@core.Wrapper，零 moondb/moonmysql）
      │ 实现
      ▼
-dao-db（手写 SQL + 行映射；BaseDao[T] 模板 + TableCodec；驱动/方言收口 conn.mbt 的 Conn 缝）
+repository（手写 SQL + 行映射；BaseDao[T] 模板 + TableCodec；驱动/方言收口 dialect.mbt 的 Conn 缝）
 
 entity（纯数据 struct，零行为）      dto（入参 schema + parse_* + Req + 出参装配）
 core（错误码/信封/sqlbuilder/m_ 查询/雪花/时钟——零 web）   core-web（moonback 适配——wrap/守卫工具）
@@ -27,7 +27,7 @@ core（错误码/信封/sqlbuilder/m_ 查询/雪花/时钟——零 web）   cor
 |---|---|
 | `core` 不 import 任何 web/ORM 包 | 框架无关底座，模块间共享、可独立测试 |
 | web 依赖（moonback）只出现在 `core-web` 与各模块 `controller` | 换 web 框架只动这两处 |
-| 驱动/方言依赖只出现在各模块 `dao-db`（conn.mbt 的 Conn trait + Box + 工厂） | 换库只动方言文件，BaseDao/SQL builder 不动 |
+| 驱动/方言依赖只出现在各模块 `repository`（dialect.mbt 的 Conn trait + Box + 工厂） | 换库只动方言文件，BaseDao/SQL builder 不动 |
 | `service` 签名零 web/ORM 类型（entity/dto/@core 进出） | 保证 service 可迁移、可纯测 |
 | `dao` trait 签名零 ORM 类型，条件用 `@core.Wrapper` 进出 | "业务怎么查"由 service 组 Wrapper 说了算 |
 | controller 不写业务逻辑（查重/默认值/状态机全在 service） | controller 只是"校验 + 转发" |
@@ -41,7 +41,7 @@ core（错误码/信封/sqlbuilder/m_ 查询/雪花/时钟——零 web）   cor
 | entity | `entity/user.mbt` | 纯数据 struct + 关联行 struct（如 `UserPageRow`） | 任何方法/IO |
 | dto | `dto/user_dto.mbt` | moon_zod schema、`Req` struct、`parse_save/parse_update/parse_page`、出参装配 `user_json/page_row_json` | 业务逻辑 |
 | dao | `dao/user_dao.mbt` | `trait UserDao`（端口） | SQL 字样 |
-| dao-db | `dao-db/user_table.mbt`（TableCodec+row 映射）、`user_db.mbt`（trait impl）、`user_page.mbt`（join 版查询） | SQL 与行映射 | 业务规则 |
+| repository | `repository/user_table.mbt`（TableCodec+row 映射）、`user_repository.mbt`（trait impl）、`user_page.mbt`（join 版查询） | SQL 与行映射 | 业务规则 |
 | service | `service/user_service.mbt` | `trait UserService` + `UserServiceImpl[R]`：校验、查重、默认值、错误码 | web/ORM 类型 |
 | controller | `controller/user_controller.mbt` | `policy()` 权限码片段（与端点同文件）+ `register()` 薄端点 | 业务逻辑 |
 
@@ -95,7 +95,14 @@ pub(open) trait UserDao {
 - 返回 `?` 表示"不存在不是错"，由 service 决定转 `NotFound`；
 - 分页统一返回 `(总数, 当页行)`，行用关联 struct。
 
-### 3.4 dao-db（实现）
+### 3.4 repository（适配器实现）
+
+> 命名理据：`dao`（端口）与 `repository`（适配器）在 Java 语境是**同一槽位的两个词**——
+> DAO 出自 J2EE BluePrints（表/CRUD 导向），Repository 出自 DDD（聚合/领域语言），Spring Data/
+> NestJS/Laravel 已让 repository 赢下命名战争但语义仍是 DAO 形状；本栈取 dao 作端口名（对照
+> boot2 家族 mapper）、repository 作适配器名（行业零解释成本）。同文件判据（同层+同依赖闭包+
+> 同变更节奏）决定了 service trait+impl 同文件，而 dao 端口与 repository 适配器分包——
+> 中间隔着依赖方向（见 §1 依赖规则）。
 
 - **每实体一份 `TableCodec[T]`**（无反射的代价，后续 gen 生成器产这份样板）：
   `name/cols/insert_cols/update_cols/from_row/id_of/del_col/order_col`；
@@ -106,7 +113,7 @@ pub(open) trait UserDao {
   find_one/list/count/page`）；业务查询（join、专列）才手写 SQL（`user_page.mbt` 是样板）；
 - 行映射 `row_user` 按列名取（`row_text/row_i64/row_opt_*`，MyBatis resultMap 的手写对应物）；
   不回显的列（password/salt/avatar）不进 `cols`；
-- 连接缝在 `dao-db/conn.mbt`：`Conn` trait（query/execute/begin/commit/rollback/close）+ 每库一个 Box 包装 + `open_conn` 按 `MLDONG_DB_DRIVER` 分发（现仅 mysql，新方言=新 Box+新分支）；q/x/close_conn/tx_* 全部泛型中性，行映射走 moondb.Row——**BaseDao/SQL builder 零方言**。事务写法见 §5。
+- 连接缝在 `repository/dialect.mbt`：`Conn` trait（query/execute/begin/commit/rollback/close）+ 每库一个 Box 包装 + `open_conn` 按 `MLDONG_DB_DRIVER` 分发（现仅 mysql，新方言=新 Box+新分支）；q/x/close_conn/tx_* 全部泛型中性，行映射走 moondb.Row——**BaseDao/SQL builder 零方言**。事务写法见 §5。
 
 ### 3.5 service（业务唯一收口）
 
@@ -177,7 +184,7 @@ let (sql, params) = @core.build_select("sys_user", cols, w, orders=[("create_tim
 
 ## 5. 事务
 
-现状：**多写操作在 dao-db 原地开局部事务**（`perm_db.mbt` 的 `grant_roles/grant_menus`
+现状：**多写操作在 repository 原地开局部事务**（`perm_repository.mbt` 的 `grant_roles/grant_menus`
 是样板）：`open_conn → begin → errdefer{rollback; close} → 语句 → commit → close`。
 正式的事务模板（环境连接 + 嵌套复用，参照 jeeflow-moon `MysqlTxTemplate`）在路线图上，
 就位后 grant 写路收敛过去——新写多语句事务先照 grant 样板，别发明第三种写法。

@@ -57,7 +57,7 @@ pub(all) struct ColumnMeta {
 设计约束（为什么是端口+方言实现，不是公共 SQL）：三库的注释取法/类型叫法/序号语义都不同，
 公共抽象只能落在"形状"上。每个库一个实现包（`metadata-mysql` / `metadata-postgres` /
 `metadata-sqlite`），消费方只 import `metadata` 端口——换库不动 gen/dev_schema。
-连接助手与 dao-db 各持一份（模板自包含，共享需求成立再抽公共件）。
+连接助手与 repository 各持一份（模板自包含，共享需求成立再抽公共件）。
 
 ## 4. 两条消费路
 

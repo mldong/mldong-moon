@@ -26,14 +26,14 @@ service（业务逻辑唯一收口；纯规则抽纯函数）
 dao（端口 trait，签名只用 entity/dto/@core.Wrapper）
      │ 实现
      ▼
-dao-db（手写 SQL + 行映射，方言收口 conn.mbt 的 Conn 缝：换库=新 Box+新工厂分支）
+repository（手写 SQL + 行映射，方言收口 dialect.mbt 的 Conn 缝：换库=新 Box+新工厂分支）
 
 entity（纯数据 struct） / dto（入参 schema + parse + Req + 出参装配）
 core（零 web：错误码/信封/sqlbuilder/m_ 查询/雪花）
 core-web（moonback 适配：wrap 统一错误转信封 / 守卫工具——全工程 web 依赖唯一收口）
 ```
 
-模块按 `sys`（系统管理）/ `dev`（开发工具）/ `biz`（业务）划分，模块内六件固定：`entity / dto / dao / dao-db / service / controller`。
+模块按 `sys`（系统管理）/ `dev`（开发工具）/ `biz`（业务）划分，模块内六件固定：`entity / dto / dao / repository / service / controller`。
 
 ## 模块布局
 
@@ -46,7 +46,7 @@ mldong-moon/
 │   ├── entity/                #   sys_user → User（类名去表前缀）
 │   ├── dto/                   #   user_dto.mbt：moon_zod schema + parse_* + 出参装配
 │   ├── dao/                   #   UserDao 端口 trait（user/role/rbac）
-│   ├── dao-db/                #   BaseDao[T] 单表模板 + TableCodec + 手写 join SQL + 方言缝
+│   ├── repository/                #   BaseDao[T] 单表模板 + TableCodec + 手写 join SQL + 方言缝
 │   ├── service/               #   UserService trait + Impl[R]；rbac_service.mbt = RBAC + moon-token 供数方
 │   ├── controller/            #   端点注册 + policy() 权限码片段（与端点同文件）
 │   └── module.mbt             #   模块自注册（main 每模块一行）
