@@ -121,17 +121,7 @@ const DEFAULT_APP_CODE : String = "platform"
 
 ///|
 pub fn parse_user_id(login_id : String) -> Int64? {
-  let id_part = match login_id.split("@").to_array() {
-    parts => if parts.length() >= 2 { parts[0].to_owned() } else { login_id }
-  }
-  if id_part.is_empty() {
-    return None
-  }
-  try {
-    Some(@string.parse_int64(id_part))
-  } catch {
-    _ => None
-  }
+  @core.parse_user_id(login_id)
 }
 
 ///|

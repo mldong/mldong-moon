@@ -14,8 +14,9 @@ fn validate(req : @dto.UserSaveReq) -> String? {
 
 ///|
 pub(open) trait UserService {
-  async fn save(Self, @dto.UserSaveReq) -> Int64 raise @core.MldongError
-  async fn update(Self, @dto.UserSaveReq) -> Unit raise @core.MldongError
+  /// op_user = 操作人 id（审计 create_user/update_user；controller 从登录主体取）
+  async fn save(Self, @dto.UserSaveReq, Int64?) -> Int64 raise @core.MldongError
+  async fn update(Self, @dto.UserSaveReq, Int64?) -> Unit raise @core.MldongError
   async fn remove_by_ids(Self, Array[Int64]) -> Unit raise @core.MldongError
   async fn find_by_id(Self, Int64) -> @entity.User raise @core.MldongError
   async fn page(Self, @dto.UserPageReq) -> (Int, Array[@entity.UserPageRow]) raise @core.MldongError
@@ -30,11 +31,11 @@ pub(open) trait UserService {
   /// 全量轻量用户（部门用户树用；未删除范围）
   async fn list_simple(Self) -> Array[@entity.User] raise @core.MldongError
   /// 修改个人信息（只动 realName/nickName/sex，其余字段忽略；对齐 boot2 ValidInfo 组）
-  async fn update_info(Self, @dto.UserSaveReq) -> Unit raise @core.MldongError
+  async fn update_info(Self, @dto.UserSaveReq, Int64?) -> Unit raise @core.MldongError
   /// 修改个人密码（验旧密 md5(旧+盐)；新盐 + md5(新+盐)；boot2 updatePwd 同语义）
   async fn update_password(Self, Int64, String, String) -> Unit raise @core.MldongError
   /// 修改个人头像（boot2 updateAvatar：avatar 存 URL 串）
-  async fn update_avatar(Self, Int64, String) -> Unit raise @core.MldongError
+  async fn update_avatar(Self, Int64, String, Int64?) -> Unit raise @core.MldongError
 }
 
 ///|
@@ -46,7 +47,7 @@ pub(all) struct UserServiceImpl[R] {
 }
 
 ///|
-pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn save(self, req) {
+pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn save(self, req, op_user) {
   match validate(req) {
     Some(msg) => raise @core.MldongError::InvalidInput(msg)
     None => ()
@@ -79,16 +80,16 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn save(self,
     post_id: None,
     remark: req.remark,
     create_time: Some(@core.now_str()),
-    create_user: None,
+    create_user: op_user,
     update_time: None,
-    update_user: None,
+    update_user: op_user,
     is_deleted: Some(0),
   }
   self.dao.insert(u)
 }
 
 ///|
-pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update(self, req) {
+pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update(self, req, op_user) {
   match validate(req) {
     Some(msg) => raise @core.MldongError::InvalidInput(msg)
     None => ()
@@ -125,7 +126,7 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update(sel
     create_time: None,
     create_user: None,
     update_time: None,
-    update_user: None,
+    update_user: op_user,
     is_deleted: None,
   }
   self.dao.update(u)
@@ -228,7 +229,7 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn list_simpl
 }
 
 ///|
-pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update_info(self, req) {
+pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update_info(self, req, op_user) {
   let old = match self.dao.find_by_id(req.id) {
     Some(u) => u
     None => raise @core.MldongError::NotFound("用户不存在: \{req.id}")
@@ -255,7 +256,7 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update_inf
     create_time: old.create_time,
     create_user: old.create_user,
     update_time: Some(@core.now_str()),
-    update_user: None,
+    update_user: op_user,
     is_deleted: old.is_deleted,
   }
   self.dao.update(u)
@@ -287,6 +288,7 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update_ava
   self,
   id,
   avatar,
+  op_user,
 ) {
   let old = match self.dao.find_by_id(id) {
     Some(u) => u
@@ -312,7 +314,7 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update_ava
     create_time: old.create_time,
     create_user: old.create_user,
     update_time: Some(@core.now_str()),
-    update_user: None,
+    update_user: op_user,
     is_deleted: old.is_deleted,
   }
   self.dao.update(u)

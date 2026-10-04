@@ -43,7 +43,8 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
 ) -> Unit raise {
   // 添加用户
   let save_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
-    let id = svc.save(@dto.parse_save(@web.json_body(request)))
+    let op_user = @web.user_id_of(request)
+    let id = svc.save(@dto.parse_save(@web.json_body(request)), op_user)
     @core.ok_data(Json::string(id.to_string()))
   })
   // 删除用户（逻辑删，ids 支持字符串/数字）
@@ -53,7 +54,8 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
   })
   // 修改用户
   let update_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
-    svc.update(@dto.parse_update(@web.json_body(request)))
+    let op_user = @web.user_id_of(request)
+    svc.update(@dto.parse_update(@web.json_body(request)), op_user)
     @core.ok_empty()
   })
   // 查询单个用户
@@ -139,7 +141,7 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
     }
     let req = @dto.parse_info(@web.json_body(request))
     req.id = uid
-    svc.update_info(req)
+    svc.update_info(req, Some(uid))
     @core.ok_empty()
   })
   // 修改个人密码（验旧密）
@@ -166,7 +168,7 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
       Some(id) => id
       None => raise @core.MldongError::NotFound("登录主体非法: \{p.login_id}")
     }
-    svc.update_avatar(uid, @core.text_or(@web.json_body(request), "avatar", ""))
+        svc.update_avatar(uid, @core.text_or(@web.json_body(request), "avatar", ""), Some(uid))
     let _ = uid
     @core.ok_empty()
   })

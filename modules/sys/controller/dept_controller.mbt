@@ -21,7 +21,8 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.DeptService]
   g : @mbguard.Guard[S, P],
 ) -> Unit raise {
   let save_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
-    let id = svc.save(@dto.dept_parse_save(@web.json_body(request)))
+    let op_user = @web.user_id_of(request)
+    let id = svc.save(@dto.dept_parse_save(@web.json_body(request)), op_user)
     @core.ok_data(Json::string(id.to_string()))
   })
   let remove_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
@@ -29,7 +30,8 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.DeptService]
     @core.ok_empty()
   })
   let update_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
-    svc.update(@dto.dept_parse_update(@web.json_body(request)))
+    let op_user = @web.user_id_of(request)
+    svc.update(@dto.dept_parse_update(@web.json_body(request)), op_user)
     @core.ok_empty()
   })
   let detail_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {

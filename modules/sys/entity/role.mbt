@@ -13,5 +13,7 @@ pub(all) struct Role {
   mut remark : String?
   mut create_time : String?
   mut update_time : String?
+  mut create_user : Int64?
+  mut update_user : Int64?
   mut is_deleted : Int?
 }

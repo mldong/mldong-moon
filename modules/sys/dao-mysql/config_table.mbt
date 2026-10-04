@@ -28,6 +28,8 @@ let config_table : TableCodec[@entity.Config] = TableCodec::{
     { name: "enabled", get: fn(d) { opt_i(d.enabled) } },
     { name: "remark", get: fn(d) { opt_s(d.remark) } },
     { name: "create_time", get: fn(d) { S(match d.create_time { Some(s) => s; None => @core.now_str() }) } },
+    { name: "create_user", get: fn(d) { opt_l(d.create_user) } },
+    { name: "update_user", get: fn(d) { opt_l(d.update_user) } },
   ],
   update_cols: [
     { name: "name", get: fn(d) { S(d.name) } },
@@ -38,6 +40,7 @@ let config_table : TableCodec[@entity.Config] = TableCodec::{
     { name: "enabled", get: fn(d) { opt_i(d.enabled) } },
     { name: "remark", get: fn(d) { opt_s(d.remark) } },
     { name: "update_time", get: fn(_d) { S(@core.now_str()) } },
+    { name: "update_user", get: fn(d) { opt_l(d.update_user) } },
   ],
   from_row: row_config,
   id_of: fn(d) { L(d.id) },

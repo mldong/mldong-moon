@@ -2,8 +2,9 @@
 
 ///|
 pub(open) trait RoleService {
-  async fn save(Self, @dto.RoleSaveReq) -> Int64 raise @core.MldongError
-  async fn update(Self, @dto.RoleSaveReq) -> Unit raise @core.MldongError
+  /// op_user = 操作人 id（审计 create_user/update_user；controller 从登录主体取）
+  async fn save(Self, @dto.RoleSaveReq, Int64?) -> Int64 raise @core.MldongError
+  async fn update(Self, @dto.RoleSaveReq, Int64?) -> Unit raise @core.MldongError
   async fn remove_by_ids(Self, Array[Int64]) -> Unit raise @core.MldongError
   async fn find_by_id(Self, Int64) -> @entity.Role raise @core.MldongError
   async fn page(Self, @dto.RolePageReq) -> (Int, Array[@entity.Role]) raise @core.MldongError
@@ -15,7 +16,7 @@ pub(all) struct RoleServiceImpl[R] {
 }
 
 ///|
-pub impl[R : @dao.RoleDao] RoleService for RoleServiceImpl[R] with fn save(self, req) {
+pub impl[R : @dao.RoleDao] RoleService for RoleServiceImpl[R] with fn save(self, req, op_user) {
   // 业务规则：code 查重（未删除范围内；code 有唯一索引语义，空 code 不查）
   if !req.code.is_empty() {
     match self.dao.find_by_code(req.code) {
@@ -36,13 +37,15 @@ pub impl[R : @dao.RoleDao] RoleService for RoleServiceImpl[R] with fn save(self,
     remark: req.remark,
     create_time: Some(@core.now_str()),
     update_time: None,
+    create_user: op_user,
+    update_user: op_user,
     is_deleted: Some(0),
   }
   self.dao.insert(r)
 }
 
 ///|
-pub impl[R : @dao.RoleDao] RoleService for RoleServiceImpl[R] with fn update(self, req) {
+pub impl[R : @dao.RoleDao] RoleService for RoleServiceImpl[R] with fn update(self, req, op_user) {
   match self.dao.find_by_id(req.id) {
     None => raise @core.MldongError::NotFound("角色不存在: \{req.id}")
     Some(_) => ()
@@ -67,7 +70,9 @@ pub impl[R : @dao.RoleDao] RoleService for RoleServiceImpl[R] with fn update(sel
     data_scope: req.data_scope,
     remark: req.remark,
     create_time: None,
+    create_user: None,
     update_time: None,
+    update_user: op_user,
     is_deleted: None,
   }
   self.dao.update(r)

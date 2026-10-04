@@ -19,6 +19,8 @@ let role_table : TableCodec[@entity.Role] = TableCodec::{
     { name: "data_scope", get: fn(r) { opt_i(r.data_scope) } },
     { name: "remark", get: fn(r) { opt_s(r.remark) } },
     { name: "create_time", get: fn(r) { S(match r.create_time { Some(s) => s; None => @core.now_str() }) } },
+    { name: "create_user", get: fn(r) { opt_l(r.create_user) } },
+    { name: "update_user", get: fn(r) { opt_l(r.update_user) } },
   ],
   update_cols: [
     { name: "app_code", get: fn(r) { opt_s(r.app_code) } },
@@ -30,6 +32,7 @@ let role_table : TableCodec[@entity.Role] = TableCodec::{
     { name: "data_scope", get: fn(r) { opt_i(r.data_scope) } },
     { name: "remark", get: fn(r) { opt_s(r.remark) } },
     { name: "update_time", get: fn(_r) { S(@core.now_str()) } },
+    { name: "update_user", get: fn(r) { opt_l(r.update_user) } },
   ],
   from_row: row_role,
   id_of: fn(r) { L(r.id) },
@@ -52,6 +55,8 @@ fn row_role(r : @moondb.Row) -> @entity.Role {
     remark: row_opt_text(r, "remark"),
     create_time: row_opt_datetime(r, "create_time"),
     update_time: row_opt_datetime(r, "update_time"),
+    create_user: row_opt_i64(r, "create_user"),
+    update_user: row_opt_i64(r, "update_user"),
     is_deleted: row_opt_int(r, "is_deleted"),
   }
 }

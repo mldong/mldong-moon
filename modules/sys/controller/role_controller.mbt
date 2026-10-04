@@ -21,7 +21,8 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.RoleService]
 ) -> Unit raise {
   // 添加角色（code 查重在 service）
   let save_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
-    let id = svc.save(@dto.parse_role_save(@web.json_body(request)))
+    let op_user = @web.user_id_of(request)
+    let id = svc.save(@dto.parse_role_save(@web.json_body(request)), op_user)
     @core.ok_data(Json::string(id.to_string()))
   })
   // 删除角色
@@ -31,7 +32,8 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.RoleService]
   })
   // 修改角色
   let update_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
-    svc.update(@dto.parse_role_update(@web.json_body(request)))
+    let op_user = @web.user_id_of(request)
+    svc.update(@dto.parse_role_update(@web.json_body(request)), op_user)
     @core.ok_empty()
   })
   // 查询单个角色

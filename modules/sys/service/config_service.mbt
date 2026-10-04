@@ -2,8 +2,9 @@
 
 ///|
 pub(open) trait ConfigService {
-  async fn save(Self, @dto.ConfigSaveReq) -> Int64 raise @core.MldongError
-  async fn update(Self, @dto.ConfigSaveReq) -> Unit raise @core.MldongError
+  /// op_user = 操作人 id（审计 create_user/update_user；controller 从登录主体取）
+  async fn save(Self, @dto.ConfigSaveReq, Int64?) -> Int64 raise @core.MldongError
+  async fn update(Self, @dto.ConfigSaveReq, Int64?) -> Unit raise @core.MldongError
   async fn remove_by_ids(Self, Array[Int64]) -> Unit raise @core.MldongError
   async fn find_by_id(Self, Int64) -> @entity.Config raise @core.MldongError
   async fn page(Self, @dto.ConfigPageReq) -> (Int, Array[@entity.Config]) raise @core.MldongError
@@ -18,7 +19,7 @@ pub(all) struct ConfigServiceImpl[R] {
 }
 
 ///|
-pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn save(self, req) {
+pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn save(self, req, op_user) {
   // 唯一编码校验（boot2 checkUnique 同位一行调）
   self.dao.check_unique(req.code, None, "唯一编码已存在: " + req.code)
   let d : @entity.Config = {
@@ -31,9 +32,9 @@ pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn save
     enabled: req.enabled,
     remark: req.remark,
     create_time: Some(@core.now_str()),
-    create_user: None,
+    create_user: op_user,
     update_time: None,
-    update_user: None,
+    update_user: op_user,
     is_deleted: Some(0),
   }
   match self.holder {
@@ -44,7 +45,7 @@ pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn save
 }
 
 ///|
-pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn update(self, req) {
+pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn update(self, req, op_user) {
   match self.dao.find_by_id(req.id) {
     None => raise @core.MldongError::NotFound("数据不存在: " + req.id.to_string())
     Some(_) => ()
@@ -64,7 +65,7 @@ pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn upda
     create_time: None,
     create_user: None,
     update_time: Some(@core.now_str()),
-    update_user: None,
+    update_user: op_user,
     is_deleted: None,
   }
   match self.holder {

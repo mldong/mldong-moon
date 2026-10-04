@@ -64,3 +64,13 @@ pub fn token_of(request : @mb.Request) -> String {
     from_header
   }
 }
+
+///|
+/// 当前请求的操作人 id（审计字段来源）：登录主体 login_id 解析；
+/// None = 豁免面（无主体）或主体形态异常——审计落 NULL 而不是报错。
+pub fn user_id_of(request : @mb.Request) -> Int64? {
+  match @mbguard.principal_of(request) {
+    Some(p) => @core.parse_user_id(p.login_id)
+    None => None
+  }
+}
