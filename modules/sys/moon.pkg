@@ -10,5 +10,6 @@ import {
   "mldong/moon-sys/repository" @repo,
   "mldong/moon-sys/service" @svc,
   "mldong/moon-sys/controller" @ctrl,
+  "mldong/moon-sys/enums" @enums,
   "moonbitlang/moonback" @mb,
 }

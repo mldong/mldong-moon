@@ -67,3 +67,30 @@ pub fn EnumDictRegistry::list(self : EnumDictRegistry) -> Array[DictModel] {
 pub fn EnumDictRegistry::find(self : EnumDictRegistry, dict_key : String) -> DictModel? {
   self.by_key.get(dict_key)
 }
+
+///|
+/// 整型码枚举值（goframe「Key/Code/Message struct 常量」的极简同位）：
+/// 业务比对用 .code、字典清单 .label 出示——base 家族码值域全是整型
+pub(all) struct IntVal {
+  code : Int
+  label : String
+}
+
+///|
+/// 整型码枚举字典便利构造（goframe RegisterEnumValues 同位）：
+/// vals 直接喂各枚举文件的 all() 清单，dataType 钉 2=数值（UC-0431① 播种器采集源）
+pub fn int_dict(name : String, dict_key : String, vals : Array[IntVal]) -> DictModel {
+  {
+    name,
+    dict_key,
+    data_type: Some(2),
+    items: vals.map(fn(v) {
+      {
+        name: v.label,
+        dict_item_value: Json::number(v.code.to_double()),
+        dict_item_key: v.code.to_string(),
+        ext: None,
+      }
+    }),
+  }
+}

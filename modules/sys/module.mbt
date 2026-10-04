@@ -57,7 +57,7 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] install(
     let dict_dao = @repo.DictRepository::make(config)
     let dict_item_dao = @repo.DictItemRepository::make(config)
     // 枚举字典：本模块声明装配期灌注册中心（goframe init() 的 moon 同位）
-    register_sys_enum_dicts(enum_registry)
+    @enums.register_sys_enum_dicts(enum_registry)
     let dict_svc = @svc.DictServiceImpl::{
       dao: dict_dao,
       items_of: async fn(dict_id) raise @core.MldongError { dict_item_dao.list_enabled_by_dict(dict_id) },

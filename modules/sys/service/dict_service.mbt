@@ -110,7 +110,7 @@ pub impl[R : @dao.DictDao] DictService for DictServiceImpl[R] with fn page(self,
 /// getByDictType 的出口装配：{label, value(+ext?)}——dataType=2 时 value 转数值
 /// （boot2 Convert.toInt 同语义；coerce 失败回落字符串），ext 空不出键
 fn dict_item_label_value(d : @entity.Dict, it : @entity.DictItem) -> Json {
-  let value : Json = if d.data_type == Some(2) {
+  let value : Json = if d.data_type == Some(@enums.dt_integer.code) {
     match @core.parse_i64_lenient(it.code) {
       Some(n) => Json::number(n.to_double())
       None => Json::string(it.code)

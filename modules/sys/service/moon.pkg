@@ -4,4 +4,5 @@ import {
   "mldong/moon-sys/entity" @entity,
   "mldong/moon-sys/dao" @dao,
   "mldong/moon-sys/dto" @dto,
+  "mldong/moon-sys/enums" @enums,
 }

@@ -260,7 +260,7 @@ pub impl[R : @dao.MenuDao] MenuService for MenuServiceImpl[R] with fn user_route
   let app = menu_app_code_of(ctx)
   let w = @core.where_().eq("enabled", @core.I(1)).eq("app_code", @core.S(app))
   // 只出目录(1)/菜单(2)——按钮(3)/接口(4)不进路由
-  let _ = w.in_("type", [@core.I(1), @core.I(2)])  // DB 列名 type（实体字段 menu_type 是保留字改名）
+  let _ = w.in_("type", [@core.I(@enums.menu_dir.code), @core.I(@enums.menu_item.code)])  // DB 列名 type（实体字段 menu_type 是保留字改名）
   let items = self.dao.list_flat(w)
   // 非超管按 RBAC 菜单 id 链过滤（boot2 rbacService.getMenuIdsByUserId 同位）
   let items = if super_admin {
@@ -309,30 +309,25 @@ pub impl[R : @dao.MenuDao] MenuService for MenuServiceImpl[R] with fn user_route
       }
       None => ()
     }
-    // 打开方式：LINK(3)→link、IFRAME(2)→iframeSrc（boot2 MenuOpenTypeEnum 同码表）
-    match m.open_type {
-      Some(3) =>
-        match m.url {
-          Some(u) => {
-            let _ = node.meta.set("link", Json::string(u))
-          }
-          None => ()
-        }
-      Some(2) =>
-        match m.url {
-          Some(u) => {
-            let _ = node.meta.set("iframeSrc", Json::string(u))
-          }
-          None => ()
-        }
-      _ => ()
+    // 打开方式：LINK→link、IFRAME→iframeSrc（boot2 MenuOpenTypeEnum 同码表）
+    // match 模式里不能放表达式路径（Some(@enums.open_link.code) 非法），用比较链
+    if m.open_type == Some(@enums.open_link.code) {
+      match m.url {
+        Some(u) => { let _ = node.meta.set("link", Json::string(u)) }
+        None => ()
+      }
+    } else if m.open_type == Some(@enums.open_iframe.code) {
+      match m.url {
+        Some(u) => { let _ = node.meta.set("iframeSrc", Json::string(u)) }
+        None => ()
+      }
     }
-    // 隐藏菜单：isShow=0 → v2 用 hideMenu、其余 hideInMenu
-    if m.is_show == Some(0) {
+    // 隐藏菜单：isShow=NO → v2 用 hideMenu、其余 hideInMenu
+    if m.is_show == Some(@enums.no.code) {
       let flag = if version == "v2" { "hideMenu" } else { "hideInMenu" }
       let _ = node.meta.set(flag, Json::boolean(true))
     }
-    if m.is_cache == Some(1) {
+    if m.is_cache == Some(@enums.yes.code) {
       let _ = node.meta.set("keepAlive", Json::boolean(true))
     }
     // meta.redirect 非空串时上提为节点 redirect（boot2 同语义）
@@ -364,7 +359,7 @@ pub impl[R : @dao.MenuDao] MenuService for MenuServiceImpl[R] with fn user_route
           }
         _ => ()
       }
-      if m.menu_type == Some(2) {
+      if m.menu_type == Some(@enums.menu_item.code) {
         if super_admin {
           let auth : Map[String, Json] = {
             "title": Json::string("超级管理员"),
@@ -458,7 +453,7 @@ async fn[T : @dao.MenuDao] sync_walk(
     return
   }
   for item in items {
-    if !(item.is_sync == Some(1)) || item.code == "ADMIN" {
+    if !(item.is_sync == Some(@enums.yes.code)) || item.code == "ADMIN" {
       continue
     }
     let existing = svc.dao.find_by_app_and_code(app, item.code)
@@ -494,7 +489,7 @@ async fn[T : @dao.MenuDao] sync_walk(
         m.id
       }
       Some(existing) => {
-        if existing.is_sync == Some(1) {
+        if existing.is_sync == Some(@enums.yes.code) {
           let u : @entity.Menu = {
             id: existing.id,
             app_code: existing.app_code,

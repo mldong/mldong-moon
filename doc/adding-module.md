@@ -89,11 +89,16 @@ let post_svc = @svc.PostServiceImpl::{ dao: post_dao }
 4. `cmd/main` 挂一行：`ctx.use_(@dev.module(config, g, auth)) catch { _ => abort(...) }`
    （moon.pkg 加 `"mldong/moon-<mod>" @dev`）；
 5. 权限码：新模块自己的 policy 聚合函数导出，main 里 `merge_policy` 并进总策略；
-6. **枚举字典**（有业务枚举才做）：模块根包建 `enums.mbt`（声明 `Array[@core.DictModel]`
-   常量表 + `register_<mod>_enum_dicts(registry)`），`install` 收 `@core.EnumDictRegistry`
-   参数并在装配期灌入——goframe「每枚举一文件 + init() 注册」的 moon 同位；sys 的样板见
-   [../modules/sys/enums.mbt](../modules/sys/enums.mbt)。main 建全进程一实例传各模块
-   （ConfigHolder 同一条传链），dict 的 getByDictType/enumDictList 自动可见。
+6. **枚举字典**（有业务枚举才做）：模块根包建 `enums/` 子包（moon.pkg import `@core`），
+   **逐枚举一文件**（goframe「每枚举一文件 + init() 注册」同位）：每文件 = 业务常量
+   （`pub let` snake_case，MoonBit 大写裸标识符是构造器命名空间留不得）+ `all()` 列表；
+   `registry.mbt` 用 `@core.int_dict(name, dict_key, vals)` 组 `DictModel` + 导出
+   `register_<mod>_enum_dicts(registry)`；`install` 收 `@core.EnumDictRegistry`
+   参数并在装配期灌入。sys 的样板见 [../modules/sys/enums/](../modules/sys/enums/)（18 个
+   枚举 18 文件 + registry）。main 建全进程一实例传各模块
+   （ConfigHolder 同一条传链），dict 的 getByDictType/enumDictList 自动可见；
+   **DB 优先**：getByDictType 先查库，枚举只是回退/播种源——纯 SQL 喂
+   sys_dict/sys_dict_item 种子同样成立（UC-0431）。
 
 ## 自检清单（提交前）
 

@@ -29,18 +29,19 @@ mldong-moon/
 │   ├── jsonx.mbt        #   Json 取值（get_i64/text_or/get_i64_array…）
 │   ├── id_gen.mbt       #   雪花 ID（next_id）+ 时间
 │   ├── config_holder.mbt#   配置常量 Holder（框架件：main 建实例传各模块，sys 灌入/刷新，dev/biz 只读）
-│   ├── enum_dict.mbt    #   枚举字典注册中心（框架件：DictModel/DictItemModel + Registry，各模块装配期灌自己的声明；sys 样板 modules/sys/enums.mbt）
+│   ├── enum_dict.mbt    #   枚举字典注册中心（框架件：IntVal/int_dict + DictModel/Registry，各模块装配期灌自己的声明；sys 样板 modules/sys/enums/ 逐枚举一文件）
 │   └── mysql_config.mbt #   MysqlConfig::from_env（MLDONG_DB_*）
 ├── core-web/            # mldong/moon-core-web —— moonback 适配层（全工程 web 依赖唯一收口）
 │   ├── common.mbt       #   wrap（统一错误转信封）+ json_body
 │   └── guard.mbt        #   merge_policy / on_error（99990401/403 信封）/ token_of（剥 Bearer）
 ├── modules/sys/         # mldong/moon-sys —— 业务模块样板（六件套）
 │   ├── entity/ dto/ dao/ repository/ service/ controller/
+│   ├── enums/           #   18 个业务枚举逐文件（常量 + all()；registry.mbt 装配期灌注册中心）
 │   └── module.mbt       #   模块自注册 + policy() 聚合 + rbac_provider()
 ├── modules/dev/         # mldong/moon-dev —— 库元数据底座（gen/dev_schema 共用，doc/gen-metadata.md）
 ├── cmd/main/            # 装配入口：鉴权 + 模块挂载 + listen :18680
 ├── cmd/gen/             # 代码生成器（读 MetadataDao 产六件套，gen-out/ 不入仓）
-├── e2e/                 # 黑盒回归矩阵（run.sh 总入口，八套 113 用例，真库）
+├── e2e/                 # 黑盒回归矩阵（run.sh 总入口，十套 183 用例，真库）
 └── doc/                 # 深入文档（AI 上手按序读）
     ├── layering.md      #   分层规范（六件套、依赖规则、BaseDao、sqlbuilder、m_）
     ├── permissions.md   #   权限鉴权（moon-token 集成、RBAC 链、appCode）
