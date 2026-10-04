@@ -38,7 +38,10 @@ mldong-moon/
 │   ├── entity/ dto/ dao/ repository/ service/ controller/
 │   ├── enums/           #   18 个业务枚举逐文件（常量 + all()；registry.mbt 装配期灌注册中心）
 │   └── module.mbt       #   模块自注册 + policy() 聚合 + rbac_provider()
-├── modules/dev/         # mldong/moon-dev —— 库元数据底座（gen/dev_schema 共用，doc/gen-metadata.md）
+├── modules/dev/         # mldong/moon-dev —— dev_schema 台账三件套（boot2 dev 22 端点）+ 库元数据底座（doc/gen-metadata.md）
+│   ├── entity/ dto/ dao/ repository/ service/ controller/
+│   ├── enums/           #   4 个 dev 枚举逐文件（registry 装配期灌注册中心；field_data_type 字符串码）
+│   ├── metadata/ + metadata-mysql/  #   MetadataDao 端口 + information_schema 实现（gen/importTable 一件两用）
 ├── cmd/main/            # 装配入口：鉴权 + 模块挂载 + listen :18680
 ├── cmd/gen/             # 代码生成器（读 MetadataDao 产六件套，gen-out/ 不入仓）
 ├── e2e/                 # 黑盒回归矩阵（run.sh 总入口，十套 183 用例，真库）
@@ -68,7 +71,7 @@ export MLDONG_DB_USER=root MLDONG_DB_PWD=<密码> MLDONG_DB_NAME=mldong-moon
 
 首次建库：`mysql -u root -p < doc/sql/mysql-schema-all.sql`（一条命令：建库 + 全表 + 种子数据）。
 
-回归（服务起后，真库黑盒矩阵，八套 113 用例）：
+回归（服务起后，真库黑盒矩阵，十一套 233 用例）：
 
 ```bash
 BASE=http://127.0.0.1:18680 bash e2e/run.sh   # 汇总 "总计: OK n FAIL 0" 为绿

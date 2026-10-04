@@ -80,14 +80,30 @@ pub(all) struct IntVal {
 /// 整型码枚举字典便利构造（goframe RegisterEnumValues 同位）：
 /// vals 直接喂各枚举文件的 all() 清单，dataType 钉 2=数值（UC-0431① 播种器采集源）
 pub fn int_dict(name : String, dict_key : String, vals : Array[IntVal]) -> DictModel {
+  int_dict_as(name, dict_key, 2, vals)
+}
+
+///|
+/// 同上但 dataType 显式给定：1=字符串码（boot2 SchemaFieldDataTypeEnum 的
+/// getDataType()=String.class 同位——dictItemValue 出字符串）、2=数值码
+pub fn int_dict_as(
+  name : String,
+  dict_key : String,
+  data_type : Int,
+  vals : Array[IntVal],
+) -> DictModel {
   {
     name,
     dict_key,
-    data_type: Some(2),
+    data_type: Some(data_type),
     items: vals.map(fn(v) {
       {
         name: v.label,
-        dict_item_value: Json::number(v.code.to_double()),
+        dict_item_value: if data_type == 1 {
+          Json::string(v.code.to_string())
+        } else {
+          Json::number(v.code.to_double())
+        },
         dict_item_key: v.code.to_string(),
         ext: None,
       }

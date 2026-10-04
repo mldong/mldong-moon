@@ -2,7 +2,7 @@
 
 mldong 快速开发框架的 **MoonBit 语言实现**。目标是与 mldong 框架的接口契约保持一致：同样的 URL、同样的 `{"code":0,"msg":"..","data":..}` 信封、同样的分页形状、同样的权限码与鉴权失败码。
 
-当前已落：`sys_user` 全链 16 端点（CRUD + 状态/个人中心/在线用户）+ `sys_role`/`sys_dept`/`sys_post`/`sys_config` CRUD + **`sys_dict`/`sys_dict_item` 字典全链**（CRUD + getByDictType/enumDictList/customDictList）+ **`sys_menu` 菜单全链**（CRUD + tree/list + appList + 用户路由菜单三版 + syncRoute）+ 登录/注销/refreshToken + moon-token 鉴权（RBAC 真码链 + appCode 多应用）+ `dev` 模块库元数据底座（gen/dev_schema 共用）。同时是后续模块与代码生成器的**模板骨架**。
+当前已落：`sys_user` 全链 16 端点（CRUD + 状态/个人中心/在线用户）+ `sys_role`/`sys_dept`/`sys_post`/`sys_config` CRUD + **`sys_dict`/`sys_dict_item` 字典全链**（CRUD + getByDictType/enumDictList/customDictList）+ **`sys_menu` 菜单全链**（CRUD + tree/list + appList + 用户路由菜单三版 + syncRoute）+ 登录/注销/refreshToken + moon-token 鉴权（RBAC 真码链 + appCode 多应用）+ `dev` 模块 **dev_schema 台账三件套全量**（schema/schemaGroup/schemaField 共 22 端点：CRUD + dbTable/disabled + importTable 先删重建 + getByTableName 免登录三段自校验 + updateDesigner 全删重插 + updateSort 拖拽 + 列表/搜索键直更 + 元数据裸切面 dbTable/columnList）+ 4 个 dev 字典枚举入册。同时是后续模块与代码生成器的**模板骨架**。
 
 ## 技术栈
 
@@ -50,7 +50,7 @@ mldong-moon/
 │   ├── service/               #   UserService trait + Impl[R]；rbac_service.mbt = RBAC + moon-token 供数方
 │   ├── controller/            #   端点注册 + policy() 权限码片段（与端点同文件）
 │   └── module.mbt             #   模块自注册（main 每模块一行）
-├── modules/dev/               # mldong/moon-dev：库元数据底座（MetadataDao 端口 + information_schema 实现 + 只读端点）
+├── modules/dev/               # mldong/moon-dev：dev_schema 台账三件套（22 端点，boot2 dev 对齐）+ 库元数据底座（MetadataDao 一件两用：gen 直调 + importTable 导入）
 ├── cmd/main/                  # 装配：鉴权（moon-token）+ 模块挂载 + listen :18680
 ├── cmd/gen/                   # 代码生成器：读活库元数据产六件套源码（产物即手写代码进仓）
 └── doc/                       # 深入文档
@@ -98,8 +98,15 @@ mldong-moon/
 | `/sys/menu/appList` | 仅登录 | 应用列表 `[{label,value}]`：字典 `app_list` 域 → 静态回退（boot2 MenuAppCodeEnum） |
 | `GET /menu/all` / `/getMenuList` / `/getArtDesignMenu` | 仅登录 | 用户路由菜单（vben5 登录流契约）：enabled + 登录域 + type 1/2，超管全量/非超管 RBAC 菜单 id 链过滤；`name=code` + meta(order/title/icon/link/iframeSrc/hideInMenu〔v2=hideMenu〕/keepAlive/variable 合并)；art 版多 isIframe/authList |
 | `/sys/menu/syncRoute` | `sys:menu:syncRoute` | 前端路由同步（**域内清理面，慎用**）：递归 upsert（appCode+code 键、isSync=1 才管、深度上限 8）→ 域内删未同步集（is_sync=1 且不在集合）+ role_menu 级联；**空数组短路不删**；e2e 只在隔离 appCode 域测 |
-| `/dev/schema/dbTable` | `dev:schema:dbTable` OR `dev:schema:importTable` | 库表清单（keywords 滤表名/注释） |
-| `/dev/schema/column/list` | `dev:schema:columnList` | 列清单（信息模式 + gen 字段类型映射） |
+| `/dev/schema/{save,remove,update,detail,page}` | `dev:schema:*` | 数据模型 CRUD（gen 生成 + ext↔variable 空不出键；detail 的 id 实当 tableName 用——boot2 同位，getByTableName 同一解析） |
+| `/dev/schema/dbTable` | `dev:schema:dbTable` OR `dev:schema:importTable` | 库表清单（keywords 滤 + **disabled 已导入标记**，[{name,comment,disabled}]） |
+| `/dev/schema/importTable` | `dev:schema:importTable` | 导入/同步表结构：先删同名历史再重建 + 表名首段匹配 group.code + 推断器（组件/ext/dataType 枚举 code；is_deleted 列过滤；listKeys 默认全字段） |
+| `GET /dev/schema/getByTableName` | 豁免面（handler 三段自校验） | 按 id/表名取模型 VO：token → appId/appSecret（sys_config SCHEMA_APP_ID/SECRET，默认 admin/123456）→ 99990403；凭证链 + DEFAULT_SCHEMA_AUTO_IMPORT=true 时自愈落库；VO 含派生（moduleName/tableCamelName/className/columns 带 fieldCamelName/listSort/searchSort/ext/schemaGroup 聚合，缺分组伪造 id=schema.id+1） |
+| `/dev/schema/updateDesigner` | `dev:schema:updateDesigner` | 表单设计保存：update 主表 + 字段全删重插（sort=index+100，事务），返回最新 VO |
+| `/dev/schema/{updateListKeys,updateSearchFormKeys}` | 各自权限码；detail 三码 OR 可见 | 列表/搜索键直更（列名白名单） |
+| `/dev/schemaGroup/{save,remove,update,detail,page}` | `dev:schemaGroup:*` | 模型分组 CRUD（code 唯一 99990003） |
+| `/dev/schemaField/{save,remove,update,detail,page,updateSort}` | `dev:schemaField:*` | 模型字段 CRUD（page 默认 sort,id 升序；remove 物理删——boot2 @TableLogic 注释同语义）+ updateSort 拖拽换位（boot2 算法逐行 port） |
+| `/dev/schema/column/list` | `dev:schema:columnList` | 列清单裸切面（信息模式 + gen 字段类型映射；与台账面并存，gen 代码生成器专用） |
 
 - 未登录 `HTTP 401 + {"code":99990401}`；无权限 `HTTP 403 + {"code":99990403}`；
 - 分页请求 `{pageNum, pageSize, keywords?, searchKeys?, m_{OP}_{col}?...}`，响应 data 形状
@@ -176,6 +183,7 @@ moon run --target wasm cmd/gen/main -- sys_dept sys_post   # 产出到 gen-out/�
 - [ ] 会话存储文件/Redis 后端（moon-token 端口已预留）
 - [ ] `rainbow` 分页导航补齐
 - [x] dev 模块元数据底座（MetadataDao 端口 + information_schema 实现 + dbTable/column/list 端点，10-04）
+- [x] dev 模块 dev_schema 台账三件套全量（boot2 22 端点 + 4 字典枚举 + 种子 2 模型全字段 + 探针表，runner 12/16 UC-0303 组收口，10-05）
 - [x] 家族契约 runner 首轮：已存在端点 5 组全 pass（认证/refresh/在线/角色页/配置页），缺模块清单见 doc/base-contract.md（10-03）
 - [x] 字典模块（sys_dict + sys_dict_item 全链 + getByDictType/enumDictList/customDictList + ext 空不出键统一到 dept/post）：e2e 9 套 142/142 + 契约 runner **10/16 pass**（10-04）
 - [x] 菜单模块（sys_menu CRUD + tree/list + appList + 用户路由菜单三版 + syncRoute 隔离域验证）：e2e 10 套 **178/178** + 契约 runner **11/16 pass**（10-04）

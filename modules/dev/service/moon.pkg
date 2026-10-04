@@ -1,0 +1,9 @@
+import {
+  "mldong/moon-core" @core,
+  "moonbitlang/core/string" @string,
+  "mldong/moon-dev/entity" @entity,
+  "mldong/moon-dev/dao" @dao,
+  "mldong/moon-dev/dto" @dto,
+  "mldong/moon-dev/metadata" @meta,
+  "mldong/moon-dev/enums" @enums,
+}

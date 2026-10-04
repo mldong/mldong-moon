@@ -45,7 +45,7 @@ async fn main raise {
       _ => abort("sys 模块挂载失败")
     }
     // dev 模块（元数据只读面）
-    ctx.use_(@dev.install(config, g)) catch {
+    ctx.use_(@dev.install(config, g, holder, enum_registry, auth)) catch {
       _ => abort("dev 模块挂载失败")
     }
     // 将来新模块各一行：

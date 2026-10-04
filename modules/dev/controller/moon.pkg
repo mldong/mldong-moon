@@ -3,6 +3,8 @@ import {
   "mldong/moon-core-web" @web,
   "mldong/moon-dev/dto" @dto,
   "mldong/moon-dev/metadata" @meta,
+  "mldong/moon-dev/service" @svc,
+  "mldong/moon-token/app" @app,
   "mldong/moon-token/guard" @guard,
   "mldong/moon-token-moonback/guard" @mbguard,
   "mldong/moon-token-store/port" @port,

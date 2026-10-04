@@ -2,10 +2,15 @@ supported_targets = "+native+wasm"
 
 import {
   "mldong/moon-core" @core,
-  "mldong/moon-dev/controller" @ctrl,
-  "mldong/moon-dev/metadata-mysql" @metamysql,
+  "mldong/moon-core-web" @web,
+  "mldong/moon-token/app" @app,
   "mldong/moon-token/guard" @guard,
   "mldong/moon-token-moonback/guard" @mbguard,
   "mldong/moon-token-store/port" @port,
+  "mldong/moon-dev/enums" @enums,
+  "mldong/moon-dev/repository" @repo,
+  "mldong/moon-dev/service" @svc,
+  "mldong/moon-dev/controller" @ctrl,
+  "mldong/moon-dev/metadata-mysql" @metamysql,
   "moonbitlang/moonback" @mb,
 }

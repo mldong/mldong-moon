@@ -1,6 +1,6 @@
 # base-verify 契约跑测 · 差异清单（2026-10-03 首轮）
 
-> 跑批报告：协调仓 `base-verify/reports/2026-10-04-moon-dict-l2.{json,txt}`（字典轮 10/16）、`base-verify/reports/2026-10-04-moon-menu-l2.{json,txt}`（菜单轮 11/16）、`base-verify/reports/2026-10-04-moon-menu2-l2.json`（菜单缺口补齐轮 11/16 无回归）。boot2 全量 12 端点已对齐（syncRoute 无 base 契约，仓内 e2e 隔离域覆盖）。
+> 跑批报告：协调仓 `base-verify/reports/2026-10-04-moon-dict-l2.{json,txt}`（字典轮 10/16）、`base-verify/reports/2026-10-04-moon-menu-l2.{json,txt}`（菜单轮 11/16）、`base-verify/reports/2026-10-04-moon-menu2-l2.json`（菜单缺口补齐轮 11/16 无回归）、`base-verify/reports/2026-10-05-moon-dev-l2.json`（dev 台账轮 **12/16**，UC-0303/0306/0310 收口）。boot2 全量 12 端点已对齐（syncRoute 无 base 契约，仓内 e2e 隔离域覆盖）；dev 模块 boot2 22 端点已对齐（无 base 契约的进仓内 e2e matrix_dev 55 例）。
 >
 > 用途：对照家族 base 契约 runner（协调仓 `scripts/contract-tests/contract_runner.py`，语言无关纯 HTTP）
 > 逐组给出 mldong-moon 的现状——**已存在端点的契约比对结论 + 未存在端点的按模块清单**。
@@ -30,7 +30,7 @@ python scripts/contract-tests/contract_runner.py \
 | UC-0405 | /sys/role/page | ✅ pass | 分页五字段 + 行 id(str)/name/code |
 | UC-0417 | /sys/config/page | ✅ pass | 分页五字段 |
 | UC-0610 | /app/appVersion/check | ❌ 404 | app 模块整缺 |
-| UC-0303/0306/0310 | /dev/schema/page, /dev/schema/getByTableName | ❌ 404 | dev_schema 前端生成元数据模型整缺（见 §4 说明） |
+| UC-0303/0306/0310 | /dev/schema/page, /dev/schema/getByTableName | ✅ pass（10-05） | page 行 id(str)/tableName/ext/variable；getByTableName columns 非空且列含 id(str)/schemaId/fieldName/component/sort/ext（dev_schema 台账全量落地） |
 | UC-0409 | /sys/menu/tree | ✅ pass（10-04） | 直返数组、根节点 id(str)/name、children 嵌套、ext 空不出键 |
 | UC-0411/0413 | /sys/dict/page, /sys/dict/getByDictType | ✅ pass（10-04） | getByDictType 直返 `[{label,value}]`、dataType coerce、未知类型空数组 |
 | UC-0431 | /sys/dict/enumDictList | ✅ pass（10-04） | 枚举注册表 yes_no，dataType 整型码表；getByDictType 出口无 dataType 键 |
@@ -63,7 +63,7 @@ python scripts/contract-tests/contract_runner.py \
 | **sys_message**（站内信） | `/sys/message/page` | UC-0501；分页五字段 + 行按前端消费口径 |
 | **sys_file_info**（文件） | `/sys/fileInfo/{upload,getFileInfoByIds,remove}` | UC-0601/0602/0606：upload 返 `{url,fileInfoId}`（id 字符串）、回查 `{id,uid,name,url,status}` |
 | **app 模块**（APP 检查升级） | `/app/appVersion/check` | UC-0610：免登录、不查库、转调蒲公英自比较 `buildVersionNo`、任何失败降级 `data:null`（家族 13 栈 2026-09-20 已全量对齐，goframe `fd88b94` 为基准） |
-| **dev_schema 模型**（前端生成元数据） | `/dev/schema/page`（行含 `{id,tableName,ext,variable}`）、`/dev/schema/getByTableName?tableName=`（含 `columns:[{id,schemaId,fieldName,component,sort,ext}]`） | 注意：家族的 /dev/schema/* 服务的是 **dev_schema/dev_schema_column 两张台账表**（前端代码生成的注册模型，列带 component/ext）；本仓现 `/dev/schema/dbTable`+`/dev/schema/column/list` 是直查 information_schema 的裸元数据切面，**不是同一契约面**——补 dev_schema 台账时两者可并存（裸切面给 gen 后端用，台账面给前端生成用） |
+| ~~dev_schema 模型~~ **已补（10-05）** | boot2 dev 22 端点全量：schema 11（save/remove/update/detail/page/dbTable/importTable/getByTableName/updateDesigner/updateListKeys/updateSearchFormKeys）+ schemaGroup 5 + schemaField 6（含 updateSort 拖拽） | 台账面与裸切面并存照旧：`/dev/schema/column/list`（gen 专用裸切面）保留，dbTable 并入台账面带 disabled；getByTableName 豁免面三段自校验（token → appId/appSecret〔sys_config SCHEMA_APP_ID/SECRET，默认 admin/123456〕→ 99990403）+ DEFAULT_SCHEMA_AUTO_IMPORT 自愈落库；importTable 先删同名历史再重建 + 表名首段匹配 group.code + 推断器（boot2 SchemaFieldInferUtil 逐规则 + goframe UC-0309 增补：备注 Textarea/可排序/列宽）；4 个 dev 字典枚举入册（dev_schema_field_data_type 字符串码 dataType=1） |
 | **SSE** | `/sse/events` | UC-0608：text/event-stream + 首帧 `data:{userId,type:"init",msg}`；站内信已读提醒等前端实时面依赖它 |
 
 ## 5. 已记录的语义差异（不拦 runner，记账待议）

@@ -88,14 +88,24 @@ pub(all) struct ColumnMeta {
    - **跨模块件**：ConfigHolder 是 core 框架件（`core/config_holder.mbt`）——main 装配处建
      一个实例传各模块，sys 持 sys_config 表负责灌入/写路刷新，dev/biz 只读注入；
    - 接入三步见 [adding-module.md](adding-module.md)。
-2. **dev_schema 导入**（boot2 同位，未落）：
-   `/dev/schema/dbTable`（表清单）→ `/dev/schema/importTable`（落 dev_schema 台账表）→
-   台账上改显示名/列表字段/搜索字段 → 生成器从台账读。台账六件套 + disabled 标记
-   （boot2 dbTable 返回项里的 `disabled`=已导入）是下一块，端点已按 boot2 语义预留双码 OR
-   （`dev:schema:dbTable` OR `dev:schema:importTable`）。
+2. **dev_schema 导入（已落，10-05）**：boot2 dev 22 端点全量进 `modules/dev`——
+   `/dev/schema/dbTable`（表清单 + **disabled 已导入标记**）→ `/dev/schema/importTable`
+   （**消费本文件同一个 MetadataDao**：逐表 list_columns 落 dev_schema + dev_schema_field，
+   先删同名历史再重建；分组 = 显式 schemaGroupId 优先 → 表名首段匹配 group.code；字段级
+   **推断器** = SQL 类型→枚举 code→组件→ext，boot2 SchemaFieldInferUtil 逐规则 port +
+   goframe UC-0309 增补，纯函数在 `service/schema_field_infer.mbt` 有单测）→
+   台账上改显示名/列表字段/搜索字段（updateListKeys/updateSearchFormKeys/updateDesigner）→
+   前端代码生成器从台账读（`GET /dev/schema/getByTableName` 免登录三段自校验 +
+   DEFAULT_SCHEMA_AUTO_IMPORT 自愈落库）。**台账面与 gen 裸切面并存**：
+   `/dev/schema/column/list` 仍是 gen 专用直读口，两契约面互不影响（base-contract §4 记账）。
+   种子：doc/sql/dev-seed.sql（sys_user/sys_dict 两真模型全字段 + devtest_import_probe 探针表，
+   已并入 mysql-schema-all.sql）。
 
-## 5. 已验证（10-04 冒烟）
+## 5. 已验证
 
-- `/dev/schema/dbTable {keywords:"sys_user"}` → 2 行（sys_user/sys_user_role，带注释）；
-- `/dev/schema/column/list {tableName:"sys_user"}` → 21 列；id→Int64+isPk、user_name→String+varchar(32)；
-- 守卫在位：未登录 401；空 tableName 99990001；不存在表 → 空数组（不报错，导入侧自行提示）。
+10-04 冒烟（裸切面）：dbTable keywords=sys_user → 2 行；column/list sys_user → 21 列（id→Int64+isPk）；
+守卫在位：未登录 401、空 tableName 99990001、不存在表 → 空数组。
+
+10-05 dev 台账轮全量门禁：moon check 0E/0W + 单测 **16/16**（推断器/拖拽算法/命名派生）+
+e2e **十一套 233/233**（matrix_dev 55 例：三台账 CRUD + importTable 探针推断四支 + getByTableName
+鉴权四态 + 自愈开关闭环 + updateSort 三分支）+ 契约 runner **12/16**（UC-0303/0306/0310 收口）。
