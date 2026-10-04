@@ -74,6 +74,14 @@ check('G6 dataType=2 值为数值', all(isinstance(it['value'],int) for it in r[
 r=post('/sys/dict/enumDictList',{},t)
 check('L1 enumDictList 非空', r['code']==0 and isinstance(r['data'],list) and len(r['data'])>=1, str(len(r.get('data',[]))))
 check('L2 每项 dataType 整型 1|2', all(isinstance(d.get('dataType'),int) and not isinstance(d.get('dataType'),bool) and d['dataType'] in (1,2) for d in r['data']), str(r['data'])[:120])
+enum_keys={d['dictKey']:d for d in r['data']}
+BOOT2_ENUMS=['yes_no','sex','sys_user_admin_type','sys_role_role_type','sys_role_data_scope','sys_menu_type','sys_menu_open_type','sys_menu_app_code','sys_dict_data_type','sys_message_msg_type','sys_op_log_op_type','sys_vis_log_vis_type','sys_sms_biz_type','sys_sms_log_status','sys_timer_state','sys_third_party_callback_handle_status','sys_task_execution_queue_state','sys_task_execution_history_state']
+check('L2b boot2 sys 域枚举全在册(18)', all(k in enum_keys for k in BOOT2_ENUMS), str([k for k in BOOT2_ENUMS if k not in enum_keys]))
+check('L2c yes_no 码表 1是/0否', [it['dictItemValue'] for it in enum_keys['yes_no']['items']]==[1,0], str(enum_keys.get('yes_no',{}).get('items')))
+check('L2d menu_type 四项 1-4', [it['dictItemValue'] for it in enum_keys['sys_menu_type']['items']]==[1,2,3,4], str(enum_keys.get('sys_menu_type',{}).get('items')))
+check('L2e sms_biz 码表 10-60', [it['dictItemValue'] for it in enum_keys['sys_sms_biz_type']['items']]==[10,20,30,40,50,60], str(enum_keys.get('sys_sms_biz_type',{}).get('items')))
+r=post('/sys/dict/getByDictType',{'dictType':'sys_role_data_scope'},t)
+check('L2f 枚举路径 getByDictType 可解析(数据范围5项)', r['code']==0 and [it['value'] for it in r['data']]==[1,2,3,4,5], str(r['data'])[:120])
 r2=post('/sys/dict/customDictList',{},t)
 check('L3 customDictList 数组（基础仓允许空）', r2['code']==0 and isinstance(r2['data'],list), str(r2))
 custom_keys=set(d.get('dictKey') for d in r2['data']) if r2['data'] else set()

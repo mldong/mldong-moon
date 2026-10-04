@@ -91,7 +91,7 @@ mldong-moon/
 | `/sys/config/public` | 豁免 | 公开配置 `{code: content}` map（`PUBLIC%` 前缀且启用；登录页/版权等免登录读，boot2 同位） |
 | `/sys/dict/{save,remove,update,detail,page}` | `sys:dict:*` | 字典 CRUD（**gen 生成** + code 全局唯一） |
 | `/sys/dict/getByDictType` | 仅登录 | `[{label,value(+ext?)}]` 直返数组：DB（code+enabled）→ 枚举注册表 → 自定义注册表 → 空数组；dataType=2 时 value 转数值；出口不带 id/dataType（UC-0411/0413/0431③） |
-| `/sys/dict/enumDictList` / `customDictList` | 仅登录 | 枚举/自定义字典清单（boot2 DictScanner/CustomDictService 同位：注册中心存服务不存模型、请求时派生；dataType 整型 1\|2 或无键，UC-0431/0432） |
+| `/sys/dict/enumDictList` / `customDictList` | 仅登录 | 枚举/自定义字典清单（boot2 DictScanner/CustomDictService 同位：注册中心存服务不存模型、请求时派生；dataType 整型 1\|2 或无键，UC-0431/0432）；枚举注册表与 boot2 @DictEnum 的 sys 域 + 基础件逐项对齐（18 个：yes_no/sex + 16 个 sys_*，同 key 同名同码表；wf_*/biz_*/dev_schema_* 随对应模块建再入册） |
 | `/sys/dictItem/{save,remove,update,detail,page}` | `sys:dictItem:*` | 字典项 CRUD（**gen 生成** + 父字典存在性 + dict 内 code 唯一；page 带 m_ 全 13 操作符 + keywords/orderBy 白名单，UC-0430） |
 | `/sys/menu/{save,remove,update,detail,page}` | `sys:menu:*` | 菜单 CRUD（**gen 生成** + code 全局唯一；type 保留字字段名 menu_type，json 键仍 `type`） |
 | `/sys/menu/tree` / `list` | `sys:menu:tree` / `sys:menu:list` | 菜单树/平铺（appCode 缺省取登录上下文、sort 升序建树、孤儿挂回根、children 嵌套 + ext 空不出键，UC-0409） |
