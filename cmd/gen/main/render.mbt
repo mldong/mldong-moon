@@ -290,7 +290,7 @@ pub fn render_dao(plan : TablePlan) -> String {
 }
 
 ///|
-/// dao-mysql/<lc>_table.mbt
+/// dao-db/<lc>_table.mbt
 pub fn render_table(plan : TablePlan) -> String {
   let o = Out::new()
   o.line("// " + plan.table + " 表编解码器 —— BaseDao 模板的每实体配置〔cmd/gen 生成，可手改〕")
@@ -355,35 +355,35 @@ pub fn render_table(plan : TablePlan) -> String {
 }
 
 ///|
-/// dao-mysql/<lc>_mysql.mbt
+/// dao-db/<lc>_mysql.mbt
 pub fn render_mysql(plan : TablePlan) -> String {
   let o = Out::new()
   o.line("// " + plan.table + " MySQL 仓储 —— 业务端口薄实现，单表操作全委托 BaseDao 模板")
   o.line("// 〔cmd/gen 生成，可手改；重生成会覆盖本文件〕")
   o.line("")
   o.line("///|")
-  o.line("pub(all) struct " + plan.class_name + "MysqlDao {")
+  o.line("pub(all) struct " + plan.class_name + "DbDao {")
   o.line("  base : BaseDao[@entity." + plan.class_name + "]")
   o.line("}")
   o.line("")
   o.line("///|")
-  o.line("pub fn " + plan.class_name + "MysqlDao::make(config : @core.MysqlConfig) -> " + plan.class_name + "MysqlDao {")
+  o.line("pub fn " + plan.class_name + "DbDao::make(config : @core.MysqlConfig) -> " + plan.class_name + "DbDao {")
   o.line("  { base: { config, table: " + plan.lc + "_table } }")
   o.line("}")
   o.line("")
   o.line("///|")
-  o.line("pub impl @dao." + plan.class_name + "Dao for " + plan.class_name + "MysqlDao with fn insert(self, d) {")
+  o.line("pub impl @dao." + plan.class_name + "Dao for " + plan.class_name + "DbDao with fn insert(self, d) {")
   o.line("  self.base.insert(d)")
   o.line("  d.id")
   o.line("}")
   o.line("")
   o.line("///|")
-  o.line("pub impl @dao." + plan.class_name + "Dao for " + plan.class_name + "MysqlDao with fn update(self, d) {")
+  o.line("pub impl @dao." + plan.class_name + "Dao for " + plan.class_name + "DbDao with fn update(self, d) {")
   o.line("  self.base.update_by_id(d)")
   o.line("}")
   o.line("")
   o.line("///|")
-  o.line("pub impl @dao." + plan.class_name + "Dao for " + plan.class_name + "MysqlDao with fn remove_by_ids(self, ids) {")
+  o.line("pub impl @dao." + plan.class_name + "Dao for " + plan.class_name + "DbDao with fn remove_by_ids(self, ids) {")
   o.line("  let vals : Array[@core.SqlValue] = []")
   o.line("  for id in ids {")
   o.line("    vals.push(L(id))")
@@ -392,12 +392,12 @@ pub fn render_mysql(plan : TablePlan) -> String {
   o.line("}")
   o.line("")
   o.line("///|")
-  o.line("pub impl @dao." + plan.class_name + "Dao for " + plan.class_name + "MysqlDao with fn find_by_id(self, id) {")
+  o.line("pub impl @dao." + plan.class_name + "Dao for " + plan.class_name + "DbDao with fn find_by_id(self, id) {")
   o.line("  self.base.find_by_id(L(id))")
   o.line("}")
   o.line("")
   o.line("///|")
-  o.line("pub impl @dao." + plan.class_name + "Dao for " + plan.class_name + "MysqlDao with fn find_by_ids(self, ids) {")
+  o.line("pub impl @dao." + plan.class_name + "Dao for " + plan.class_name + "DbDao with fn find_by_ids(self, ids) {")
   o.line("  let vals : Array[@core.SqlValue] = []")
   o.line("  for id in ids {")
   o.line("    vals.push(L(id))")
@@ -407,7 +407,7 @@ pub fn render_mysql(plan : TablePlan) -> String {
   if plan.has_code {
     o.line("")
     o.line("///|")
-    o.line("pub impl @dao." + plan.class_name + "Dao for " + plan.class_name + "MysqlDao with fn check_unique(")
+    o.line("pub impl @dao." + plan.class_name + "Dao for " + plan.class_name + "DbDao with fn check_unique(")
     o.line("  self,")
     o.line("  code,")
     o.line("  exclude_id,")
@@ -418,12 +418,12 @@ pub fn render_mysql(plan : TablePlan) -> String {
   }
   o.line("")
   o.line("///|")
-  o.line("pub impl @dao." + plan.class_name + "Dao for " + plan.class_name + "MysqlDao with fn page(self, w, page_num, page_size) {")
+  o.line("pub impl @dao." + plan.class_name + "Dao for " + plan.class_name + "DbDao with fn page(self, w, page_num, page_size) {")
   o.line("  self.base.page(w, page_num, page_size)")
   o.line("}")
   o.line("")
   let exports : Array[String] = ["remove_by_ids", "find_by_id", "insert", "update", "page", "find_by_ids"]
-  o.line("pub extend " + plan.class_name + "MysqlDao with @dao." + plan.class_name + "Dao::{")
+  o.line("pub extend " + plan.class_name + "DbDao with @dao." + plan.class_name + "Dao::{")
   for e in exports {
     o.line("  " + e + ",")
   }
@@ -624,8 +624,8 @@ pub fn render_all(plan : TablePlan) -> Array[(String, String)] {
     ("entity/" + plan.lc + ".mbt", render_entity(plan)),
     ("dto/" + plan.lc + "_dto.mbt", render_dto(plan)),
     ("dao/" + plan.lc + "_dao.mbt", render_dao(plan)),
-    ("dao-mysql/" + plan.lc + "_table.mbt", render_table(plan)),
-    ("dao-mysql/" + plan.lc + "_mysql.mbt", render_mysql(plan)),
+    ("dao-db/" + plan.lc + "_table.mbt", render_table(plan)),
+    ("dao-db/" + plan.lc + "_mysql.mbt", render_mysql(plan)),
     ("service/" + plan.lc + "_service.mbt", render_service(plan)),
     ("controller/" + plan.lc + "_controller.mbt", render_controller(plan)),
   ]

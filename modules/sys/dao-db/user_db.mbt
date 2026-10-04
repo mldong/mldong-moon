@@ -2,28 +2,28 @@
 // 业务特有的查询用 wrapper 组合（怎么用由业务说了算），moondb+moonmysql 只进本包
 
 ///|
-pub(all) struct UserMysqlDao {
+pub(all) struct UserDbDao {
   base : BaseDao[@entity.User]
 }
 
 ///|
-pub fn UserMysqlDao::make(config : @core.MysqlConfig) -> UserMysqlDao {
+pub fn UserDbDao::make(config : @core.MysqlConfig) -> UserDbDao {
   { base: { config, table: user_table } }
 }
 
 ///|
-pub impl @dao.UserDao for UserMysqlDao with fn insert(self, u) {
+pub impl @dao.UserDao for UserDbDao with fn insert(self, u) {
   self.base.insert(u)
   u.id
 }
 
 ///|
-pub impl @dao.UserDao for UserMysqlDao with fn update(self, u) {
+pub impl @dao.UserDao for UserDbDao with fn update(self, u) {
   self.base.update_by_id(u)
 }
 
 ///|
-pub impl @dao.UserDao for UserMysqlDao with fn remove_by_ids(self, ids) {
+pub impl @dao.UserDao for UserDbDao with fn remove_by_ids(self, ids) {
   let vals : Array[@core.SqlValue] = []
   for id in ids {
     vals.push(L(id))
@@ -32,18 +32,18 @@ pub impl @dao.UserDao for UserMysqlDao with fn remove_by_ids(self, ids) {
 }
 
 ///|
-pub impl @dao.UserDao for UserMysqlDao with fn find_by_id(self, id) {
+pub impl @dao.UserDao for UserDbDao with fn find_by_id(self, id) {
   self.base.find_by_id(L(id))
 }
 
 ///|
-pub impl @dao.UserDao for UserMysqlDao with fn find_by_user_name(self, user_name) {
+pub impl @dao.UserDao for UserDbDao with fn find_by_user_name(self, user_name) {
   self.base.find_one(@core.where_().eq("user_name", S(user_name)))
 }
 
 ///|
 ///|
-pub impl @dao.UserDao for UserMysqlDao with fn find_by_ids(self, ids) {
+pub impl @dao.UserDao for UserDbDao with fn find_by_ids(self, ids) {
   let vals : Array[@core.SqlValue] = []
   for id in ids {
     vals.push(L(id))
@@ -61,7 +61,7 @@ pub impl @dao.UserDao for UserMysqlDao with fn find_by_ids(self, ids) {
 }
 
 ///|
-pub impl @dao.UserDao for UserMysqlDao with fn set_locked(self, ids, locked) {
+pub impl @dao.UserDao for UserDbDao with fn set_locked(self, ids, locked) {
   let vals : Array[@core.SqlValue] = []
   for id in ids {
     vals.push(L(id))
@@ -80,7 +80,7 @@ pub impl @dao.UserDao for UserMysqlDao with fn set_locked(self, ids, locked) {
 }
 
 ///|
-pub impl @dao.UserDao for UserMysqlDao with fn update_password(
+pub impl @dao.UserDao for UserDbDao with fn update_password(
   self,
   id,
   password,
@@ -99,7 +99,7 @@ pub impl @dao.UserDao for UserMysqlDao with fn update_password(
 }
 
 ///|
-pub impl @dao.UserDao for UserMysqlDao with fn select_options(self, keywords) {
+pub impl @dao.UserDao for UserDbDao with fn select_options(self, keywords) {
   let w = self.base.base_where()
   if !keywords.is_empty() {
     let pat = "%\{keywords}%"
@@ -120,7 +120,7 @@ pub impl @dao.UserDao for UserMysqlDao with fn select_options(self, keywords) {
 }
 
 ///|
-pub impl @dao.UserDao for UserMysqlDao with fn list_simple(self) {
+pub impl @dao.UserDao for UserDbDao with fn list_simple(self) {
   let (sql, params) = @core.build_select(
     "sys_user",
     ["id", "dept_id", "real_name", "admin_type"],
@@ -134,7 +134,7 @@ pub impl @dao.UserDao for UserMysqlDao with fn list_simple(self) {
   out
 }
 
-pub extend UserMysqlDao with @dao.UserDao::{
+pub extend UserDbDao with @dao.UserDao::{
   remove_by_ids,
   find_by_user_name,
   find_by_id,

@@ -2,28 +2,28 @@
 // 〔cmd/gen 生成，可手改；重生成会覆盖本文件〕
 
 ///|
-pub(all) struct PostMysqlDao {
+pub(all) struct PostDbDao {
   base : BaseDao[@entity.Post]
 }
 
 ///|
-pub fn PostMysqlDao::make(config : @core.MysqlConfig) -> PostMysqlDao {
+pub fn PostDbDao::make(config : @core.MysqlConfig) -> PostDbDao {
   { base: { config, table: post_table } }
 }
 
 ///|
-pub impl @dao.PostDao for PostMysqlDao with fn insert(self, d) {
+pub impl @dao.PostDao for PostDbDao with fn insert(self, d) {
   self.base.insert(d)
   d.id
 }
 
 ///|
-pub impl @dao.PostDao for PostMysqlDao with fn update(self, d) {
+pub impl @dao.PostDao for PostDbDao with fn update(self, d) {
   self.base.update_by_id(d)
 }
 
 ///|
-pub impl @dao.PostDao for PostMysqlDao with fn remove_by_ids(self, ids) {
+pub impl @dao.PostDao for PostDbDao with fn remove_by_ids(self, ids) {
   let vals : Array[@core.SqlValue] = []
   for id in ids {
     vals.push(L(id))
@@ -32,12 +32,12 @@ pub impl @dao.PostDao for PostMysqlDao with fn remove_by_ids(self, ids) {
 }
 
 ///|
-pub impl @dao.PostDao for PostMysqlDao with fn find_by_id(self, id) {
+pub impl @dao.PostDao for PostDbDao with fn find_by_id(self, id) {
   self.base.find_by_id(L(id))
 }
 
 ///|
-pub impl @dao.PostDao for PostMysqlDao with fn find_by_ids(self, ids) {
+pub impl @dao.PostDao for PostDbDao with fn find_by_ids(self, ids) {
   let vals : Array[@core.SqlValue] = []
   for id in ids {
     vals.push(L(id))
@@ -46,7 +46,7 @@ pub impl @dao.PostDao for PostMysqlDao with fn find_by_ids(self, ids) {
 }
 
 ///|
-pub impl @dao.PostDao for PostMysqlDao with fn check_unique(
+pub impl @dao.PostDao for PostDbDao with fn check_unique(
   self,
   code,
   exclude_id,
@@ -56,11 +56,11 @@ pub impl @dao.PostDao for PostMysqlDao with fn check_unique(
 }
 
 ///|
-pub impl @dao.PostDao for PostMysqlDao with fn page(self, w, page_num, page_size) {
+pub impl @dao.PostDao for PostDbDao with fn page(self, w, page_num, page_size) {
   self.base.page(w, page_num, page_size)
 }
 
-pub extend PostMysqlDao with @dao.PostDao::{
+pub extend PostDbDao with @dao.PostDao::{
   remove_by_ids,
   find_by_id,
   insert,

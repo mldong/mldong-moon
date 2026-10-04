@@ -2,28 +2,28 @@
 // 〔cmd/gen 生成，可手改；重生成会覆盖本文件〕
 
 ///|
-pub(all) struct ConfigMysqlDao {
+pub(all) struct ConfigDbDao {
   base : BaseDao[@entity.Config]
 }
 
 ///|
-pub fn ConfigMysqlDao::make(config : @core.MysqlConfig) -> ConfigMysqlDao {
+pub fn ConfigDbDao::make(config : @core.MysqlConfig) -> ConfigDbDao {
   { base: { config, table: config_table } }
 }
 
 ///|
-pub impl @dao.ConfigDao for ConfigMysqlDao with fn insert(self, d) {
+pub impl @dao.ConfigDao for ConfigDbDao with fn insert(self, d) {
   self.base.insert(d)
   d.id
 }
 
 ///|
-pub impl @dao.ConfigDao for ConfigMysqlDao with fn update(self, d) {
+pub impl @dao.ConfigDao for ConfigDbDao with fn update(self, d) {
   self.base.update_by_id(d)
 }
 
 ///|
-pub impl @dao.ConfigDao for ConfigMysqlDao with fn remove_by_ids(self, ids) {
+pub impl @dao.ConfigDao for ConfigDbDao with fn remove_by_ids(self, ids) {
   let vals : Array[@core.SqlValue] = []
   for id in ids {
     vals.push(L(id))
@@ -32,12 +32,12 @@ pub impl @dao.ConfigDao for ConfigMysqlDao with fn remove_by_ids(self, ids) {
 }
 
 ///|
-pub impl @dao.ConfigDao for ConfigMysqlDao with fn find_by_id(self, id) {
+pub impl @dao.ConfigDao for ConfigDbDao with fn find_by_id(self, id) {
   self.base.find_by_id(L(id))
 }
 
 ///|
-pub impl @dao.ConfigDao for ConfigMysqlDao with fn find_by_ids(self, ids) {
+pub impl @dao.ConfigDao for ConfigDbDao with fn find_by_ids(self, ids) {
   let vals : Array[@core.SqlValue] = []
   for id in ids {
     vals.push(L(id))
@@ -46,7 +46,7 @@ pub impl @dao.ConfigDao for ConfigMysqlDao with fn find_by_ids(self, ids) {
 }
 
 ///|
-pub impl @dao.ConfigDao for ConfigMysqlDao with fn check_unique(
+pub impl @dao.ConfigDao for ConfigDbDao with fn check_unique(
   self,
   code,
   exclude_id,
@@ -56,11 +56,11 @@ pub impl @dao.ConfigDao for ConfigMysqlDao with fn check_unique(
 }
 
 ///|
-pub impl @dao.ConfigDao for ConfigMysqlDao with fn page(self, w, page_num, page_size) {
+pub impl @dao.ConfigDao for ConfigDbDao with fn page(self, w, page_num, page_size) {
   self.base.page(w, page_num, page_size)
 }
 
-pub extend ConfigMysqlDao with @dao.ConfigDao::{
+pub extend ConfigDbDao with @dao.ConfigDao::{
   remove_by_ids,
   find_by_id,
   insert,
@@ -71,7 +71,7 @@ pub extend ConfigMysqlDao with @dao.ConfigDao::{
 
 ///|
 /// PUBLIC 前缀且启用的配置（like_pat 原样通配：前缀匹配 PUBLIC%）——二次开发（公开配置）
-pub async fn ConfigMysqlDao::list_public(self : ConfigMysqlDao) -> Array[@entity.Config] raise @core.MldongError {
+pub async fn ConfigDbDao::list_public(self : ConfigDbDao) -> Array[@entity.Config] raise @core.MldongError {
   let (sql, params) = @core.build_select(
     "sys_config",
     self.base.table.cols,
@@ -87,7 +87,7 @@ pub async fn ConfigMysqlDao::list_public(self : ConfigMysqlDao) -> Array[@entity
 
 ///|
 /// 全量配置（启动灌入 holder 用；未删除范围，code 序）
-pub async fn ConfigMysqlDao::list_all(self : ConfigMysqlDao) -> Array[@entity.Config] raise @core.MldongError {
+pub async fn ConfigDbDao::list_all(self : ConfigDbDao) -> Array[@entity.Config] raise @core.MldongError {
   let out : Array[@entity.Config] = []
   for r in self.base.query(
     "SELECT " + self.base.table.cols.join(", ") + " FROM sys_config WHERE is_deleted = 0 ORDER BY code",

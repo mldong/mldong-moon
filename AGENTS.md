@@ -34,7 +34,7 @@ mldong-moon/
 │   ├── common.mbt       #   wrap（统一错误转信封）+ json_body
 │   └── guard.mbt        #   merge_policy / on_error（99990401/403 信封）/ token_of（剥 Bearer）
 ├── modules/sys/         # mldong/moon-sys —— 业务模块样板（六件套）
-│   ├── entity/ dto/ dao/ dao-mysql/ service/ controller/
+│   ├── entity/ dto/ dao/ dao-db/ service/ controller/
 │   └── module.mbt       #   模块自注册 + policy() 聚合 + rbac_provider()
 ├── modules/dev/         # mldong/moon-dev —— 库元数据底座（gen/dev_schema 共用，doc/gen-metadata.md）
 ├── cmd/main/            # 装配入口：鉴权 + 模块挂载 + listen :18680

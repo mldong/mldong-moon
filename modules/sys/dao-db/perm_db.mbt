@@ -3,17 +3,17 @@
 // 最小原地实现，模板就位后收敛过去）
 
 ///|
-pub(all) struct RbacDaoMysql {
+pub(all) struct RbacDaoDb {
   config : @core.MysqlConfig
 }
 
 ///|
-pub fn RbacDaoMysql::make(config : @core.MysqlConfig) -> RbacDaoMysql {
+pub fn RbacDaoDb::make(config : @core.MysqlConfig) -> RbacDaoDb {
   { config }
 }
 
 ///|
-pub impl @dao.RbacDao for RbacDaoMysql with fn find_user_auth_by_name(self, user_name) {
+pub impl @dao.RbacDao for RbacDaoDb with fn find_user_auth_by_name(self, user_name) {
   let conn = open_conn(self.config)
   let rows = q(
     conn,
@@ -29,7 +29,7 @@ pub impl @dao.RbacDao for RbacDaoMysql with fn find_user_auth_by_name(self, user
 }
 
 ///|
-pub impl @dao.RbacDao for RbacDaoMysql with fn find_user_auth_by_id(self, id) {
+pub impl @dao.RbacDao for RbacDaoDb with fn find_user_auth_by_id(self, id) {
   let conn = open_conn(self.config)
   let rows = q(
     conn,
@@ -45,7 +45,7 @@ pub impl @dao.RbacDao for RbacDaoMysql with fn find_user_auth_by_id(self, id) {
 }
 
 ///|
-pub impl @dao.RbacDao for RbacDaoMysql with fn find_role_codes(self, user_id, app_code) {
+pub impl @dao.RbacDao for RbacDaoDb with fn find_role_codes(self, user_id, app_code) {
   let conn = open_conn(self.config)
   let rows = q(
     conn,
@@ -61,7 +61,7 @@ pub impl @dao.RbacDao for RbacDaoMysql with fn find_role_codes(self, user_id, ap
 }
 
 ///|
-pub impl @dao.RbacDao for RbacDaoMysql with fn find_perms_by_user(self, user_id, app_code) {
+pub impl @dao.RbacDao for RbacDaoDb with fn find_perms_by_user(self, user_id, app_code) {
   let conn = open_conn(self.config)
   let rows = q(
     conn,
@@ -81,24 +81,24 @@ pub impl @dao.RbacDao for RbacDaoMysql with fn find_perms_by_user(self, user_id,
 
 ///|
 /// 全量替换：DELETE 旧关系 → 批量 INSERT 新关系（局部事务保证不留半态）
-pub impl @dao.RbacDao for RbacDaoMysql with fn grant_roles(self, user_id, role_ids) {
+pub impl @dao.RbacDao for RbacDaoDb with fn grant_roles(self, user_id, role_ids) {
   let conn = open_conn(self.config)
   // 局部事务（模板就位前先原地实现）
   try {
-    conn.begin()
+    tx_begin(conn)
   } catch {
     e => {
-      conn.close()
-      raise @core.MldongError::Internal("grant_roles begin: \{e}")
+      close_conn(conn)
+      raise @core.MldongError::Internal("grant_roles begin: " + e.message())
     }
   }
   errdefer {
     try {
-      conn.rollback()
+      tx_rollback(conn)
     } catch {
       _ => ()
     }
-    conn.close()
+    close_conn(conn)
   }
   let _ = x(conn, "DELETE FROM sys_user_role WHERE user_id = ?", [@moondb.Int64(user_id)])
   for role_id in role_ids {
@@ -109,31 +109,31 @@ pub impl @dao.RbacDao for RbacDaoMysql with fn grant_roles(self, user_id, role_i
     )
   }
   try {
-    conn.commit()
+    tx_commit(conn)
   } catch {
-    e => raise @core.MldongError::Internal("grant_roles commit: \{e}")
+    e => raise @core.MldongError::Internal("grant_roles commit: " + e.message())
   }
   conn.close()
 }
 
 ///|
-pub impl @dao.RbacDao for RbacDaoMysql with fn grant_menus(self, role_id, menu_ids) {
+pub impl @dao.RbacDao for RbacDaoDb with fn grant_menus(self, role_id, menu_ids) {
   let conn = open_conn(self.config)
   try {
-    conn.begin()
+    tx_begin(conn)
   } catch {
     e => {
-      conn.close()
-      raise @core.MldongError::Internal("grant_menus begin: \{e}")
+      close_conn(conn)
+      raise @core.MldongError::Internal("grant_menus begin: " + e.message())
     }
   }
   errdefer {
     try {
-      conn.rollback()
+      tx_rollback(conn)
     } catch {
       _ => ()
     }
-    conn.close()
+    close_conn(conn)
   }
   let _ = x(conn, "DELETE FROM sys_role_menu WHERE role_id = ?", [@moondb.Int64(role_id)])
   for menu_id in menu_ids {
@@ -144,15 +144,15 @@ pub impl @dao.RbacDao for RbacDaoMysql with fn grant_menus(self, role_id, menu_i
     )
   }
   try {
-    conn.commit()
+    tx_commit(conn)
   } catch {
-    e => raise @core.MldongError::Internal("grant_menus commit: \{e}")
+    e => raise @core.MldongError::Internal("grant_menus commit: " + e.message())
   }
   conn.close()
 }
 
 ///|
-pub extend RbacDaoMysql with @dao.RbacDao::{
+pub extend RbacDaoDb with @dao.RbacDao::{
   grant_roles,
   grant_menus,
   find_perms_by_user,

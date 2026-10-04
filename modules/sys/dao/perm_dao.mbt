@@ -11,7 +11,7 @@ pub(open) trait RbacDao {
   async fn find_role_codes(Self, user_id : Int64, app_code : String) -> Array[String] raise @core.MldongError
   /// 权限码链：user_role ⋈ role_menu ⋈ menu.code（去重，按 role/menu 的 app_code 过滤）
   async fn find_perms_by_user(Self, user_id : Int64, app_code : String) -> Array[String] raise @core.MldongError
-  /// 授权写路：全量替换（删旧插新，dao-mysql 实现内局部事务）
+  /// 授权写路：全量替换（删旧插新，dao-db 实现内局部事务）
   async fn grant_roles(Self, user_id : Int64, role_ids : Array[Int64]) -> Unit raise @core.MldongError
   async fn grant_menus(Self, role_id : Int64, menu_ids : Array[Int64]) -> Unit raise @core.MldongError
 }

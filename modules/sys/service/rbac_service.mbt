@@ -114,6 +114,13 @@ pub extend RbacServiceImpl with RbacService::{
 }
 
 ///|
+pub extend RbacServiceImpl with @port.PermissionProvider::{
+  get_permissions,
+  get_roles,
+  is_super_admin,
+}
+
+///|
 /// login_id 就是 sys_user.id 字符串（appCode 走 extra，不再编进 login_id——
 /// 免污染按 login_id 的搜索面；缺省 platform）。
 /// 兼容形态：带 "@{appCode}" 的旧会话取 "@" 前段。

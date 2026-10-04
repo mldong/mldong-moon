@@ -8,4 +8,5 @@ import {
   "moonbitlang/async",
   "moonbitlang/async/fs" @fs,
   "moonbitlang/core/env" @env,
+  "moonbitlang/core/string" @string,
 }
