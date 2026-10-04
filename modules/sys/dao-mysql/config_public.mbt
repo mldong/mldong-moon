@@ -18,3 +18,17 @@ pub async fn ConfigMysqlDao::list_public(self : ConfigMysqlDao) -> Array[@entity
   }
   out
 }
+
+
+///|
+/// 全量配置（启动灌入 holder 用；未删除范围，code 序）
+pub async fn ConfigMysqlDao::list_all(self : ConfigMysqlDao) -> Array[@entity.Config] raise @core.MldongError {
+  let out : Array[@entity.Config] = []
+  for r in self.base.query(
+    "SELECT " + self.base.table.cols.join(", ") + " FROM sys_config" + " WHERE is_deleted = 0 ORDER BY code",
+    [],
+  ) {
+    out.push((self.base.table.from_row)(r))
+  }
+  out
+}

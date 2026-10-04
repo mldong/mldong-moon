@@ -12,15 +12,15 @@ pub(open) trait ConfigService {
 ///|
 pub(all) struct ConfigServiceImpl[R] {
   dao : R
+  /// 常量刷新钩子（boot2 ConstantContext.putConstant 同位；None = 无 holder 直查库）。
+  /// remove 先收 code 后逐个摘——boot2 靠定时任务自愈，骨架即时刷新
+  mut holder : ConfigHolder?
 }
 
 ///|
 pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn save(self, req) {
-  // 唯一编码查重（未删除范围内）
-  match self.dao.find_by_code(req.code) {
-    Some(_) => raise @core.MldongError::Conflict("唯一编码已存在: " + req.code)
-    None => ()
-  }
+  // 唯一编码校验（boot2 checkUnique 同位一行调）
+  self.dao.check_unique(req.code, None, "唯一编码已存在: " + req.code)
   let d : @entity.Config = {
     id: @core.next_id(),
     name: req.name,
@@ -36,6 +36,10 @@ pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn save
     update_user: None,
     is_deleted: Some(0),
   }
+  match self.holder {
+    Some(h) => h.put(req.code, req.content)
+    None => ()
+  }
   self.dao.insert(d)
 }
 
@@ -46,12 +50,7 @@ pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn upda
     Some(_) => ()
   }
   // 编码查重（排除自身）
-  match self.dao.find_by_code(req.code) {
-    Some(other) => if other.id != req.id {
-      raise @core.MldongError::Conflict("唯一编码已存在: " + req.code)
-    }
-    None => ()
-  }
+  self.dao.check_unique(req.code, Some(req.id), "唯一编码已存在: " + req.code)
   // 未传的可选字段落 N，BaseDao 构建 SET 时跳过（null 不覆盖语义在 builder 层统一）
   let d : @entity.Config = {
     id: req.id,
@@ -68,6 +67,10 @@ pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn upda
     update_user: None,
     is_deleted: None,
   }
+  match self.holder {
+    Some(h) => h.put(req.code, req.content)
+    None => ()
+  }
   self.dao.update(d)
 }
 
@@ -76,7 +79,16 @@ pub impl[R : @dao.ConfigDao] ConfigService for ConfigServiceImpl[R] with fn remo
   if ids.is_empty() {
     raise @core.MldongError::InvalidInput("ids 不能为空")
   }
+  // 先收 code（删后查不到），删后逐个摘 holder——boot2 靠定时任务自愈，骨架即时刷新
+  let items = self.dao.find_by_ids(ids)
   self.dao.remove_by_ids(ids)
+  match self.holder {
+    Some(h) =>
+      for c in items {
+        h.delete(c.code)
+      }
+    None => ()
+  }
 }
 
 ///|

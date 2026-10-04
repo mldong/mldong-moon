@@ -277,9 +277,11 @@ pub fn render_dao(plan : TablePlan) -> String {
   o.line("  /// 逻辑删除（表配置驱动）")
   o.line("  async fn remove_by_ids(Self, Array[Int64]) -> Unit raise @core.MldongError")
   o.line("  async fn find_by_id(Self, Int64) -> @entity." + plan.class_name + "? raise @core.MldongError")
+  o.line("  /// 批量按 id 查（remove 前收标识刷缓存等场景）")
+  o.line("  async fn find_by_ids(Self, Array[Int64]) -> Array[@entity." + plan.class_name + "] raise @core.MldongError")
   if plan.has_code {
-    o.line("  /// 编码查重（未删除范围内）")
-    o.line("  async fn find_by_code(Self, String) -> @entity." + plan.class_name + "? raise @core.MldongError")
+    o.line("  /// 唯一编码校验（boot2 checkUnique 同位一行调：存在且排除自身即 Conflict）")
+    o.line("  async fn check_unique(Self, String, Int64?, String) -> Unit raise @core.MldongError")
   }
   o.line("  /// 分页：Wrapper 由 service 组装（业务说了算），返回 (总数, 当页行)")
   o.line("  async fn page(Self, @core.Wrapper, Int, Int) -> (Int, Array[@entity." + plan.class_name + "]) raise @core.MldongError")
@@ -389,11 +391,25 @@ pub fn render_mysql(plan : TablePlan) -> String {
   o.line("pub impl @dao." + plan.class_name + "Dao for " + plan.class_name + "MysqlDao with fn find_by_id(self, id) {")
   o.line("  self.base.find_by_id(L(id))")
   o.line("}")
+  o.line("")
+  o.line("///|")
+  o.line("pub impl @dao." + plan.class_name + "Dao for " + plan.class_name + "MysqlDao with fn find_by_ids(self, ids) {")
+  o.line("  let vals : Array[@core.SqlValue] = []")
+  o.line("  for id in ids {")
+  o.line("    vals.push(L(id))")
+  o.line("  }")
+  o.line("  self.base.find_by_ids(vals)")
+  o.line("}")
   if plan.has_code {
     o.line("")
     o.line("///|")
-    o.line("pub impl @dao." + plan.class_name + "Dao for " + plan.class_name + "MysqlDao with fn find_by_code(self, code) {")
-    o.line("  self.base.find_one(@core.where_().eq(\"code\", S(code)))")
+    o.line("pub impl @dao." + plan.class_name + "Dao for " + plan.class_name + "MysqlDao with fn check_unique(")
+    o.line("  self,")
+    o.line("  code,")
+    o.line("  exclude_id,")
+    o.line("  msg,")
+    o.line(") {")
+    o.line("  self.base.check_unique(\"code\", S(code), exclude_id, msg)")
     o.line("}")
   }
   o.line("")
@@ -402,10 +418,7 @@ pub fn render_mysql(plan : TablePlan) -> String {
   o.line("  self.base.page(w, page_num, page_size)")
   o.line("}")
   o.line("")
-  let exports : Array[String] = ["remove_by_ids", "find_by_id", "insert", "update", "page"]
-  if plan.has_code {
-    exports.push("find_by_code")
-  }
+  let exports : Array[String] = ["remove_by_ids", "find_by_id", "insert", "update", "page", "find_by_ids"]
   o.line("pub extend " + plan.class_name + "MysqlDao with @dao." + plan.class_name + "Dao::{")
   for e in exports {
     o.line("  " + e + ",")
@@ -437,11 +450,8 @@ pub fn render_service(plan : TablePlan) -> String {
   o.line("///|")
   o.line("pub impl[R : @dao." + plan.class_name + "Dao] " + plan.class_name + "Service for " + plan.class_name + "ServiceImpl[R] with fn save(self, req) {")
   if plan.has_code {
-    o.line("  // 唯一编码查重（未删除范围内）")
-    o.line("  match self.dao.find_by_code(req.code) {")
-    o.line("    Some(_) => raise @core.MldongError::Conflict(\"唯一编码已存在: \" + req.code)")
-    o.line("    None => ()")
-    o.line("  }")
+    o.line("  // 唯一编码校验（boot2 checkUnique 同位一行调）")
+    o.line("  self.dao.check_unique(req.code, None, \"唯一编码已存在: \" + req.code)")
   }
   o.line("  let d : @entity." + plan.class_name + " = {")
   o.line("    id: @core.next_id(),")
@@ -470,12 +480,7 @@ pub fn render_service(plan : TablePlan) -> String {
   o.line("  }")
   if plan.has_code {
     o.line("  // 编码查重（排除自身）")
-    o.line("  match self.dao.find_by_code(req.code) {")
-    o.line("    Some(other) => if other.id != req.id {")
-    o.line("      raise @core.MldongError::Conflict(\"唯一编码已存在: \" + req.code)")
-    o.line("    }")
-    o.line("    None => ()")
-    o.line("  }")
+    o.line("  self.dao.check_unique(req.code, Some(req.id), \"唯一编码已存在: \" + req.code)")
   }
   o.line("  // 未传的可选字段落 N，BaseDao 构建 SET 时跳过（null 不覆盖语义在 builder 层统一）")
   o.line("  let d : @entity." + plan.class_name + " = {")

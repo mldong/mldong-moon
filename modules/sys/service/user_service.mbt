@@ -38,6 +38,9 @@ pub(open) trait UserService {
 ///|
 pub(all) struct UserServiceImpl[R] {
   dao : R
+  /// 默认密码明文取值（boot2 ConstantContextHolder.getDefaultPassword 同位：
+  /// 配置 holder/env 优先，缺省 123456——构造方注入，service 不依赖 holder 类型）
+  mut default_password_of : () -> String
 }
 
 ///|
@@ -51,7 +54,8 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn save(self,
     Some(_) => raise @core.MldongError::Conflict("用户名已存在: \{req.user_name}")
     None => ()
   }
-  // 密码机制对齐 boot2 save：不收用户自报密码，发默认密码 + 8 位随机盐（resetPwd 同式）
+  // 密码机制对齐 boot2 save：不收用户自报密码，发默认密码（holder 可配）+ 8 位随机盐
+  let default_password = (self.default_password_of)()
   let salt = @core.random_salt()
   let u : @entity.User = {
     id: @core.next_id(),
@@ -59,7 +63,7 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn save(self,
     real_name: req.real_name,
     nick_name: req.nick_name,
     avatar: None,
-    password: Some(@core.md5_hex(@core.DEFAULT_PASSWORD + salt)),
+    password: Some(@core.md5_hex(default_password + salt)),
     salt: Some(salt),
     mobile_phone: req.mobile_phone,
     tel: req.tel,
@@ -202,7 +206,7 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn reset_pass
       // 超管不允许重置（boot2 resetPwd 同过滤）
       Some(u) => if u.admin_type != Some(1) {
         let salt = @core.random_salt()
-        self.dao.update_password(id, @core.md5_hex(@core.DEFAULT_PASSWORD + salt), salt)
+        self.dao.update_password(id, @core.md5_hex((self.default_password_of)() + salt), salt)
         n = n + 1
       }
       None => ()

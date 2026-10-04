@@ -16,11 +16,8 @@ pub(all) struct DeptServiceImpl[R] {
 
 ///|
 pub impl[R : @dao.DeptDao] DeptService for DeptServiceImpl[R] with fn save(self, req) {
-  // 唯一编码查重（未删除范围内）
-  match self.dao.find_by_code(req.code) {
-    Some(_) => raise @core.MldongError::Conflict("唯一编码已存在: " + req.code)
-    None => ()
-  }
+  // 唯一编码校验（boot2 checkUnique 同位一行调）
+  self.dao.check_unique(req.code, None, "唯一编码已存在: " + req.code)
   let d : @entity.Dept = {
     id: @core.next_id(),
     parent_id: req.parent_id,
@@ -49,12 +46,7 @@ pub impl[R : @dao.DeptDao] DeptService for DeptServiceImpl[R] with fn update(sel
     Some(_) => ()
   }
   // 编码查重（排除自身）
-  match self.dao.find_by_code(req.code) {
-    Some(other) => if other.id != req.id {
-      raise @core.MldongError::Conflict("唯一编码已存在: " + req.code)
-    }
-    None => ()
-  }
+  self.dao.check_unique(req.code, Some(req.id), "唯一编码已存在: " + req.code)
   // 未传的可选字段落 N，BaseDao 构建 SET 时跳过（null 不覆盖语义在 builder 层统一）
   let d : @entity.Dept = {
     id: req.id,

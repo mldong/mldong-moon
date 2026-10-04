@@ -152,6 +152,43 @@ async fn[T] BaseDao::list(self : BaseDao[T], w : @core.Wrapper) -> Array[T] rais
 }
 
 ///|
+/// 批量按主键查（remove 前收 code 刷新 holder 等场景）
+pub async fn[T] BaseDao::find_by_ids(self : BaseDao[T], vals : Array[@core.SqlValue]) -> Array[T] raise @core.MldongError {
+  if vals.is_empty() {
+    return []
+  }
+  let (sql, params) = @core.build_select(
+    self.table.name,
+    self.table.cols,
+    self.base_where().in_("id", vals),
+  )
+  let out : Array[T] = []
+  for r in self.query(sql, params) {
+    out.push((self.table.from_row)(r))
+  }
+  out
+}
+
+///|
+/// 唯一编码校验（boot2 LowCodeServiceUtil.checkUnique 同位）：存在（排除自身）即 Conflict。
+/// col/value 由调用方给（code 唯一是常态），msg 直出给前端。
+pub async fn[T] BaseDao::check_unique(
+  self : BaseDao[T],
+  col : String,
+  val : @core.SqlValue,
+  exclude_id : Int64?,
+  msg : String,
+) -> Unit raise @core.MldongError {
+  let w = self.base_where().eq(col, val)
+  if !(exclude_id is None) {
+    let _ = w.ne("id", L(exclude_id.unwrap()))
+  }
+  if (self.count(w)) > 0 {
+    raise @core.MldongError::Conflict(msg)
+  }
+}
+
+///|
 /// 计数
 async fn[T] BaseDao::count(self : BaseDao[T], w : @core.Wrapper) -> Int raise @core.MldongError {
   let full = self.base_where()

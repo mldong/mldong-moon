@@ -16,8 +16,16 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] module(
     @ctrl.register_login(ctx, auth, rbac_svc) catch {
       _ => abort("sys 模块登录路由注册失败（路由冲突?）")
     }
+    // 常量 holder（boot2 ConstantContext 同位）：启动灌入，config 写路刷新；
+    // 默认密码等系统参数从这读（env 优先），user service 经闭包注入不依赖 holder 类型
     let user_dao = @mysql.UserMysqlDao::make(config)
-    let user_svc = @svc.UserServiceImpl::{ dao: user_dao }
+    let config_dao = @mysql.ConfigMysqlDao::make(config)
+    let holder = @svc.ConfigHolder::new()
+    holder.load_items(config_dao.list_all())
+    let user_svc = @svc.UserServiceImpl::{
+      dao: user_dao,
+      default_password_of: fn() { holder.get("M_DEFAULT_PASSWORD", @core.DEFAULT_PASSWORD) },
+    }
     @ctrl.register(ctx, user_svc, rbac_svc, g, auth) catch {
       e => abort("sys 模块 user 路由注册失败: \{e}")
     }
@@ -42,9 +50,8 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] module(
     @ctrl.register_dept_trees(ctx, async fn() raise @core.MldongError { dept_dao.list_all() }, async fn() raise @core.MldongError { user_dao.list_simple() }, g) catch {
       e => abort("sys 模块树路由注册失败: \{e}")
     }
-    // config —— cmd/gen 生成 + public 二次开发（config_public.mbt 手写面）
-    let config_dao = @mysql.ConfigMysqlDao::make(config)
-    let config_svc = @svc.ConfigServiceImpl::{ dao: config_dao }
+    // config —— cmd/gen 生成 + public/holder 二次开发（config_public.mbt 手写面）
+    let config_svc = @svc.ConfigServiceImpl::{ dao: config_dao, holder: Some(holder) }
     @ctrl.register_config(ctx, config_svc, g) catch {
       e => abort("sys 模块 config 路由注册失败: \{e}")
     }

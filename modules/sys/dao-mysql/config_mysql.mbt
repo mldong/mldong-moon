@@ -37,8 +37,22 @@ pub impl @dao.ConfigDao for ConfigMysqlDao with fn find_by_id(self, id) {
 }
 
 ///|
-pub impl @dao.ConfigDao for ConfigMysqlDao with fn find_by_code(self, code) {
-  self.base.find_one(@core.where_().eq("code", S(code)))
+pub impl @dao.ConfigDao for ConfigMysqlDao with fn find_by_ids(self, ids) {
+  let vals : Array[@core.SqlValue] = []
+  for id in ids {
+    vals.push(L(id))
+  }
+  self.base.find_by_ids(vals)
+}
+
+///|
+pub impl @dao.ConfigDao for ConfigMysqlDao with fn check_unique(
+  self,
+  code,
+  exclude_id,
+  msg,
+) {
+  self.base.check_unique("code", S(code), exclude_id, msg)
 }
 
 ///|
@@ -52,5 +66,5 @@ pub extend ConfigMysqlDao with @dao.ConfigDao::{
   insert,
   update,
   page,
-  find_by_code,
+  find_by_ids,
 }
