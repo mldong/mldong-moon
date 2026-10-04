@@ -11,6 +11,8 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] install(
   auth : @app.TokenAuth[S, P],
   /// 框架级常量 holder（core 件，main 建实例传入）：sys 负责灌入/刷新，dev/biz 只读注入
   holder : @core.ConfigHolder,
+  /// 框架级枚举字典注册中心（core 件，main 建实例传入）：各模块装配期灌自己的声明
+  enum_registry : @core.EnumDictRegistry,
 ) -> @mb.Module {
   @mb.Module(ctx => {
     let rbac_dao = @repo.RbacRepository::make(config)
@@ -54,10 +56,12 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] install(
     // （枚举注册表静态声明、自定义注册中心存服务不存模型、请求时派生，UC-0431/0432）
     let dict_dao = @repo.DictRepository::make(config)
     let dict_item_dao = @repo.DictItemRepository::make(config)
+    // 枚举字典：本模块声明装配期灌注册中心（goframe init() 的 moon 同位）
+    register_sys_enum_dicts(enum_registry)
     let dict_svc = @svc.DictServiceImpl::{
       dao: dict_dao,
       items_of: async fn(dict_id) raise @core.MldongError { dict_item_dao.list_enabled_by_dict(dict_id) },
-      enum_models: @svc.enum_registry(),
+      enums: enum_registry,
       custom_providers: [],
     }
     @ctrl.register_dict(ctx, dict_svc, g) catch {

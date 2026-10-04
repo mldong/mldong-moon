@@ -12,9 +12,9 @@ pub(open) trait DictService {
   /// （boot2 DictServiceImpl.getByDictType 回退链同构；出口 [{label,value(+ext?)}]，无 id/dataType）
   async fn get_by_dict_type(Self, @core.Ctx, String) -> Array[Json] raise @core.MldongError
   /// 枚举字典清单（boot2 DictScanner/goframe GetEnums 同位；播种器采集源，UC-0431①）
-  fn enum_list(Self) -> Array[@dto.DictModel]
+  fn enum_list(Self) -> Array[@core.DictModel]
   /// 自定义字典清单（goframe GetCustomDict 同位：注册中心存服务不存模型，请求时派生，UC-0432②）
-  fn custom_list(Self) -> Array[@dto.DictModel]
+  fn custom_list(Self) -> Array[@core.DictModel]
 }
 
 ///|
@@ -22,10 +22,10 @@ pub(all) struct DictServiceImpl[R] {
   dao : R
   /// 某字典的启用项（sort 升序）——模块装配闭包注入，服务不依赖 DictItemDao 类型
   items_of : async (Int64) -> Array[@entity.DictItem] raise @core.MldongError
-  /// 枚举字典注册表（编译期静态声明；moon 无运行时扫描，boot2 DictScanner 的静态对应物）
-  enum_models : Array[@dto.DictModel]
+  /// 枚举字典注册中心（core 框架件，main 建实例传入；各模块装配期灌自己的声明）
+  enums : @core.EnumDictRegistry
   /// 自定义字典供数方（业务模块注册自己的 list_dict_models 闭包；基础仓零实现 → 空清单）
-  custom_providers : Array[() -> Array[@dto.DictModel]]
+  custom_providers : Array[() -> Array[@core.DictModel]]
 }
 
 ///|
@@ -134,7 +134,7 @@ fn dict_item_label_value(d : @entity.Dict, it : @entity.DictItem) -> Json {
 
 ///|
 /// 注册表模型 → getByDictType 出口（value 已定型，ext 空不出键）
-fn dict_models_to_label_value(items : Array[@dto.DictItemModel]) -> Array[Json] {
+fn dict_models_to_label_value(items : Array[@core.DictItemModel]) -> Array[Json] {
   let arr : Array[Json] = []
   for it in items {
     let obj : Json = { "label": Json::string(it.name), "value": it.dict_item_value }
@@ -166,11 +166,10 @@ pub impl[R : @dao.DictDao] DictService for DictServiceImpl[R] with fn get_by_dic
     }
     None => ()
   }
-  // ② 枚举注册表 → ③ 自定义注册表（请求时派生）→ ④ 空数组（UC-0413 未知类型空数组）
-  for m in self.enum_models {
-    if m.dict_key == dict_type {
-      return dict_models_to_label_value(m.items)
-    }
+  // ② 枚举注册中心 → ③ 自定义注册表（请求时派生）→ ④ 空数组（UC-0413 未知类型空数组）
+  match self.enums.find(dict_type) {
+    Some(m) => return dict_models_to_label_value(m.items)
+    None => ()
   }
   for provider in self.custom_providers {
     for m in provider() {
@@ -184,92 +183,18 @@ pub impl[R : @dao.DictDao] DictService for DictServiceImpl[R] with fn get_by_dic
 
 ///|
 pub impl[R : @dao.DictDao] DictService for DictServiceImpl[R] with fn enum_list(self) {
-  self.enum_models
+  self.enums.list()
 }
 
 ///|
 pub impl[R : @dao.DictDao] DictService for DictServiceImpl[R] with fn custom_list(self) {
-  let out : Array[@dto.DictModel] = []
+  let out : Array[@core.DictModel] = []
   for provider in self.custom_providers {
     for m in provider() {
       out.push(m)
     }
   }
   out
-}
-
-///|
-/// 枚举字典项速记（label=枚举 message、value=枚举 code；dataType 全 2 整型码）
-fn ei(label : String, value : Int) -> @dto.DictItemModel {
-  {
-    name: label,
-    dict_item_value: Json::number(value.to_double()),
-    dict_item_key: value.to_string(),
-    ext: None,
-  }
-}
-
-///|
-/// 枚举字典注册表（boot2 DictScanner / goframe RegisterEnumValues 同位）：
-/// 与 boot2 @DictEnum 的 sys 域 + 基础件逐项对齐（18 个，同 key 同名同码表）；
-/// dataType 整型码表必填（UC-0431① 播种器唯一采集源），新枚举在数组里加一项。
-/// wf_*/biz_*/dev_schema_* 不在 base 范围（boot2 对应模块未建，随模块补齐再入册）
-pub fn enum_registry() -> Array[@dto.DictModel] {
-  [
-    { name: "是否", dict_key: "yes_no", data_type: Some(2), items: [ei("是", 1), ei("否", 0)] },
-    { name: "性别", dict_key: "sex", data_type: Some(2), items: [ei("男", 1), ei("女", 2), ei("未知", 3)] },
-    { name: "管理员类型", dict_key: "sys_user_admin_type", data_type: Some(2), items: [ei("超级管理员", 1), ei("普通管理员", 2)] },
-    { name: "角色类型", dict_key: "sys_role_role_type", data_type: Some(2), items: [ei("普通角色", 1), ei("数据角色", 2), ei("工作流", 3)] },
-    {
-      name: "角色数据范围",
-      dict_key: "sys_role_data_scope",
-      data_type: Some(2),
-      items: [ei("全部数据权限", 1), ei("自定义数据权限", 2), ei("本部门数据权限", 3), ei("本部门及以下部门权限", 4), ei("仅本人数据权限", 5)],
-    },
-    {
-      name: "菜单类型",
-      dict_key: "sys_menu_type",
-      data_type: Some(2),
-      items: [ei("目录", 1), ei("菜单", 2), ei("按钮", 3), ei("接口", 4)],
-    },
-    {
-      name: "菜单打开方式",
-      dict_key: "sys_menu_open_type",
-      data_type: Some(2),
-      items: [ei("无", 0), ei("组件", 1), ei("内部链接", 2), ei("外部链接", 3)],
-    },
-    { name: "应用编码类型", dict_key: "sys_menu_app_code", data_type: Some(2), items: [ei("平台", 10)] },
-    { name: "字典数据类型", dict_key: "sys_dict_data_type", data_type: Some(2), items: [ei("字符串", 1), ei("整型", 2)] },
-    { name: "站内消息类型", dict_key: "sys_message_msg_type", data_type: Some(2), items: [ei("待办消息", 10), ei("通知消息", 20)] },
-    {
-      name: "系统日志操作类型",
-      dict_key: "sys_op_log_op_type",
-      data_type: Some(2),
-      items: [ei("登录", 0), ei("查询", 1), ei("新增", 2), ei("修改", 3), ei("删除", 4), ei("主动注销", 5)],
-    },
-    { name: "访问类型", dict_key: "sys_vis_log_vis_type", data_type: Some(2), items: [ei("登录", 1), ei("登出", 2)] },
-    {
-      name: "短信业务类型",
-      dict_key: "sys_sms_biz_type",
-      data_type: Some(2),
-      items: [ei("注册验证码", 10), ei("登录验证码", 20), ei("重置密码", 30), ei("变更验证码", 40), ei("绑定验证码", 50), ei("通知消息", 60)],
-    },
-    { name: "短信发送日志状态", dict_key: "sys_sms_log_status", data_type: Some(2), items: [ei("待发送", 0), ei("成功", 1), ei("失败", 2)] },
-    { name: "定时任务状态", dict_key: "sys_timer_state", data_type: Some(2), items: [ei("运行", 1), ei("停止", 2)] },
-    {
-      name: "第三方回调处理状态",
-      dict_key: "sys_third_party_callback_handle_status",
-      data_type: Some(2),
-      items: [ei("未处理", 0), ei("处理成功", 1), ei("处理失败", 2)],
-    },
-    { name: "任务队列状态", dict_key: "sys_task_execution_queue_state", data_type: Some(2), items: [ei("未开始", 0), ei("执行中", 1), ei("执行失败-待重试", 9)] },
-    {
-      name: "历史归档队列状态",
-      dict_key: "sys_task_execution_history_state",
-      data_type: Some(2),
-      items: [ei("成功", 2), ei("已取消", 3), ei("失败-终态", 9)],
-    },
-  ]
 }
 
 ///|

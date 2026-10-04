@@ -122,29 +122,9 @@ pub fn dict_json(d : @entity.Dict) -> Json {
 }
 
 ///|
-/// 枚举/自定义字典项模型（boot2 DictItemModel / goframe DictItemModelVO 同形；
-/// dictItemValue 已按 dataType 定型：1=字符串 2=数值）
-pub(all) struct DictItemModel {
-  name : String
-  dict_item_value : Json
-  dict_item_key : String
-  /// ext 预留（i18n 等）；None 不出键（UC-0426 ext 同语义）
-  ext : Json?
-}
-
-///|
-/// 枚举/自定义字典模型（boot2 DictModel / goframe DictModelVO 同形）：
-/// dataType 整型 1|2（枚举路径必填，UC-0431① 播种器采集源）；自定义路径 None 不出键
-pub(all) struct DictModel {
-  name : String
-  dict_key : String
-  data_type : Int?
-  items : Array[DictItemModel]
-}
-
-///|
-/// 清单出参：{name, dictKey, dataType?, items}——dataType None 不出键（空值兼作播种排除标记）
-pub fn dict_model_json(m : DictModel) -> Json {
+/// 清单出参：{name, dictKey, dataType?, items}——dataType None 不出键（空值兼作播种排除标记）。
+/// 模型本体上收 core（DictModel/DictItemModel + EnumDictRegistry，框架件），此处只留渲染
+pub fn dict_model_json(m : @core.DictModel) -> Json {
   let obj : Json = {
     "name": Json::string(m.name),
     "dictKey": Json::string(m.dict_key),
@@ -164,7 +144,7 @@ pub fn dict_model_json(m : DictModel) -> Json {
 }
 
 ///|
-fn dict_item_model_json(m : DictItemModel) -> Json {
+fn dict_item_model_json(m : @core.DictItemModel) -> Json {
   let obj : Json = {
     "name": Json::string(m.name),
     "dictItemValue": m.dict_item_value,
@@ -185,6 +165,6 @@ fn dict_item_model_json(m : DictItemModel) -> Json {
 
 ///|
 /// 清单数组出参
-pub fn dict_model_list_json(models : Array[DictModel]) -> Json {
+pub fn dict_model_list_json(models : Array[@core.DictModel]) -> Json {
   Json::array(models.map(dict_model_json))
 }

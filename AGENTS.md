@@ -29,6 +29,7 @@ mldong-moon/
 │   ├── jsonx.mbt        #   Json 取值（get_i64/text_or/get_i64_array…）
 │   ├── id_gen.mbt       #   雪花 ID（next_id）+ 时间
 │   ├── config_holder.mbt#   配置常量 Holder（框架件：main 建实例传各模块，sys 灌入/刷新，dev/biz 只读）
+│   ├── enum_dict.mbt    #   枚举字典注册中心（框架件：DictModel/DictItemModel + Registry，各模块装配期灌自己的声明；sys 样板 modules/sys/enums.mbt）
 │   └── mysql_config.mbt #   MysqlConfig::from_env（MLDONG_DB_*）
 ├── core-web/            # mldong/moon-core-web —— moonback 适配层（全工程 web 依赖唯一收口）
 │   ├── common.mbt       #   wrap（统一错误转信封）+ json_body

@@ -88,7 +88,12 @@ let post_svc = @svc.PostServiceImpl::{ dao: post_dao }
    （模块内装配 + 注册，抄 `modules/sys/module.mbt`；模块无鉴权端点可去 auth/g 参数，看需）；
 4. `cmd/main` 挂一行：`ctx.use_(@dev.module(config, g, auth)) catch { _ => abort(...) }`
    （moon.pkg 加 `"mldong/moon-<mod>" @dev`）；
-5. 权限码：新模块自己的 policy 聚合函数导出，main 里 `merge_policy` 并进总策略。
+5. 权限码：新模块自己的 policy 聚合函数导出，main 里 `merge_policy` 并进总策略；
+6. **枚举字典**（有业务枚举才做）：模块根包建 `enums.mbt`（声明 `Array[@core.DictModel]`
+   常量表 + `register_<mod>_enum_dicts(registry)`），`install` 收 `@core.EnumDictRegistry`
+   参数并在装配期灌入——goframe「每枚举一文件 + init() 注册」的 moon 同位；sys 的样板见
+   [../modules/sys/enums.mbt](../modules/sys/enums.mbt)。main 建全进程一实例传各模块
+   （ConfigHolder 同一条传链），dict 的 getByDictType/enumDictList 自动可见。
 
 ## 自检清单（提交前）
 
