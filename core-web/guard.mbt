@@ -19,8 +19,9 @@ pub fn merge_policy(total : @guard.RoutePolicy, part : @guard.RoutePolicy) -> @g
 }
 
 ///|
-/// mldong 风格的鉴权失败响应：HTTP 状态码对齐 mldong 框架约定（401 未登录/403 无权限），
-/// body 用本项目信封（code 99990401/99990403，msg 取 TokenError 精确原因）。
+/// mldong 风格的鉴权失败响应：**HTTP 恒 200**，业务码进信封（boot2 GlobalExceptionHandler
+/// 返回 CommonResult / goframe WriteJson(base.Fail(...)) 同约定——vben5 按 code 分支不走 HTTP 状态），
+/// code 99990401 未登录 / 99990403 token 无效，msg 取 TokenError 精确原因。
 /// 经 Guard::with_on_error 挂上，替换 moon-token 默认的空体响应。
 pub async fn on_error(
   _request : @mb.Request,
@@ -28,14 +29,17 @@ pub async fn on_error(
   err : @port.TokenError,
 ) -> Unit {
   let status = @mbguard.status_of(err)
+  // 受保护端点的 token 校验失败一律 99990403（boot2 NotLoginException→TOKEN_NOT_EXIST、
+  // goframe middleware WriteJson(99990403) 同码；99990401 只归登录端点「用户名或密码错误」）。
+  // 无权限 boot2 走 99990406 NO_RESOURCE_AUTH，moon 暂同 99990403（差异记台账，runner 未测）。
   let code = match status {
-    401 => 99990401
+    401 => 99990403
     403 => 99990403
     400 => 99990001
     _ => 99990000
   }
   let body : Json = { "code": code, "msg": err.message(), "data": Json::null() }
-  responder.send_json(body, status=status, headers=[("Content-Type", "application/json; charset=utf-8")]) catch {
+  responder.send_json(body, headers=[("Content-Type", "application/json; charset=utf-8")]) catch {
     _ => ()
   }
 }

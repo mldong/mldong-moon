@@ -25,7 +25,8 @@ async fn main raise {
       @guard.RoutePolicy::new()
         .exempt("/sys/login")
         .exempt("/sys/logout")
-        .exempt("/sys/refreshToken"),
+        .exempt("/sys/refreshToken")
+        .exempt("/sys/getCaptchaOpenFlag"),
       @sys.policy(),
     ),
     @dev.policy(),
@@ -52,6 +53,6 @@ async fn main raise {
   defer app.close()
   let server = @mb.listen(host="127.0.0.1", port=18680)
   println("mldong-moon listening on http://127.0.0.1:18680")
-  println("端点：POST /sys/login /sys/logout + /sys/user/*（含 grantRole） /sys/role/*（带鉴权）")
+  println("端点：POST /sys/login /sys/logout /sys/refreshToken /sys/getCaptchaOpenFlag + /sys/user/*（含 grantRole） /sys/role|dept|post|config/*（带鉴权） /dev/schema/*")
   app.serve(server)
 }

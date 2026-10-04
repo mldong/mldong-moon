@@ -66,7 +66,8 @@ mldong-moon/
 
 | 端点 | 权限码 | 说明 |
 |---|---|---|
-| `/sys/login` | 豁免 | `{userName, password}` → `{token, refreshToken, userId}`；密文校验 `md5(密码+盐)` 对齐 boot2（错密与不存在同话术防枚举，失败 401+99990401）；会话 extra 带入 appCode/ip/ua |
+| `/sys/login` | 豁免 | `{userName, password}` → `{token, refreshToken, userId}`；密文校验 `md5(密码+盐)` 对齐 boot2（错密与不存在同话术防枚举，失败 99990401）；会话 extra 带入 appCode/ip/ua |
+| `/sys/getCaptchaOpenFlag` | 豁免 | `{flag: bool}`——`MOLE_CAPTCHA_OPEN` env 优先 → sys_config 表 → 默认 false（boot2 AuthController 同位） |
 | `/sys/refreshToken` | 豁免 | `{refreshToken}` → 全新 `{token, refreshToken, userId}`（全量轮转：旧 access+旧 refresh 同时失效；失败统一 `99990410` 不泄露原因） |
 | `/sys/logout` | 豁免 | 注销当前 token |
 | `/sys/user/save` | `sys:user:save` | 新增（用户名查重；不收密码，发默认密码 `123456` + 8 位随机盐，boot2 同机制；雪花 ID 全部字符串出入，防 JS 精度丢失） |
@@ -80,7 +81,7 @@ mldong-moon/
 | `/sys/user/resetPassword` | `sys:user:resetPassword` | 批量重置为默认密码（超管跳过） |
 | `/sys/user/select` | `sys:user:select` | 下拉选项 `[{label,value}]` |
 | `/sys/user/permCode` | 仅登录 | 当前用户权限码数组（守卫快照投影） |
-| `/sys/user/info` / `updateInfo` / `updatePwd` / `updateAvatar` | 仅登录 | 个人中心（id 取自登录主体） |
+| `/sys/user/info` / `updateInfo` / `updatePwd` / `updateAvatar` | 仅登录 | 个人中心（id 取自登录主体；info 含 `deptName`/`lastLoginTime` 契约键） |
 | `/sys/user/onlineUserList` / `onlineDevice` | `sys:user:onlineUserList` / 仅登录 | 在线用户（按人分组带 tokenList/ip/ua/剩余时长，moon-token 会话枚举） |
 | `/sys/dept/{save,remove,update,detail,page}` | `sys:dept:*` | 部门 CRUD（**gen 生成**） |
 | `/sys/dept/list` | `sys:dept:list` | 部门树（parent_id 内存建树，root=0；手写扩展面） |
@@ -154,6 +155,7 @@ moon run --target wasm cmd/gen/main -- sys_dept sys_post   # 产出到 gen-out/�
 | [doc/permissions.md](doc/permissions.md) | 权限鉴权：登录/守卫装配、权限码声明收集、RBAC 真码链、appCode、验收矩阵 |
 | [doc/adding-module.md](doc/adding-module.md) | 新增模块/新表操作手册（六件套清单 + 自检） |
 | [doc/gen-metadata.md](doc/gen-metadata.md) | 库元数据底座：跨库实现要点、类型映射、gen/dev_schema 两条消费路 |
+| [doc/base-contract.md](doc/base-contract.md) | 家族契约 runner 跑法 + 已存在端点比对结论 + 未存在接口按模块清单 |
 
 ## 路线图
 
@@ -165,8 +167,9 @@ moon run --target wasm cmd/gen/main -- sys_dept sys_post   # 产出到 gen-out/�
 - [ ] 会话存储文件/Redis 后端（moon-token 端口已预留）
 - [ ] `rainbow` 分页导航补齐
 - [x] dev 模块元数据底座（MetadataDao 端口 + information_schema 实现 + dbTable/column/list 端点，10-04）
+- [x] 家族契约 runner 首轮：已存在端点 5 组全 pass（认证/refresh/在线/角色页/配置页），缺模块清单见 doc/base-contract.md（10-03）
 - [ ] dev 模块：代码生成器（读 MetadataDao 产出六件套源码，见 doc/gen-metadata.md §4）
-- [ ] dev_schema 台账（importTable 落库 + disabled 标记，boot2 同位）
+- [ ] dev_schema 台账（importTable 落库 + disabled 标记 + /dev/schema/page·getByTableName 契约面，boot2 同位）
 - [ ] CI：GitHub Actions（wasm + native 双档）
 
 ## License

@@ -12,6 +12,8 @@ pub fn[S : @port.TokenStore, P, R : @svc.RbacService] register_login(
   ctx : @mb.ModuleContext,
   auth : @app.TokenAuth[S, P],
   rbac : R,
+  /// 验证码开关读链（holder 经模块装配闭包注入，控制器不依赖 holder 类型）
+  captcha_flag_of : () -> Bool,
 ) -> Unit {
   // 登录（豁免面直挂）
   let login_handler : @mb.Handler = async fn(request, responder) {
@@ -100,7 +102,6 @@ pub fn[S : @port.TokenStore, P, R : @svc.RbacService] register_login(
       err => {
         responder.send_json(
           @core.fail(99990401, err.message()),
-          status=401,
           headers=[("Content-Type", "application/json; charset=utf-8")],
         ) catch {
           _ => ()
@@ -109,6 +110,16 @@ pub fn[S : @port.TokenStore, P, R : @svc.RbacService] register_login(
       }
     }
     responder.send_json(@core.ok_empty(), headers=[("Content-Type", "application/json; charset=utf-8")]) catch {
+      _ => ()
+    }
+  }
+  // 验证码开关（公开端点，boot2 AuthController 同位）：data.flag 布尔，
+  // 开关真值走 holder 读链（env 优先 → sys_config 表 → 默认 false）
+  let captcha_flag_handler : @mb.Handler = async fn(_request, responder) {
+    responder.send_json(
+      @core.ok_data({ "flag": captcha_flag_of() }),
+      headers=[("Content-Type", "application/json; charset=utf-8")],
+    ) catch {
       _ => ()
     }
   }
@@ -121,14 +132,16 @@ pub fn[S : @port.TokenStore, P, R : @svc.RbacService] register_login(
   ctx.post("/sys/refreshToken", refresh_handler) catch {
     _ => abort("刷新路由注册失败（路由冲突?）")
   }
+  ctx.post("/sys/getCaptchaOpenFlag", captcha_flag_handler) catch {
+    _ => abort("验证码开关路由注册失败（路由冲突?）")
+  }
 }
 
 ///|
-/// 鉴权失败统一出 401 + 信封
+/// 鉴权失败统一出信封（HTTP 恒 200，boot2 GlobalExceptionHandler 同约定——业务码在 body）
 async fn fail_auth(responder : @mb.Responder, e : @core.MldongError) -> Unit {
   responder.send_json(
     { "code": 99990401, "msg": e.message(), "data": Json::null() },
-    status=401,
     headers=[("Content-Type", "application/json; charset=utf-8")],
   ) catch {
     _ => ()

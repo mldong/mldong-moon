@@ -81,7 +81,7 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn save(self,
     remark: req.remark,
     create_time: Some(@core.now_str()),
     create_user: ctx.user_id,
-    update_time: None,
+    update_time: Some(@core.now_str()),
     update_user: ctx.user_id,
     is_deleted: Some(0),
   }

@@ -28,9 +28,9 @@ check('RR2 新 access 打受保护端点', c==0, 'code=%s'%c)
 # RR3 旧 refresh 重放 → 99990410
 c=post('/sys/refreshToken',{'refreshToken':d['refreshToken']})['code']
 check('RR3 旧 refresh 重放 99990410', c==99990410, 'code=%s'%c)
-# RR4 旧 access 已废 → 401
+# RR4 旧 access 已废 → 99990403
 c=post('/sys/user/page',{'pageNum':1,'pageSize':2},d['token'])['code']
-check('RR4 旧 access 99990401', c==99990401, 'code=%s'%c)
+check('RR4 旧 access 99990403', c==99990403, 'code=%s'%c)
 # RR5 垃圾 refreshToken → 99990410
 c=post('/sys/refreshToken',{'refreshToken':'garbage-not-exist'})['code']
 check('RR5 垃圾串 99990410', c==99990410, 'code=%s'%c)

@@ -90,3 +90,38 @@ pub fn get_i64_array(body : Json, key : String) -> Array[Int64] {
 pub fn get_ids(body : Json) -> Array[Int64] {
   get_i64_array(body, "ids")
 }
+
+///|
+/// 扩展属性往返（boot2 ext↔variable 同语义）：前端提交 ext 对象 → 存储为 JSON 串；
+/// 提取键的任意 Json 值 stringify（缺失/Null → None）
+pub fn get_ext_string(data : Json, key : String) -> String? {
+  match data {
+    Object(map) =>
+      match map.get(key) {
+        Some(Json::Null) | None => None
+        Some(v) => Some(v.stringify())
+      }
+    _ => None
+  }
+}
+
+///|
+/// 存储串 → ext 对象（boot2 isTypeJSONObject 同语义：非对象/空/坏串 → Null）
+pub fn parse_ext(variable : String?) -> Json {
+  match variable {
+    Some(s) =>
+      if s.is_empty() {
+        Json::null()
+      } else {
+        try {
+          match @json.parse(s) {
+            Object(_) => @json.parse(s)
+            _ => Json::null()
+          }
+        } catch {
+          _ => Json::null()
+        }
+      }
+    None => Json::null()
+  }
+}

@@ -13,6 +13,8 @@ pub(all) struct DeptSaveReq {
   mut leader_ids : String?
   mut main_leader_id : Int64?
   mut remark : String?
+  /// ext 扩展对象序列化串（存 variable 列）
+  mut variable : String?
 }
 
 ///|
@@ -27,6 +29,8 @@ let dept_save_schema : @moon_zod.Schema = @moon_zod.object({
   "leaderIds": @moon_zod.string().max(255, msg="leaderIds 最多 255 位").optional(),
   "mainLeaderId": @moon_zod.any().optional(),
   "remark": @moon_zod.string().max(255, msg="remark 最多 255 位").optional(),
+  // ext 扩展对象（预留：国际化等）——存 variable 列（JSON 串），往返转换见 core.get_ext_string/parse_ext
+  "ext": @moon_zod.any().optional(),
 })
 
 ///|
@@ -42,6 +46,11 @@ fn dept_req_of(data : Json) -> DeptSaveReq {
     leader_ids: @core.get_text(data, "leaderIds"),
     main_leader_id: @core.get_i64(data, "mainLeaderId"),
     remark: @core.get_text(data, "remark"),
+    // boot2 同语义：Param.ext 默认空 Dict，不带 ext = "{}"（非 null）
+    variable: Some(match @core.get_ext_string(data, "ext") {
+      Some(s) => s
+      None => "{}"
+    }),
   }
 }
 
@@ -102,7 +111,7 @@ pub fn dept_json(d : @entity.Dept) -> Json {
     "leaderIds": jstr(d.leader_ids),
     "mainLeaderId": jsnow(d.main_leader_id),
     "remark": jstr(d.remark),
-    "variable": jstr(d.variable),
+    "ext": @core.parse_ext(d.variable),
     "createTime": jstr(d.create_time),
     "createUser": jsnow(d.create_user),
     "updateTime": jstr(d.update_time),

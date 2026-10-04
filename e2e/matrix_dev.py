@@ -18,7 +18,7 @@ c=(r['code']==0 and len(r['data'])>=1); ok+= 1 if c else 0; print('PASS' if c el
 r=post('/dev/schema/column/list',{'tableName':'sys_user'},t)
 c=(r['code']==0 and len(r['data'])==21); ok+= 1 if c else 0; print('PASS' if c else 'FAIL','D2 column/list 21')
 r=post('/dev/schema/dbTable',{},'garbage')
-c=(r['code']==99990401); ok+= 1 if c else 0; print('PASS' if c else 'FAIL','D3 未登录 401')
+c=(r['code']==99990403); ok+= 1 if c else 0; print('PASS' if c else 'FAIL','D3 未登录 99990403')
 r=post('/dev/schema/dbTable',{},t)
 c=(r['code']==0 and len(r['data'])>10); ok+= 1 if c else 0; print('PASS' if c else 'FAIL','D4 全表')
 r=post('/dev/schema/column/list',{'tableName':'no_such_table_xyz'},t)

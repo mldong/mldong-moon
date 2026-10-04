@@ -92,13 +92,17 @@ curl -s -X POST http://127.0.0.1:18680/sys/user/page \
 3. [doc/permissions.md](doc/permissions.md) —— 权限/鉴权（碰登录、权限码、appCode 前必读）；
 4. [doc/adding-module.md](doc/adding-module.md) —— 加表/加模块时照抄；
 5. [doc/gen-metadata.md](doc/gen-metadata.md) —— 碰 gen/dev_schema/元数据时读；
-5. 模板样板真身在 `modules/sys`（user 全链 + role + RBAC 中间表），文档与源码冲突时**以源码为准**并回来修文档。
+6. [doc/base-contract.md](doc/base-contract.md) —— 家族契约 runner 跑法 + 已存在端点比对结论 + 未存在接口按模块清单（补模块前先看）；
+7. 模板样板真身在 `modules/sys`（user 全链 + role + RBAC 中间表），文档与源码冲突时**以源码为准**并回来修文档。
 
 ## 5. 关键认知 / 坑（先读再动手）
 
 - **moonback handler 没有 raise 通道**（`Handler = async (Request, Responder) -> Unit`），
   统一异常处理落 `@web.wrap`：业务闭包只许抛 `MldongError`，wrap 负责转 9999xxxx 信封。
   **中间件做不了这事**（moonback 中间件是 App 全局作用域且先于路由匹配执行）。
+- **信封 HTTP 恒 200**（含鉴权失败）：业务码进 body（99990403=token 失效、99990401 只归登录
+  「用户名或密码错误」）——boot2 GlobalExceptionHandler / goframe WriteJson 同约定，vben5 按 code
+  分支不吃 HTTP 状态；新端点别再直出 4xx（契约 runner UC-0101/0113 都按此断，详见 doc/base-contract.md §3）。
 - **moon_zod 是 strip 模式**：schema 里没声明的字段会被**丢弃**。id/deptId 这类"不校验但要存活"
   的字段必须写 `"id": @moon_zod.any().optional()` 占位。
 - **雪花 ID 全链字符串化**：JS Number 53 位精度装不下 64 位雪花，入参出参一律 String

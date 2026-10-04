@@ -35,6 +35,7 @@ let dept_table : TableCodec[@entity.Dept] = TableCodec::{
     { name: "update_time", get: fn(d) { S(match d.update_time { Some(s) => s; None => @core.now_str() }) } },
     { name: "create_user", get: fn(d) { opt_l(d.create_user) } },
     { name: "update_user", get: fn(d) { opt_l(d.update_user) } },
+    { name: "variable", get: fn(d) { opt_s(d.variable) } },
   ],
   update_cols: [
     { name: "parent_id", get: fn(d) { opt_l(d.parent_id) } },
@@ -47,6 +48,7 @@ let dept_table : TableCodec[@entity.Dept] = TableCodec::{
     { name: "remark", get: fn(d) { opt_s(d.remark) } },
     { name: "update_time", get: fn(_d) { S(@core.now_str()) } },
     { name: "update_user", get: fn(d) { opt_l(d.update_user) } },
+    { name: "variable", get: fn(d) { opt_s(d.variable) } },
   ],
   from_row: row_dept,
   id_of: fn(d) { L(d.id) },

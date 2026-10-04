@@ -59,6 +59,16 @@ rnode=[n for n in r['data'] if n['name']==UN+'总部']
 check('D7 根节点含两子', len(rnode)==1 and len(rnode[0]['children'])==2, 'children=%d'%(len(rnode[0]['children']) if rnode else -1))
 r=post('/sys/dept/page',{'pageNum':1,'pageSize':10,'m_EQ_code':UN+'hq'},t)
 check('D8 dept page + m_EQ', r['code']==0 and r['data']['recordCount']==1)
+# ext↔variable 往返（boot2 同语义：前端提交 ext 对象 → variable JSON 串 → 返回 ext 对象）
+r=post('/sys/dept/update',{'id':root,'name':UN+'总部','code':UN+'hq','parentId':'0','ext':{'i18nKey':'dept.hq','level':3,'tags':['a','b']}},t)
+check('D8b update 带 ext 对象', r['code']==0, str(r))
+r=post('/sys/dept/detail',{'id':root},t)
+ext=r['data'].get('ext')
+check('D8c detail 回 ext 对象', isinstance(ext,dict) and ext.get('i18nKey')=='dept.hq' and ext.get('level')==3 and ext.get('tags')==['a','b'], str(ext))
+# 清空 ext → null
+r=post('/sys/dept/update',{'id':root,'name':UN+'总部','code':UN+'hq','parentId':'0'},t)
+r=post('/sys/dept/detail',{'id':root},t)
+check('D8d 不带 ext 回空对象（boot2 空 Dict 语义）', r['data'].get('ext')=={}, str(r['data'].get('ext')))
 # 部门用户树：把 u0011 挂到 child 部门下
 import urllib.request as _u
 # 建自有用户挂子部门（不碰种子数据；跨套件残留依赖已两次假红，教训入册）

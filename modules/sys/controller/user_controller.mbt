@@ -123,7 +123,25 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
     }
     @core.ok_data(Json::array(arr))
   })
-  // 个人信息（用户字段 + roleCodes/roleNames/superAdmin）
+  // 枚举全部在线行（翻尽游标；moon-token 单页硬上限 100）——个人信息 lastLoginTime 也用它
+  let all_online = async fn() -> Array[@app.OnlineRow] raise @port.TokenError {
+    let rows : Array[@app.OnlineRow] = []
+    let mut cursor = ""
+    let mut guard_count = 0
+    while guard_count < 100 {
+      let page = auth.list_online(@port.SessionFilter::all(), cursor, 100)
+      for row in auth.load_online(page) {
+        rows.push(row)
+      }
+      if page.next_cursor.is_empty() {
+        break
+      }
+      cursor = page.next_cursor
+      guard_count = guard_count + 1
+    }
+    rows
+  }
+  // 个人信息（用户字段 + roleCodes/roleNames/superAdmin/deptName/lastLoginTime）
   let info_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
     let ctx = @web.ctx_of(request)
     let p = match @mbguard.principal_of(request) {
@@ -134,7 +152,32 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
       Some(id) => id
       None => raise @core.MldongError::NotFound("登录主体非法: \{p.login_id}")
     }
-    @core.ok_data(@dto.user_info_json(svc.find_by_id(ctx, uid), p.roles, p.super_admin))
+    let u = svc.find_by_id(ctx, uid)
+    // deptName 实时补查（boot2 loginHandler.postLogin 同位；loginUser 里不常驻）
+    let dept_name : String? = match u.dept_id {
+      Some(dept_id) => {
+        let mut found : String? = None
+        for d in dept_list() {
+          if d.id == dept_id {
+            found = Some(d.name)
+          }
+        }
+        found
+      }
+      None => None
+    }
+    // lastLoginTime = 当前 token 的登录时刻（boot2 new Date(loginTimestamp) 同物）
+    let current_token = @web.token_of(request)
+    let mut last_login : String? = None
+    let rows = all_online() catch {
+      _ => []
+    }
+    for row in rows {
+      if row.listing.token == current_token {
+        last_login = Some(@core.format_unix_utc(row.listing.login_time / 1000L))
+      }
+    }
+    @core.ok_data(@dto.user_info_json(u, p.roles, p.super_admin, dept_name, last_login))
   })
   // 修改个人信息（只动 realName/nickName/sex；id 取自登录主体，body 里的 id 不信任）
   let update_info_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
@@ -184,25 +227,8 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
   })
 
   // ---- 在线用户族（moon-token list_online 枚举 + DB join 名称；boot2 onlineUserList/onlineDevice 同位）----
+  // （枚举器 all_online 已上移至个人信息 handler 前——lastLoginTime 复用）
 
-  // 枚举全部在线行（翻尽游标；moon-token 单页硬上限 100）
-  let all_online = async fn() -> Array[@app.OnlineRow] raise @port.TokenError {
-    let rows : Array[@app.OnlineRow] = []
-    let mut cursor = ""
-    let mut guard_count = 0
-    while guard_count < 100 {
-      let page = auth.list_online(@port.SessionFilter::all(), cursor, 100)
-      for row in auth.load_online(page) {
-        rows.push(row)
-      }
-      if page.next_cursor.is_empty() {
-        break
-      }
-      cursor = page.next_cursor
-      guard_count = guard_count + 1
-    }
-    rows
-  }
   // 空 User 占位（会话人已删账号时兜底，防在线页 500）
   let ghost_user = fn(id : Int64) -> @entity.User {
     {
@@ -243,7 +269,6 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
     }
     {
       token_value: if super_admin && uid_str != viewer_id { "-" } else { l.token },
-      device: l.device,
       is_current: l.token == current_token,
       login_time: l.login_time,
       expire_at: l.expire_at,
@@ -323,16 +348,18 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
         tokens.push(token_view(row, users_map, current_token, lid))
       }
       let first = tokens_rows[0]
-      let timeout = (first.listing.expire_at - @port.now_ms()) / 1000L
+      let first_view = token_view(first, users_map, current_token, lid)
       out.push(@dto.online_user_json({
         id: lid,
         user_name: u.user_name,
         real_name: u.real_name,
-        is_current: lid == viewer.login_id,
         super_admin: u.admin_type == Some(1),
+        is_current: lid == viewer.login_id,
         login_time: first.listing.login_time,
         expire_at: first.listing.expire_at,
-        timeout: if timeout > 0L { timeout } else { 0L },
+        token_value: first_view.token_value,
+        login_ip: first_view.login_ip,
+        login_browser: first_view.login_browser,
         tokens,
       }))
     }

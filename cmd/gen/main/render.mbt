@@ -153,6 +153,8 @@ pub fn render_dto(plan : TablePlan) -> String {
       } else {
         o.line("  " + k + ": @moon_zod.number().int(),")
       }
+    } else if c.is_ext {
+      o.line("  " + k + ": @moon_zod.any().optional(),")
     } else {
       let mut rule = "@moon_zod.string()"
       match c.max_len {
@@ -179,7 +181,12 @@ pub fn render_dto(plan : TablePlan) -> String {
     } else if c.ftype == "Int" {
       o.line("    " + c.name + ": @core.get_int(data, " + k + "),")
     } else {
-      if c.option {
+      if c.is_ext {
+        o.line("    " + c.name + ": Some(match @core.get_ext_string(data, \"ext\") {")
+        o.line("      Some(s) => s")
+        o.line("      None => \"{}\"")
+        o.line("    }),")
+      } else if c.option {
         o.line("    " + c.name + ": @core.get_text(data, " + k + "),")
       } else {
         o.line("    " + c.name + ": @core.text_or(data, " + k + ", \"\"),")
@@ -251,7 +258,9 @@ pub fn render_dto(plan : TablePlan) -> String {
         o.line("    " + k + ": Json::number(d." + c.name + ".to_double()),")
       }
     } else {
-      if c.option {
+      if c.is_ext {
+        o.line("    " + k + ": @core.parse_ext(d." + c.name + "),")
+      } else if c.option {
         o.line("    " + k + ": jstr(d." + c.name + "),")
       } else {
         o.line("    " + k + ": Json::string(d." + c.name + "),")
@@ -470,7 +479,7 @@ pub fn render_service(plan : TablePlan) -> String {
   }
   o.line("    create_time: Some(@core.now_str()),")
   o.line("    create_user: ctx.user_id,")
-  o.line("    update_time: None,")
+  o.line("    update_time: Some(@core.now_str()),")
   o.line("    update_user: ctx.user_id,")
   o.line("    is_deleted: Some(0),")
   o.line("  }")

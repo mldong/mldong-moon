@@ -15,8 +15,10 @@ pub(all) struct Col {
   is_pk : Bool
   /// varchar 长度（非 varchar 为 None）
   max_len : Int?
-  /// 进 Req/写路（审计列/variable/pids 只进实体读面）
+  /// 进 Req/写路（审计列/pids 只进实体读面；variable 以 ext 名义参与读写）
   business : Bool
+  /// variable 扩展列：JSON 键名用 ext、schema any 占位、出参 parse 回对象
+  is_ext : Bool
 }
 
 ///|
@@ -33,7 +35,7 @@ fn is_audit(name : String) -> Bool {
 /// 实体专用列：boot2 语义下服务层不维护的列（pids 树表留档、variable 扩展 JSON）——
 /// 只进实体读面，不进 Req/写路
 fn is_entity_only(name : String) -> Bool {
-  name == "pids" || name == "variable"
+  name == "pids"
 }
 
 ///|
@@ -118,11 +120,12 @@ pub fn classify(c : @meta.ColumnMeta) -> Col {
   let required = c.is_nullable == "NO" && c.default_value is None && !is_audit(c.name)
   {
     name: c.name,
-    json: to_camel(c.name),
+    json: if c.name == "variable" { "ext" } else { to_camel(c.name) },
     ftype: @meta.column_to_field_type(c),
     option: !required,
     is_pk: c.is_pk,
     max_len: parse_max_len(c.column_type),
     business,
+    is_ext: c.name == "variable",
   }
 }

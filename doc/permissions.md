@@ -20,9 +20,10 @@
 - 端点 `POST /sys/login`、`POST /sys/logout`，走**全局豁免面**（main 里 `.exempt(...)`，guard 不拦）；
 - 密文校验对齐 boot2：**`md5(密码明文 + 盐)` 小写 hex**（注意顺序：密码在前盐在后；
   `core/password.mbt` 用 mooncrypt md5 + UTF-8，单测对标准向量）；校验顺序 = 存在 →
-  锁定（`is_locked=1` 拒绝）→ 密文；用户不存在与密码错**同话术同码**（401 + 99990401
+  锁定（`is_locked=1` 拒绝）→ 密文；用户不存在与密码错**同话术同码**（99990401
   “用户名或密码错误”，防枚举，boot2 两支同抛 USER_NOT_EXIST 同设计；mldong 框架登录失败码各自
-  为政——boot2=10000001、其余各语言实现自定，本栈定案 401+99990401 走鉴权失败语义）；
+  为政——boot2=10000001、其余各语言实现自定，本栈定案 99990401 走登录失败语义）；
+  **鉴权失败 HTTP 恒 200**，业务码进信封（boot2 GlobalExceptionHandler / goframe WriteJson 同约定）；
 - `login_id = sys_user.id 字符串`（对齐 sa-token `StpUtil.login(user.getId())`），
   **纯 id，不含任何后缀**——appCode 等会话属性走 extra（§5），别复合进 login_id
   （会污染按 login_id 的搜索面，owner 定过案）；
@@ -85,8 +86,10 @@ moon-token 判定：**豁免 > 例外清单（显式 rule）> 推导（derive_pe
 ### 4.4 失败响应
 
 `core-web/guard.mbt` 的 `on_error`：HTTP 401/403 + mldong 信封
-`{"code":99990401,"msg":<TokenError 原因>,"data":null}`（99990401 未登录 / 99990403 无权限 /
-400→99990001 / 其余→99990000）。对齐 mldong 接口契约，前端按 code 区分跳登录还是报无权限。
+HTTP 200 + `{"code":99990403,"msg":<TokenError 原因>,"data":null}`（受保护端点 token 校验失败
+一律 99990403——boot2 NotLoginException→TOKEN_NOT_EXIST、goframe middleware 同码；无权限 boot2
+走 99990406 NO_RESOURCE_AUTH，本栈暂同 99990403 记账待对齐；400→99990001 / 其余→99990000。
+99990401 只归登录端点「用户名或密码错误」）。前端按 code 区分跳登录还是报无权限。
 
 ## 5. appCode 多应用机制
 
@@ -145,19 +148,19 @@ sys_user_role ──▶ sys_role (app_code 过滤) ──▶ sys_role_menu ─�
 
 | # | 用例 | 预期 |
 |---|---|---|
-| R1 | 无 sys:user:page 的用户打 page | 403（99990403） |
+| R1 | 无 sys:user:page 的用户打 page | 99990403（boot2=99990406，记账待对齐） |
 | R2 | SQL 授码后重登打 page | 200（码链生效） |
 | R3 | 同会话打未授权端点（sys:role:page） | 403（精确单码，不多授） |
 | R4 | 撤码后重登 | 403（撤销生效） |
 
 **回归（4 例）**：login 200 且字段齐（token/refreshToken/userId）→ save/update/detail/grantRole/remove
-全 0 → 负向（非法 JSON/缺字段）99990001 → 未带 token 打受保护端点 401。
+全 0 → 负向（非法 JSON/缺字段）99990001 → 未带 token 打受保护端点 99990403（HTTP 200）。
 
 **密码（10 例）**：正向 admin/123456 → 错密与不存在同话术同码（防枚举）→ 缺 password 字段 →
 锁定用户拒登（“用户已锁定”）→ save 新用户默认密码可登 → detail 不回显 password/salt → rotate 回归。
 
 **refreshToken（8 例，UC-0113）**：RR0 login 形状恰为 {token,refreshToken,userId} → RR1 rotate 出全新对 →
-RR2 新 access 打受保护端点 200 → RR3 旧 refresh 重放 99990410 → RR4 旧 access 99990401 →
+RR2 新 access 打受保护端点 200 → RR3 旧 refresh 重放 99990410 → RR4 旧 access 99990403 →
 RR5 垃圾串 99990410 → RR6 rotate 延续 extra（platform 滤空仍 403、超管轮转后仍 200）→
 RR7 登出后其 refresh 联动失效 99990410（moon-token logout 单一漏斗内建）。
 

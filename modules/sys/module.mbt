@@ -15,7 +15,7 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] install(
   @mb.Module(ctx => {
     let rbac_dao = @repo.RbacRepository::make(config)
     let rbac_svc = @svc.RbacServiceImpl::{ dao: rbac_dao }
-    @ctrl.register_login(ctx, auth, rbac_svc)
+    @ctrl.register_login(ctx, auth, rbac_svc, fn() { holder.get_bool("MOLE_CAPTCHA_OPEN", false) })
     // 常量 holder（boot2 ConstantContext 同位）：启动灌入，config 写路刷新；
     // 默认密码等系统参数从这读（env 优先），user service 经闭包注入不依赖 holder 类型
     let user_dao = @repo.UserRepository::make(config)

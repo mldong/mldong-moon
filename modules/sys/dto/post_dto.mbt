@@ -10,6 +10,8 @@ pub(all) struct PostSaveReq {
   mut sort : Int64?
   mut enabled : Int?
   mut remark : String?
+  /// ext 扩展对象序列化串（存 variable 列）
+  mut variable : String?
 }
 
 ///|
@@ -33,6 +35,11 @@ fn post_req_of(data : Json) -> PostSaveReq {
     sort: @core.get_i64(data, "sort"),
     enabled: @core.get_int(data, "enabled"),
     remark: @core.get_text(data, "remark"),
+    // boot2 同语义：Param.ext 默认空 Dict，不带 ext = "{}"（非 null）
+    variable: Some(match @core.get_ext_string(data, "ext") {
+      Some(s) => s
+      None => "{}"
+    }),
   }
 }
 
@@ -89,7 +96,7 @@ pub fn post_json(d : @entity.Post) -> Json {
     "sort": jsnow(d.sort),
     "enabled": jint(d.enabled),
     "remark": jstr(d.remark),
-    "variable": jstr(d.variable),
+    "ext": @core.parse_ext(d.variable),
     "createTime": jstr(d.create_time),
     "createUser": jsnow(d.create_user),
     "updateTime": jstr(d.update_time),

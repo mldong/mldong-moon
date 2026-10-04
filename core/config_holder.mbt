@@ -62,3 +62,12 @@ pub fn ConfigHolder::get(self : ConfigHolder, code : String, default_value : Str
   let _ = self.map.set(code, default_value)
   default_value
 }
+
+///|
+/// 布尔读（boot2 getSysConfigWithDefault Boolean.class 同位）：真值集
+/// true/1/y/yes/on（不区分大小写），其余一律 false——空串/未配走默认值
+pub fn ConfigHolder::get_bool(self : ConfigHolder, code : String, default_value : Bool) -> Bool {
+  let raw = self.get(code, if default_value { "true" } else { "false" })
+  let lower = raw.to_lower()
+  lower == "true" || lower == "1" || lower == "y" || lower == "yes" || lower == "on"
+}

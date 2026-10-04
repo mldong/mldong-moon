@@ -73,15 +73,15 @@ check('U18 onlineUserList 有数据', r['code']==0 and len(d)>=1 and len(me)==1,
 if me:
     m=me[0]
     tok=m['tokenList'][0]
-    check('U19 本人 token 明文+ip/ua', tok['tokenValue']==t and tok['isCurrentUser']==True and tok['loginIp']!='' and tok['loginBrowser']!='', 'ip=%s ua=%s'%(tok['loginIp'][:12],tok['loginBrowser'][:16]))
-    check('U20 字段形状', set(tok.keys())=={'tokenValue','device','isCurrentUser','loginTime','loginTimestamp','expireTime','loginIp','loginBrowser','superAdmin'}, str(sorted(tok.keys())))
-    check('U21 timeout>0', m['timeout']>0)
+    check('U19 本人 token 明文+ip/ua（token 级+顶层）', tok['tokenValue']==t and tok['isCurrentUser']==True and tok['loginIp']!='' and m['tokenValue']==t and m['loginIp']!='', 'ip=%s ua=%s'%(tok['loginIp'][:12],tok['loginBrowser'][:16]))
+    check('U20 token 级字段形状（goframe 契约）', set(tok.keys())=={'tokenValue','isCurrentUser','loginTime','expireTime','loginIp','loginBrowser','superAdmin'}, str(sorted(tok.keys())))
+    check('U21 顶层字段形状（goframe 契约）', set(m.keys())=={'id','userName','realName','superAdmin','isCurrentUser','loginTime','expireTime','tokenValue','loginIp','loginBrowser','tokenList'}, str(sorted(m.keys())))
 r=post('/sys/user/onlineUserList',{'keywords':'u0010'},t)
 check('U22 keywords 过滤', r['code']==0 and all(x['userName']=='u0010' for x in r['data']) if r['data'] else True, str(r['data'])[:100])
 r=post('/sys/user/onlineDevice',{},t)
 check('U23 onlineDevice 自身行', r['code']==0 and len(r['data'])>=1 and all(x['isCurrentUser'] for x in r['data'] if x['tokenValue']==t))
 r=post('/sys/user/info',{},'garbage-token')
-check('U24 无效 token 401', r['code']==99990401)
+check('U24 无效 token 99990403', r['code']==99990403)
 
 # 自清理（本套新建用户；不清理会霸占分页首页，殃及别的套件的分页断言）
 post('/sys/user/remove',{'ids':[uid]},t)

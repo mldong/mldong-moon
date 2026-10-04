@@ -44,7 +44,7 @@ check('C10 disabled 不入', r2['data'].get(GC+'_PUBLIC_COPYRIGHT') is None)
 post('/sys/config/update',{'id':cid,'name':'版权改','code':'PUBLIC_'+GC+'_COPYRIGHT','groupCode':GC,'content':'(c) mldong 2026','enabled':1},t)
 # 守卫面：受保护端点无 token 401
 r=post('/sys/config/page',{'pageNum':1,'pageSize':1})
-check('C11 page 无 token 401', r['code']==99990401)
+check('C11 page 无 token 99990403', r['code']==99990403)
 # 清理
 r=post('/sys/config/remove',{'ids':[cid,cid2]},t)
 check('C12 remove 批量', r['code']==0)

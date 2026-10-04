@@ -173,7 +173,6 @@ fn jsnow(v : Int64?) -> Json {
 /// 在线 token 级行（对齐 boot2 OnlineUserVO 的 tokenList 项）
 pub(all) struct OnlineTokenView {
   token_value : String
-  device : String
   is_current : Bool
   /// 登录时刻（epoch ms）
   login_time : Int64
@@ -194,8 +193,10 @@ pub(all) struct OnlineUserView {
   super_admin : Bool
   login_time : Int64
   expire_at : Int64
-  /// 会话剩余秒数
-  timeout : Int64
+  /// 顶层行级字段（对齐 boot4/goframe：取该用户最新 token 的值；超管他人凭证置 "-"）
+  token_value : String
+  login_ip : String
+  login_browser : String
   tokens : Array[OnlineTokenView]
 }
 
@@ -209,10 +210,8 @@ fn jms(ms : Int64) -> Json {
 pub fn online_token_json(v : OnlineTokenView) -> Json {
   {
     "tokenValue": v.token_value,
-    "device": v.device,
     "isCurrentUser": Json::boolean(v.is_current),
     "loginTime": jms(v.login_time),
-    "loginTimestamp": Json::number(v.login_time.to_double()),
     "expireTime": jms(v.expire_at),
     "loginIp": Json::string(v.login_ip),
     "loginBrowser": Json::string(v.login_browser),
@@ -230,12 +229,14 @@ pub fn online_user_json(v : OnlineUserView) -> Json {
     "id": v.id,
     "userName": v.user_name,
     "realName": v.real_name,
-    "isCurrentUser": Json::boolean(v.is_current),
     "superAdmin": Json::boolean(v.super_admin),
+    "isCurrentUser": Json::boolean(v.is_current),
     "loginTime": jms(v.login_time),
-    "loginTimestamp": Json::number(v.login_time.to_double()),
     "expireTime": jms(v.expire_at),
-    "timeout": Json::number(v.timeout.to_double()),
+    // 顶层行级三件（goframe/boot4 契约：超管他人凭证置 "-"）
+    "tokenValue": v.token_value,
+    "loginIp": v.login_ip,
+    "loginBrowser": v.login_browser,
     "tokenList": Json::array(arr),
   }
 }
@@ -252,8 +253,15 @@ pub fn parse_info(body : Json) -> UserSaveReq raise @core.MldongError {
 }
 
 ///|
-/// 个人信息出参（boot2 /sys/user/info → LoginUser 的骨架子集：用户字段 + 角色/超管位）
-pub fn user_info_json(u : @entity.User, roles : Array[String], super_admin : Bool) -> Json {
+/// 个人信息出参（boot2 /sys/user/info → LoginUser 的骨架子集：用户字段 + 角色/超管位；
+/// deptName/lastLoginTime 契约键由控制器实时补——boot2 loginHandler.postLogin 同位）
+pub fn user_info_json(
+  u : @entity.User,
+  roles : Array[String],
+  super_admin : Bool,
+  dept_name : String?,
+  last_login_time : String?,
+) -> Json {
   let base = match user_json(u) {
     Object(map) => map
     _ => abort("user_json 恒为 Object")
@@ -265,5 +273,19 @@ pub fn user_info_json(u : @entity.User, roles : Array[String], super_admin : Boo
   let _ = base.set("roleCodes", Json::array(role_arr))
   let _ = base.set("roleNames", Json::array(role_arr))
   let _ = base.set("superAdmin", Json::boolean(super_admin))
+  let _ = base.set(
+    "deptName",
+    match dept_name {
+      Some(s) => Json::string(s)
+      None => Json::null()
+    },
+  )
+  let _ = base.set(
+    "lastLoginTime",
+    match last_login_time {
+      Some(s) => Json::string(s)
+      None => Json::null()
+    },
+  )
   Json::object(base)
 }
