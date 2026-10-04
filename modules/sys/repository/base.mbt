@@ -185,12 +185,39 @@ async fn[T] BaseDao::count(self : BaseDao[T], w : @core.Wrapper) -> Int raise @c
 }
 
 ///|
-/// 分页：返回 (总数, 当页行)
+/// 条件列表（不分页；排序同 page 约定：orders 非空用调用方，空回落 order_col 倒序）。
+/// 消费方：字典 getByDictType 取启用项等全量读场景
+async fn[T] BaseDao::list(
+  self : BaseDao[T],
+  w : @core.Wrapper,
+  orders? : Array[(String, Bool)] = [],
+) -> Array[T] raise @core.MldongError {
+  let full = self.base_where()
+  for c in w.conds {
+    full.conds.push(c)
+  }
+  let order = if orders.is_empty() {
+    [(self.order_col_of(), true)]
+  } else {
+    orders
+  }
+  let (sql, params) = @core.build_select(self.table.name, self.table.cols, full, orders=order)
+  let rows : Array[T] = []
+  for r in self.query(sql, params) {
+    rows.push((self.table.from_row)(r))
+  }
+  rows
+}
+
+///|
+/// 分页：返回 (总数, 当页行)；orders 非空时用调用方排序（已过 parse_order_by 白名单），
+/// 否则回落表默认 order_col 倒序
 async fn[T] BaseDao::page(
   self : BaseDao[T],
   w : @core.Wrapper,
   page_num : Int,
   page_size : Int,
+  orders? : Array[(String, Bool)] = [],
 ) -> (Int, Array[T]) raise @core.MldongError {
   let total = self.count(w)
   let rows : Array[T] = []
@@ -199,11 +226,16 @@ async fn[T] BaseDao::page(
     for c in w.conds {
       full.conds.push(c)
     }
+    let order = if orders.is_empty() {
+      [(self.order_col_of(), true)]
+    } else {
+      orders
+    }
     let (sql, params) = @core.build_select(
       self.table.name,
       self.table.cols,
       full,
-      orders=[(self.order_col_of(), true)],
+      orders=order,
       limit=page_size,
       offset=(page_num - 1) * page_size,
     )

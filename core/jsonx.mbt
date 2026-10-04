@@ -125,3 +125,28 @@ pub fn parse_ext(variable : String?) -> Json {
     None => Json::null()
   }
 }
+
+///|
+/// 存储串 → ext 出参（boot2 @JsonInclude(NON_EMPTY) / goframe omitempty 同语义）：
+/// 仅当 variable 解析出**非空对象**才 Some——空串/NULL/坏串/非对象/空对象一律 None，
+/// 调用方 None 时**不出 ext 键**（UC-0426 双读侧契约：恒重写 '{}' 与 NULL 两态同判）
+pub fn ext_json_opt(variable : String?) -> Json? {
+  let j = parse_ext(variable)
+  match j {
+    Object(map) => if map.length() > 0 { Some(j) } else { None }
+    _ => None
+  }
+}
+
+///|
+/// 数字串宽松转 Int64（getByDictType dataType=2 值 coerce 用；失败回落字符串语义由调用方定）
+pub fn parse_i64_lenient(s : String) -> Int64? {
+  if s.is_empty() {
+    return None
+  }
+  try {
+    Some(@string.parse_int64(s))
+  } catch {
+    _ => None
+  }
+}

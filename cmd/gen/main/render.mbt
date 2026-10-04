@@ -177,7 +177,11 @@ pub fn render_dto(plan : TablePlan) -> String {
   for c in biz {
     let k = "\"" + c.json + "\""
     if c.ftype == "Int64" {
-      o.line("    " + c.name + ": @core.get_i64(data, " + k + "),")
+      if c.option {
+        o.line("    " + c.name + ": @core.get_i64(data, " + k + "),")
+      } else {
+        o.line("    " + c.name + ": @core.get_i64(data, " + k + ").unwrap_or(0L),")
+      }
     } else if c.ftype == "Int" {
       o.line("    " + c.name + ": @core.get_int(data, " + k + "),")
     } else {
@@ -233,7 +237,7 @@ pub fn render_dto(plan : TablePlan) -> String {
   o.line("  {")
   o.line("    page_num,")
   o.line("    page_size,")
-  o.line("    m: @core.parse_m_params(body, exclude=[\"pageNum\", \"pageSize\", \"keywords\", \"searchKeys\"]),")
+  o.line("    m: @core.parse_m_params(body, exclude=[\"pageNum\", \"pageSize\", \"keywords\", \"searchKeys\", \"orderBy\"]),")
   o.line("    keywords: @core.text_or(body, \"keywords\", \"\"),")
   o.line("    search_keys: @core.text_or(body, \"searchKeys\", \"\"),")
   o.line("  }")
@@ -242,15 +246,55 @@ pub fn render_dto(plan : TablePlan) -> String {
   o.line("///|")
   o.line("/// 出参装配：<Cls> → Json（camelCase；雪花 id 一律字符串化防 JS 精度丢失）")
   o.line("pub fn " + plan.lc + "_json(d : @entity." + plan.class_name + ") -> Json {")
-  o.line("  {")
+  // ext 列（variable）特殊：空不出键（boot2 NON_EMPTY / goframe omitempty 同语义，
+  // UC-0426 双读侧契约——空对象/NULL/坏串一律不出现 ext 键），走条件 set 而非字面量键
+  let ext_col = plan.cols.filter(fn(c) { c.is_ext })
+  if ext_col.is_empty() {
+    o.line("  {")
+    o.line("    \"id\": d.id.to_string(),")
+    for c in plan.cols {
+      if c.is_pk {
+        continue
+      }
+      let k = "\"" + c.json + "\""
+      if c.ftype == "Int64" {
+        if c.option {
+          o.line("    " + k + ": jsnow(d." + c.name + "),")
+        } else {
+          o.line("    " + k + ": d." + c.name + ".to_string(),")
+        }
+      } else if c.ftype == "Int" {
+        if c.option {
+          o.line("    " + k + ": jint(d." + c.name + "),")
+        } else {
+          o.line("    " + k + ": Json::number(d." + c.name + ".to_double()),")
+        }
+      } else {
+        if c.option {
+          o.line("    " + k + ": jstr(d." + c.name + "),")
+        } else {
+          o.line("    " + k + ": Json::string(d." + c.name + "),")
+        }
+      }
+    }
+    o.line("  }")
+    o.line("}")
+    return o.text()
+  }
+  let ext_name = ext_col[0].name
+  o.line("  let obj : Json = {")
   o.line("    \"id\": d.id.to_string(),")
   for c in plan.cols {
-    if c.is_pk {
+    if c.is_pk || c.is_ext {
       continue
     }
     let k = "\"" + c.json + "\""
     if c.ftype == "Int64" {
-      o.line("    " + k + ": jsnow(d." + c.name + "),")
+      if c.option {
+        o.line("    " + k + ": jsnow(d." + c.name + "),")
+      } else {
+        o.line("    " + k + ": d." + c.name + ".to_string(),")
+      }
     } else if c.ftype == "Int" {
       if c.option {
         o.line("    " + k + ": jint(d." + c.name + "),")
@@ -258,9 +302,7 @@ pub fn render_dto(plan : TablePlan) -> String {
         o.line("    " + k + ": Json::number(d." + c.name + ".to_double()),")
       }
     } else {
-      if c.is_ext {
-        o.line("    " + k + ": @core.parse_ext(d." + c.name + "),")
-      } else if c.option {
+      if c.option {
         o.line("    " + k + ": jstr(d." + c.name + "),")
       } else {
         o.line("    " + k + ": Json::string(d." + c.name + "),")
@@ -268,6 +310,16 @@ pub fn render_dto(plan : TablePlan) -> String {
     }
   }
   o.line("  }")
+  o.line("  let base = match obj {")
+  o.line("    Object(map) => map")
+  o.line("    _ => abort(\"" + plan.lc + "_json 恒为 Object\")")
+  o.line("  }")
+  o.line("  // ext 空不出键（UC-0426：'{}' 恒重写与 NULL 两态同判）")
+  o.line("  match @core.ext_json_opt(d." + ext_name + ") {")
+  o.line("    Some(e) => { let _ = base.set(\"ext\", e) }")
+  o.line("    None => ()")
+  o.line("  }")
+  o.line("  Json::object(base)")
   o.line("}")
   o.text()
 }
@@ -432,6 +484,10 @@ pub fn render_mysql(plan : TablePlan) -> String {
   o.line("}")
   o.line("")
   let exports : Array[String] = ["remove_by_ids", "find_by_id", "insert", "update", "page", "find_by_ids"]
+  // has_code 时端口带 check_unique（extend 必须全量列方法，漏一个即 implicit 告警）
+  if plan.has_code {
+    exports.push("check_unique")
+  }
   o.line("pub extend " + plan.class_name + "Repository with @dao." + plan.class_name + "Dao::{")
   for e in exports {
     o.line("  " + e + ",")
@@ -449,11 +505,11 @@ pub fn render_service(plan : TablePlan) -> String {
   o.line("///|")
   o.line("pub(open) trait " + plan.class_name + "Service {")
   o.line("  /// ctx = 请求上下文（审计操作人/后续业务身份传播；controller @web.ctx_of 装配）")
-  o.line("  async fn save(Self, @dto." + plan.class_name + "SaveReq, Int64?) -> Int64 raise @core.MldongError")
-  o.line("  async fn update(Self, @dto." + plan.class_name + "SaveReq, Int64?) -> Unit raise @core.MldongError")
-  o.line("  async fn remove_by_ids(Self, Array[Int64]) -> Unit raise @core.MldongError")
-  o.line("  async fn find_by_id(Self, Int64) -> @entity." + plan.class_name + " raise @core.MldongError")
-  o.line("  async fn page(Self, @dto." + plan.class_name + "PageReq) -> (Int, Array[@entity." + plan.class_name + "]) raise @core.MldongError")
+  o.line("  async fn save(Self, @core.Ctx, @dto." + plan.class_name + "SaveReq) -> Int64 raise @core.MldongError")
+  o.line("  async fn update(Self, @core.Ctx, @dto." + plan.class_name + "SaveReq) -> Unit raise @core.MldongError")
+  o.line("  async fn remove_by_ids(Self, @core.Ctx, Array[Int64]) -> Unit raise @core.MldongError")
+  o.line("  async fn find_by_id(Self, @core.Ctx, Int64) -> @entity." + plan.class_name + " raise @core.MldongError")
+  o.line("  async fn page(Self, @core.Ctx, @dto." + plan.class_name + "PageReq) -> (Int, Array[@entity." + plan.class_name + "]) raise @core.MldongError")
   o.line("}")
   o.line("")
   o.line("///|")
@@ -517,7 +573,7 @@ pub fn render_service(plan : TablePlan) -> String {
   o.line("}")
   o.line("")
   o.line("///|")
-  o.line("pub impl[R : @dao." + plan.class_name + "Dao] " + plan.class_name + "Service for " + plan.class_name + "ServiceImpl[R] with fn remove_by_ids(self, ids) {")
+  o.line("pub impl[R : @dao." + plan.class_name + "Dao] " + plan.class_name + "Service for " + plan.class_name + "ServiceImpl[R] with fn remove_by_ids(self, _ctx, ids) {")
   o.line("  if ids.is_empty() {")
   o.line("    raise @core.MldongError::InvalidInput(\"ids 不能为空\")")
   o.line("  }")
@@ -527,6 +583,7 @@ pub fn render_service(plan : TablePlan) -> String {
   o.line("///|")
   o.line("pub impl[R : @dao." + plan.class_name + "Dao] " + plan.class_name + "Service for " + plan.class_name + "ServiceImpl[R] with fn find_by_id(")
   o.line("  self,")
+  o.line("  _ctx,")
   o.line("  id,")
   o.line(") {")
   o.line("  match self.dao.find_by_id(id) {")
@@ -536,7 +593,7 @@ pub fn render_service(plan : TablePlan) -> String {
   o.line("}")
   o.line("")
   o.line("///|")
-  o.line("pub impl[R : @dao." + plan.class_name + "Dao] " + plan.class_name + "Service for " + plan.class_name + "ServiceImpl[R] with fn page(self, req) {")
+  o.line("pub impl[R : @dao." + plan.class_name + "Dao] " + plan.class_name + "Service for " + plan.class_name + "ServiceImpl[R] with fn page(self, _ctx, req) {")
   o.line("  let w = @core.where_()")
   o.line("  let _ = w.append(req.m)")
   o.line("  self.dao.page(w, req.page_num, req.page_size)")
@@ -555,13 +612,42 @@ pub fn render_service(plan : TablePlan) -> String {
 
 ///|
 /// controller/<lc>_controller.mbt
+///|
+/// 表名后段 camel 拼接（sys_dict_item → dictItem；首段小写、后续段首字母大写）——
+/// 路由/权限码同用：/sys/dictItem、sys:dictItem（boot2 同形；直接下划线透传是错的，已踩）
+fn camel_join(parts : Array[String]) -> String {
+  let b = StringBuilder()
+  for i, p in parts {
+    if i == 0 {
+      b.write_string(p)
+    } else if !p.is_empty() {
+      // 首字母大写（char 算术：小写 -32；非小写原样——表名段全小写是常态）
+      let head = p[0].to_int()
+      b.write_char((if head >= 97 && head <= 122 { (head - 32).unsafe_to_char() } else { head.unsafe_to_char() }))
+      b.write_string(p[1:].to_owned())
+    }
+  }
+  b.to_string()
+}
+
+///|
 pub fn render_controller(plan : TablePlan) -> String {
   let o = Out::new()
-  // 路由前缀 = 表名首下划线换 /（sys_dept → /sys/dept）；权限码前缀另算（sys:dept）
-  let route_base = match plan.table.find("_") {
-    Some(i) =>
-      "/" + plan.table[:i].to_owned() + "/" + plan.table[i + 1:].to_owned()
-    None => "/" + plan.table
+  // 路由前缀 = 表名首下划线换 /，其余段 camel 拼接（sys_dept → /sys/dept、sys_dict_item → /sys/dictItem）；
+  // 权限码前缀另算（sys:dictItem），与路由分家但同一 camel 规则
+  let raw_segs = plan.table.split("_")
+  let segs : Array[String] = []
+  for sv in raw_segs {
+    segs.push(sv.to_owned())
+  }
+  let rest_segs : Array[String] = []
+  for i in 1..<segs.length() {
+    rest_segs.push(segs[i])
+  }
+  let route_base = if segs.length() == 1 {
+    "/" + plan.table
+  } else {
+    "/" + segs[0] + "/" + camel_join(rest_segs)
   }
   o.line("// " + plan.table + " 控制器 —— 手写薄端点（校验在 dto、业务在 service、响应工具在 core）")
   o.line("// 〔cmd/gen 生成，可手改；重生成会覆盖本文件〕")
@@ -587,7 +673,8 @@ pub fn render_controller(plan : TablePlan) -> String {
   o.line("    @core.ok_data(Json::string(id.to_string()))")
   o.line("  })")
   o.line("  let remove_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {")
-  o.line("    svc.remove_by_ids(@core.get_ids(@web.json_body(request)))")
+  o.line("    let ctx = @web.ctx_of(request)")
+  o.line("    svc.remove_by_ids(ctx, @core.get_ids(@web.json_body(request)))")
   o.line("    @core.ok_empty()")
   o.line("  })")
   o.line("  let update_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {")
@@ -600,11 +687,13 @@ pub fn render_controller(plan : TablePlan) -> String {
   o.line("      Some(n) => n")
   o.line("      None => 0L")
   o.line("    }")
-  o.line("    @core.ok_data(@dto." + plan.lc + "_json(svc.find_by_id(id)))")
+  o.line("    let ctx = @web.ctx_of(request)")
+  o.line("    @core.ok_data(@dto." + plan.lc + "_json(svc.find_by_id(ctx, id)))")
   o.line("  })")
   o.line("  let page_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {")
+  o.line("    let ctx = @web.ctx_of(request)")
   o.line("    let req = @dto." + plan.lc + "_parse_page(@web.json_body(request))")
-  o.line("    let (total, rows) = svc.page(req)")
+  o.line("    let (total, rows) = svc.page(ctx, req)")
   o.line("    let arr : Array[Json] = []")
   o.line("    for row in rows {")
   o.line("      arr.push(@dto." + plan.lc + "_json(row))")
@@ -612,9 +701,7 @@ pub fn render_controller(plan : TablePlan) -> String {
   o.line("    @core.ok_page(req.page_num, req.page_size, total, arr)")
   o.line("  })")
   for act in ["save", "remove", "update", "detail", "page"] {
-    o.line("  g.post(ctx, \"" + route_base + "/" + act + "\", " + snake_act(act) + "_handler) catch {")
-    o.line("    e => raise e")
-    o.line("  }")
+    o.line("  g.post(ctx, \"" + route_base + "/" + act + "\", " + snake_act(act) + "_handler)")
   }
   o.line("}")
   o.text()
@@ -634,7 +721,7 @@ pub fn render_all(plan : TablePlan) -> Array[(String, String)] {
     ("dto/" + plan.lc + "_dto.mbt", render_dto(plan)),
     ("dao/" + plan.lc + "_dao.mbt", render_dao(plan)),
     ("repository/" + plan.lc + "_table.mbt", render_table(plan)),
-    ("repository/" + plan.lc + "_mysql.mbt", render_mysql(plan)),
+    ("repository/" + plan.lc + "_repository.mbt", render_mysql(plan)),
     ("service/" + plan.lc + "_service.mbt", render_service(plan)),
     ("controller/" + plan.lc + "_controller.mbt", render_controller(plan)),
   ]

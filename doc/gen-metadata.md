@@ -72,7 +72,10 @@ pub(all) struct ColumnMeta {
    - 生成面 = 标准 CRUD 五端点 + 权限码片段 + 唯一编码校验一行调（`check_unique`，BaseDao
      通用件，boot2 checkUnique 同位）/ 批量查 `find_by_ids`；**权限码前缀取表名首段
      （sys_dept → sys:dept），路由前缀 = 表名首下划线换 /（/sys/dept）**——两者形状相近
-     别混用（已踩）；
+     别混用（已踩）；**三段表名其余段 camel 拼接**（sys_dict_item → /sys/dictItem +
+     sys:dictItem，直接下划线透传是错的，已踩）；**非可选列 json/req 装配分家**
+     （String 非可选用 Json::string、Int64 非可选用 to_string/unwrap_or(0L)——
+     jstr/jsnow 只吃可选，首遇 NOT NULL 业务列即撞，已踩）；
    - **同包多实体防撞名**：生成物 dto 顶层标识符带表内小写前缀（post_parse_save 等）——
      不加前缀会静默命中同包其它实体的同名符号（编译不报错、运行时校验面张冠李戴，已踩）；
    - **二次开发 = 直接改生成物**（boot2/各栈同做法，一处一文件不另立）：生成器**默认跳过

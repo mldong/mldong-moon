@@ -34,7 +34,7 @@ async fn main raise {
   }
   let config = @core.MysqlConfig::from_env()
   gen_all(@metamysql.MetadataMysqlDao::make(config), tables, out_root, force)
-  println("完成。")
+  println("完成。v2")
 }
 
 ///|
@@ -53,11 +53,19 @@ async fn[M : @meta.MetadataDao] gen_all(
     }
     let class_name = table_to_class(table)
     let lc = class_name.to_lower()
-    // 权限码前缀：sys_dept → sys:dept
-    let perm = match table.find("_") {
-      Some(i) =>
-        table[:i].to_owned() + ":" + table[i + 1:].to_owned()
-      None => table
+    // 权限码前缀：sys_dept → sys:dept、sys_dict_item → sys:dictItem（camel 拼接，与路由同规则）
+    let segs : Array[String] = []
+    for sv in table.split("_") {
+      segs.push(sv.to_owned())
+    }
+    let perm = if segs.length() == 1 {
+      table
+    } else {
+      let rest : Array[String] = []
+      for i in 1..<segs.length() {
+        rest.push(segs[i])
+      }
+      segs[0] + ":" + camel_join(rest)
     }
     let has_code = cols_meta.filter(fn(c) { c.name == "code" }).length() > 0
     let plan : TablePlan = {

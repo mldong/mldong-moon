@@ -68,7 +68,7 @@ check('D8c detail 回 ext 对象', isinstance(ext,dict) and ext.get('i18nKey')==
 # 清空 ext → null
 r=post('/sys/dept/update',{'id':root,'name':UN+'总部','code':UN+'hq','parentId':'0'},t)
 r=post('/sys/dept/detail',{'id':root},t)
-check('D8d 不带 ext 回空对象（boot2 空 Dict 语义）', r['data'].get('ext')=={}, str(r['data'].get('ext')))
+check('D8d 不带 ext 不出键（boot2 NON_EMPTY 空不出键，UC-0426 双读侧）', r['data'].get('ext') is None, str(r['data'].get('ext')))
 # 部门用户树：把 u0011 挂到 child 部门下
 import urllib.request as _u
 # 建自有用户挂子部门（不碰种子数据；跨套件残留依赖已两次假红，教训入册）

@@ -53,13 +53,14 @@ pub fn is_field_safe(col : String) -> Bool {
 }
 
 ///|
-/// Json 值 → 绑定值（Number 整数走 I、带小数走 D；String→S；Bool→B；其余 None）
+/// Json 值 → 绑定值（Number 整数走 L——m_EQ_dictId 这类雪花 id 超 32 位，
+/// I 会静默截断；带小数走 D；String→S；Bool→B；其余 None）
 fn json_scalar(v : Json) -> SqlValue? {
   match v {
     Number(n, ..) => {
       let d = n
-      if d == d.to_int().to_double() {
-        Some(I(d.to_int()))
+      if d == d.to_int64().to_double() {
+        Some(L(d.to_int64()))
       } else {
         Some(D(d))
       }
@@ -323,4 +324,49 @@ pub fn parse_keywords_with_raw(
     }
   }
   (keywords, keys)
+}
+
+///|
+/// 解析 orderBy（goframe low_code 同约定）：逗号拆分，每段 `col [dir]`，
+/// dir 含 desc/descend → 倒序，其余（含缺省）正序；列名 camel→snake（goframe CaseSnake 同款）
+/// 后过 is_field_safe 白名单，不安全段（如 `sort;drop table t`）整段静默丢弃 → 回落表默认排序。
+pub fn parse_order_by(body : Json) -> Array[(String, Bool)] {
+  let raw = match body {
+    Object(map) =>
+      match map.get("orderBy") {
+        Some(String(s)) => s
+        _ => ""
+      }
+    _ => ""
+  }
+  let out : Array[(String, Bool)] = []
+  if raw.is_empty() {
+    return out
+  }
+  for seg in raw.split(",") {
+    let seg = seg.trim(chars=" \t").to_owned()
+    if seg.is_empty() {
+      continue
+    }
+    let parts : Array[String] = []
+    for p in seg.split(" ") {
+      let p = p.trim(chars=" \t").to_owned()
+      if !p.is_empty() {
+        parts.push(p)
+      }
+    }
+    if parts.is_empty() {
+      continue
+    }
+    let col = to_underscore(parts[0])
+    let mut desc = false
+    if parts.length() > 1 {
+      let dir = parts[1].to_lower()
+      desc = dir == "desc" || dir == "descend"
+    }
+    if !col.is_empty() && is_field_safe(col) {
+      out.push((col, desc))
+    }
+  }
+  out
 }

@@ -98,9 +98,10 @@ pub fn dept_parse_page(body : Json) -> DeptPageReq raise @core.MldongError {
 }
 
 ///|
-/// 出参装配：<Cls> → Json（camelCase；雪花 id 一律字符串化防 JS 精度丢失）
+/// 出参装配：<Cls> → Json（camelCase；雪花 id 一律字符串化防 JS 精度丢失）；
+/// ext 空不出键（boot2 NON_EMPTY / goframe omitempty 同语义，UC-0426 双读侧）
 pub fn dept_json(d : @entity.Dept) -> Json {
-  {
+  let obj : Json = {
     "id": d.id.to_string(),
     "parentId": jsnow(d.parent_id),
     "pids": jstr(d.pids),
@@ -111,11 +112,21 @@ pub fn dept_json(d : @entity.Dept) -> Json {
     "leaderIds": jstr(d.leader_ids),
     "mainLeaderId": jsnow(d.main_leader_id),
     "remark": jstr(d.remark),
-    "ext": @core.parse_ext(d.variable),
     "createTime": jstr(d.create_time),
     "createUser": jsnow(d.create_user),
     "updateTime": jstr(d.update_time),
     "updateUser": jsnow(d.update_user),
     "isDeleted": jint(d.is_deleted),
   }
+  let base = match obj {
+    Object(map) => map
+    _ => abort("dept_json 恒为 Object")
+  }
+  match @core.ext_json_opt(d.variable) {
+    Some(e) => {
+      let _ = base.set("ext", e)
+    }
+    None => ()
+  }
+  Json::object(base)
 }

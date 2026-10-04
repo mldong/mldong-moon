@@ -1,5 +1,7 @@
 # base-verify 契约跑测 · 差异清单（2026-10-03 首轮）
 
+> 跑批报告：协调仓 `base-verify/reports/2026-10-04-moon-dict-l2.{json,txt}`（字典轮 10/16）。
+>
 > 用途：对照家族 base 契约 runner（协调仓 `scripts/contract-tests/contract_runner.py`，语言无关纯 HTTP）
 > 逐组给出 mldong-moon 的现状——**已存在端点的契约比对结论 + 未存在端点的按模块清单**。
 > 未存在的接口按此清单逐模块补齐（等下一步慢慢完善，每补一个模块回来复跑一轮）。
@@ -18,7 +20,7 @@ python scripts/contract-tests/contract_runner.py \
   --report base-verify/reports/2026-10-03-moon-l2.json
 ```
 
-## 2. 首轮结果（5 pass / 11 fail，fail 全部是 404 缺模块）
+## 2. 最新结果（2026-10-04 字典轮：**10 pass / 6 fail**，fail 全部是 404 缺模块）
 
 | 用例组 | 端点 | 结果 | 说明 |
 |---|---|---|---|
@@ -30,11 +32,11 @@ python scripts/contract-tests/contract_runner.py \
 | UC-0610 | /app/appVersion/check | ❌ 404 | app 模块整缺 |
 | UC-0303/0306/0310 | /dev/schema/page, /dev/schema/getByTableName | ❌ 404 | dev_schema 前端生成元数据模型整缺（见 §4 说明） |
 | UC-0409 | /sys/menu/tree | ❌ 404 | menu 模块整缺 |
-| UC-0411/0413 | /sys/dict/page, /sys/dict/getByDictType | ❌ 404 | dict 模块整缺 |
-| UC-0431 | /sys/dict/enumDictList | ❌ 404 | 同上 |
-| UC-0432 | /sys/dict/customDictList | ❌ 404 | 同上 |
-| UC-0430 | /sys/dictItem/page（m_ 通用查询 13 操作符） | ❌ 404 | dictItem 模块整缺 |
-| UC-0426 | /sys/dict/save|update + ext↔variable i18n 链 | ❌ 404 | 同上 |
+| UC-0411/0413 | /sys/dict/page, /sys/dict/getByDictType | ✅ pass（10-04） | getByDictType 直返 `[{label,value}]`、dataType coerce、未知类型空数组 |
+| UC-0431 | /sys/dict/enumDictList | ✅ pass（10-04） | 枚举注册表 yes_no，dataType 整型码表；getByDictType 出口无 dataType 键 |
+| UC-0432 | /sys/dict/customDictList | ✅ pass（10-04） | 基础仓零实现空清单，两域分离 ∩ = ∅ |
+| UC-0430 | /sys/dictItem/page（m_ 通用查询 13 操作符） | ✅ pass（10-04） | 全 13 操作符 + keywords/orderBy 白名单 + 漏传全量 |
+| UC-0426 | /sys/dict/save|update + ext↔variable i18n 链 | ✅ pass（10-04） | 双读侧逐键往返；不带 ext / ext={} / NULL 存量三态均不出键（dept/post 同步统一） |
 | UC-0501 | /sys/message/page | ❌ 404 | message 模块整缺 |
 | UC-0601/0602/0606 | /sys/fileInfo/upload, getFileInfoByIds, remove | ❌ 404 | file 模块整缺 |
 | UC-0608 | /sse/events | ❌ 404 | SSE 整缺（首帧 `{userId,type:"init",msg}`） |
@@ -58,7 +60,6 @@ python scripts/contract-tests/contract_runner.py \
 
 | 模块（表） | runner 消费的端点 | 备注 |
 |---|---|---|
-| **sys_dict + sys_dict_item**（字典） | `/sys/dict/{page,save,update,remove,detail,getByDictType,enumDictList,customDictList}`、`/sys/dictItem/{page,save,remove}` | 用例组最多（5 组）：UC-0411/0413 getByDictType 直返 `[{label,value}]`、UC-0430 m_ 通用查询 13 操作符 + keywords/orderBy 白名单、UC-0426 ext↔variable i18n（variable JSON 串，空/非对象不出 ext 键）、UC-0431/0432 字典清单两域分离。**建议第一个补**（本仓 dept/post 已趟平 ext↔variable 同款语义） |
 | **sys_menu**（菜单） | `/sys/menu/tree` | UC-0409；menu 同时是权限码链数据源（rbac provider 已消费 sys_menu.code，表已在 schema，缺 CRUD/tree 端点） |
 | **sys_message**（站内信） | `/sys/message/page` | UC-0501；分页五字段 + 行按前端消费口径 |
 | **sys_file_info**（文件） | `/sys/fileInfo/{upload,getFileInfoByIds,remove}` | UC-0601/0602/0606：upload 返 `{url,fileInfoId}`（id 字符串）、回查 `{id,uid,name,url,status}` |

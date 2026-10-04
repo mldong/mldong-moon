@@ -50,6 +50,31 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] install(
     @ctrl.register_config(ctx, config_svc, g, async fn() raise @core.MldongError { config_dao.list_public() }) catch {
       e => abort("sys 模块 config 路由注册失败: \{e}")
     }
+    // dict/dictItem —— cmd/gen 生成 + getByDictType/enumDictList/customDictList 二次开发
+    // （枚举注册表静态声明、自定义注册中心存服务不存模型、请求时派生，UC-0431/0432）
+    let dict_dao = @repo.DictRepository::make(config)
+    let dict_item_dao = @repo.DictItemRepository::make(config)
+    let dict_svc = @svc.DictServiceImpl::{
+      dao: dict_dao,
+      items_of: async fn(dict_id) raise @core.MldongError { dict_item_dao.list_enabled_by_dict(dict_id) },
+      enum_models: @svc.enum_registry(),
+      custom_providers: [],
+    }
+    @ctrl.register_dict(ctx, dict_svc, g) catch {
+      e => abort("sys 模块 dict 路由注册失败: \{e}")
+    }
+    let dict_item_svc = @svc.DictItemServiceImpl::{
+      dao: dict_item_dao,
+      dict_exists: async fn(dict_id) raise @core.MldongError {
+        match dict_dao.find_by_id(dict_id) {
+          Some(_) => true
+          None => false
+        }
+      },
+    }
+    @ctrl.register_dictitem(ctx, dict_item_svc, g) catch {
+      e => abort("sys 模块 dictItem 路由注册失败: \{e}")
+    }
   })
 }
 
@@ -68,6 +93,8 @@ pub fn policy() -> @guard.RoutePolicy {
     @ctrl.dept_policy(),
     @ctrl.post_policy(),
     @ctrl.config_policy(),
+    @ctrl.dict_policy(),
+    @ctrl.dictitem_policy(),
   ]
   let mut p = @guard.RoutePolicy::new()
   for f in fragments {

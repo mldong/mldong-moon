@@ -14,7 +14,7 @@ set -u
 cd "$(dirname "$0")"
 export PYTHONIOENCODING=utf-8
 TOTAL_OK=0; TOTAL_FAIL=0
-for t in matrix_user.py pwdmatrix.py rotmatrix.py crud_smoke.py matrix_dept.py matrix_config.py matrix_holder.py matrix_dev.py; do
+for t in matrix_user.py pwdmatrix.py rotmatrix.py crud_smoke.py matrix_dept.py matrix_config.py matrix_holder.py matrix_dev.py matrix_dict.py; do
   out=$(python "$t" 2>&1 | tail -1)
   echo "[$t] $out"
   ok=$(echo "$out" | grep -oE "OK [0-9]+" | grep -oE "[0-9]+" || echo 0)
