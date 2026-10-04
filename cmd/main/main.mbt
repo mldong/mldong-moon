@@ -35,8 +35,10 @@ async fn main raise {
   policy.by_convention = false
   let g = @mbguard.Guard::new(auth, policy).with_on_error(@web.on_error)
 
+  // 框架级常量 holder：全进程一个实例，sys 灌入 sys_config 并在写路刷新，dev/biz 只读注入
+  let holder = @core.ConfigHolder::new()
   let root = @mb.Module(ctx => {
-    ctx.use_(@sys.module(config, g, auth)) catch {
+    ctx.use_(@sys.module(config, g, auth, holder)) catch {
       _ => abort("sys 模块挂载失败")
     }
     // dev 模块（元数据只读面）

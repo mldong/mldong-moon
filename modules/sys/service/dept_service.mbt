@@ -7,6 +7,8 @@ pub(open) trait DeptService {
   async fn remove_by_ids(Self, Array[Int64]) -> Unit raise @core.MldongError
   async fn find_by_id(Self, Int64) -> @entity.Dept raise @core.MldongError
   async fn page(Self, @dto.DeptPageReq) -> (Int, Array[@entity.Dept]) raise @core.MldongError
+  /// 全量部门（树端点取数；sort 升序）——二次开发（树表）
+  async fn list_all(Self) -> Array[@entity.Dept] raise @core.MldongError
 }
 
 ///|
@@ -96,6 +98,58 @@ pub impl[R : @dao.DeptDao] DeptService for DeptServiceImpl[R] with fn page(self,
 }
 
 ///|
+///|
+pub impl[R : @dao.DeptDao] DeptService for DeptServiceImpl[R] with fn list_all(self) {
+  self.dao.list_all()
+}
+
+///|
+/// 部门树节点（dept 全字段 + children）——二次开发（树表）
+pub(all) struct DeptNode {
+  dept : @entity.Dept
+  children : Array[DeptNode]
+}
+
+///|
+/// 平表 → 树（parent_id 内存建树，root=0，boot2 TreeTool 同语义；sort 已由取数层排好）。
+/// 孤儿节点（父缺失/删除）挂回根，不丢数据。
+pub fn build_dept_tree(items : Array[@entity.Dept]) -> Array[DeptNode] {
+  let by_parent : Map[String, Array[@entity.Dept]] = Map([], capacity=0)
+  let ids : Map[String, Bool] = Map([], capacity=0)
+  for d in items {
+    let _ = ids.set(d.id.to_string(), true)
+  }
+  for d in items {
+    let key = match d.parent_id {
+      Some(p) =>
+        if p == 0L || ids.get(p.to_string()) is None {
+          "0"
+        } else {
+          p.to_string()
+        }
+      None => "0"
+    }
+    match by_parent.get(key) {
+      Some(arr) => arr.push(d)
+      None => {
+        let _ = by_parent.set(key, [d])
+      }
+    }
+  }
+  fn attach(d : @entity.Dept) -> DeptNode {
+    let children = match by_parent.get(d.id.to_string()) {
+      Some(arr) => arr.map(attach)
+      None => []
+    }
+    { dept: d, children }
+  }
+
+  match by_parent.get("0") {
+    Some(roots) => roots.map(attach)
+    None => []
+  }
+}
+
 pub extend DeptServiceImpl with DeptService::{
   page,
   remove_by_ids,

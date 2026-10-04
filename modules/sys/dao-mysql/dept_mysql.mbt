@@ -68,3 +68,19 @@ pub extend DeptMysqlDao with @dao.DeptDao::{
   page,
   find_by_ids,
 }
+
+///|
+/// 全量部门（树装配取数；sort 升序、同序按 id）——二次开发（树表），重生成 --force 时需并回
+pub impl @dao.DeptDao for DeptMysqlDao with fn list_all(self) {
+  let (sql, params) = @core.build_select(
+    "sys_dept",
+    self.base.table.cols,
+    self.base.base_where(),
+    orders=[("sort", false), ("id", false)],
+  )
+  let out : Array[@entity.Dept] = []
+  for r in self.base.query(sql, params) {
+    out.push((self.base.table.from_row)(r))
+  }
+  out
+}

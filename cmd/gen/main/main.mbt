@@ -12,12 +12,16 @@ async fn main raise {
   let args = @env.args()
   let mut out_root = "gen-out"
   let tables : Array[String] = []
+  // 二次开发直接改生成物：默认跳过已存在文件（防覆盖手改），--force 才整体重生成
+  let mut force = false
   for a in args {
     // moonrun 会把 wasm 自身路径塞进 argv，滤掉
     if a.has_suffix(".wasm") || a.contains("_build") {
       continue
     }
-    if a.has_prefix("--out=") {
+    if a == "--force" {
+      force = true
+    } else if a.has_prefix("--out=") {
       out_root = a.substring(start=6).to_string()
     } else if a != "--" {
       tables.push(a)
@@ -29,12 +33,17 @@ async fn main raise {
     return
   }
   let config = @core.MysqlConfig::from_env()
-  gen_all(@metamysql.MetadataMysqlDao::make(config), tables, out_root)
+  gen_all(@metamysql.MetadataMysqlDao::make(config), tables, out_root, force)
   println("完成。")
 }
 
 ///|
-async fn[M : @meta.MetadataDao] gen_all(dao : M, tables : Array[String], out_root : String) -> Unit raise {
+async fn[M : @meta.MetadataDao] gen_all(
+  dao : M,
+  tables : Array[String],
+  out_root : String,
+  force : Bool,
+) -> Unit raise {
   for table in tables {
     println("== 生成 " + table)
     let cols_meta = dao.list_columns(table)
@@ -67,6 +76,10 @@ async fn[M : @meta.MetadataDao] gen_all(dao : M, tables : Array[String], out_roo
         None => out_root
       }
       @fs.mkdir(dir, recursive=true, allow_exist=true)
+      if !force && @fs.exists(path) {
+        println("   = " + path + " 已存在，跳过（二次开发请直接改文件；重生成加 --force）")
+        continue
+      }
       @fs.write_file(path, files.1, create_mode=@fs.CreateOrTruncate)
       println("   + " + path)
     }

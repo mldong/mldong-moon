@@ -14,7 +14,7 @@ pub(all) struct ConfigServiceImpl[R] {
   dao : R
   /// 常量刷新钩子（boot2 ConstantContext.putConstant 同位；None = 无 holder 直查库）。
   /// remove 先收 code 后逐个摘——boot2 靠定时任务自愈，骨架即时刷新
-  mut holder : ConfigHolder?
+  mut holder : @core.ConfigHolder?
 }
 
 ///|

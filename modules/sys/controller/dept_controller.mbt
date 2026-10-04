@@ -10,6 +10,8 @@ pub fn dept_policy() -> @guard.RoutePolicy {
     .rule(@guard.RouteRule::make("/sys/dept/update", ["sys:dept:update"]))
     .rule(@guard.RouteRule::make("/sys/dept/detail", ["sys:dept:detail"]))
     .rule(@guard.RouteRule::make("/sys/dept/page", ["sys:dept:page"]))
+    // 二次开发（树表）：部门树端点
+    .rule(@guard.RouteRule::make("/sys/dept/list", ["sys:dept:list"]))
 }
 
 ///|
@@ -61,4 +63,31 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.DeptService]
   g.post(ctx, "/sys/dept/page", page_handler) catch {
     e => raise e
   }
+  // 部门树（boot2 /sys/dept/list：全量平表 → parent_id 建树）——二次开发（树表）
+  let list_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let tree = @svc.build_dept_tree(svc.list_all())
+    let arr : Array[Json] = []
+    for n in tree {
+      arr.push(dept_node_json(n))
+    }
+    @core.ok_data(Json::array(arr))
+  })
+  g.post(ctx, "/sys/dept/list", list_handler) catch {
+    e => raise e
+  }
+}
+
+///|
+/// dept_json 套 children（动态键并回 Object——boot2 DeptVO + children 形状）
+fn dept_node_json(n : @svc.DeptNode) -> Json {
+  let base = match @dto.dept_json(n.dept) {
+    Object(m) => m
+    _ => Map([], capacity=0)
+  }
+  let arr : Array[Json] = []
+  for c in n.children {
+    arr.push(dept_node_json(c))
+  }
+  let _ = base.set("children", Json::array(arr))
+  Json::object(base)
 }

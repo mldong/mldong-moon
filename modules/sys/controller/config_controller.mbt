@@ -4,7 +4,9 @@
 ///|
 /// 权限码片段——与端点同文件声明；全部显式 rule（推导兜底已被 main 关闭）
 pub fn config_policy() -> @guard.RoutePolicy {
+  // 二次开发：public 端点走豁免面（片段自带 exempt，module 聚合时 merge_policy 搬运）
   @guard.RoutePolicy::new()
+    .exempt("/sys/config/public")
     .rule(@guard.RouteRule::make("/sys/config/save", ["sys:config:save"]))
     .rule(@guard.RouteRule::make("/sys/config/remove", ["sys:config:remove"]))
     .rule(@guard.RouteRule::make("/sys/config/update", ["sys:config:update"]))
@@ -17,6 +19,8 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.ConfigServic
   ctx : @mb.ModuleContext,
   svc : T,
   g : @mbguard.Guard[S, P],
+  /// 公开配置取数闭包（module 接线到 config dao，controller 零 dao 依赖）——二次开发
+  list_public : async () -> Array[@entity.Config] raise @core.MldongError,
 ) -> Unit raise {
   let save_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
     let id = svc.save(@dto.config_parse_save(@web.json_body(request)))
@@ -59,6 +63,21 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.ConfigServic
     e => raise e
   }
   g.post(ctx, "/sys/config/page", page_handler) catch {
+    e => raise e
+  }
+  // 公开配置（boot2 /sys/config/public @SaIgnore 同位）：PUBLIC 前缀且启用的 {code: content} map，
+  // 登录页/版权等免登录读——豁免面路由（ctx.post 不经守卫，取数闭包由 module 接线）——二次开发
+  let public_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let m : Map[String, Json] = Map([], capacity=0)
+    for c in list_public() {
+      let _ = m.set(c.code, Json::string(match c.content {
+        Some(v) => v
+        None => ""
+      }))
+    }
+    @core.ok_data(Json::object(m))
+  })
+  ctx.post("/sys/config/public", public_handler) catch {
     e => raise e
   }
 }

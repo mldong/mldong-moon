@@ -20,6 +20,7 @@ pub fn user_policy() -> @guard.RoutePolicy {
     .rule(@guard.RouteRule::make("/sys/user/detail", ["sys:user:detail"]))
     .rule(@guard.RouteRule::make("/sys/user/page", ["sys:user:page"]))
     .rule(@guard.RouteRule::make("/sys/user/grantRole", ["sys:user:grantRole"]))
+    .rule(@guard.RouteRule::make("/sys/user/getDeptUserTree", ["sys:user:getDeptUserTree"]))
     // locked/unLocked 双端点共用双码 OR（boot2 SaMode.OR 同构）——URL 与码不一致的样板场景
     .rule(locked_rule)
     .rule(un_locked_rule)
@@ -37,6 +38,8 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
   rbac : R,
   g : @mbguard.Guard[S, P],
   auth : @app.TokenAuth[S, P],
+  /// 部门全量取数闭包（getDeptUserTree 用；module 接线到 dept dao，user 侧零 dept dao 依赖）
+  dept_list : async () -> Array[@entity.Dept] raise @core.MldongError,
 ) -> Unit raise {
   // 添加用户
   let save_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
@@ -411,5 +414,61 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
   }
   g.post(ctx, "/sys/user/onlineDevice", online_device_handler) catch {
     e => raise e
+  }
+  // 部门用户树（boot2 /sys/user/getDeptUserTree 同位）：部门节点（nodeType=1，disabled 不可选）
+  // 挂用户叶（nodeType=2）；用户按部门分组一次取全量，避免逐部门 N 查
+  let dept_user_tree_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let tree = @svc.build_dept_tree(dept_list())
+    let users_by_dept : Map[String, Array[Json]] = Map([], capacity=0)
+    for u in svc.list_simple() {
+      let key = match u.dept_id {
+        Some(d) => d.to_string()
+        None => continue
+      }
+      let node : Json = {
+        "label": Json::string(u.real_name),
+        "value": Json::string(u.id.to_string()),
+        "nodeType": Json::string("2"),
+        "disabled": Json::boolean(false),
+        "children": Json::array([]),
+      }
+      match users_by_dept.get(key) {
+        Some(arr) => arr.push(node)
+        None => {
+          let _ = users_by_dept.set(key, [node])
+        }
+      }
+    }
+    let arr : Array[Json] = []
+    for n in tree {
+      arr.push(dept_user_node(n, users_by_dept))
+    }
+    @core.ok_data(Json::array(arr))
+  })
+  g.post(ctx, "/sys/user/getDeptUserTree", dept_user_tree_handler) catch {
+    e => raise e
+  }
+}
+
+///|
+/// 部门用户树节点（boot2 DeptUserTreeVO：label/value/nodeType/disabled/children）
+fn dept_user_node(n : @svc.DeptNode, users_by_dept : Map[String, Array[Json]]) -> Json {
+  let children : Array[Json] = []
+  match users_by_dept.get(n.dept.id.to_string()) {
+    Some(users) =>
+      for u in users {
+        children.push(u)
+      }
+    None => ()
+  }
+  for c in n.children {
+    children.push(dept_user_node(c, users_by_dept))
+  }
+  {
+    "label": Json::string(n.dept.name),
+    "value": Json::string(n.dept.id.to_string()),
+    "nodeType": Json::string("1"),
+    "disabled": Json::boolean(true),
+    "children": Json::array(children),
   }
 }

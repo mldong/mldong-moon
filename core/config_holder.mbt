@@ -1,6 +1,8 @@
 // 配置常量 Holder —— boot2 ConstantContext/ConstantContextHolder 同位：
-// 进程内 code→content 常量表，config 写路刷新，读取链 = **env 优先 → 常量表 → 默认值回填**。
-// 消费方：默认密码（M_DEFAULT_PASSWORD）、验证码开关等系统参数——业务不直接查 sys_config 表。
+// 进程内 code→content 常量表，读取链 = **env 优先 → 常量表 → 默认值回填**。
+// 框架级共用件（core）：main 装配处建一个实例传给各模块——sys 持有 sys_config 表负责
+// 灌入与写路刷新，dev/biz 等模块只读注入；默认密码（M_DEFAULT_PASSWORD）、验证码开关等
+// 系统参数都从这读，业务不直接查 sys_config 表。
 // boot2 的定时刷新任务（RefreshConstantsTaskRunner）骨架先不做：写路即时刷新 + 多实例部署前补。
 
 ///|
@@ -14,10 +16,10 @@ pub fn ConfigHolder::new() -> ConfigHolder {
 }
 
 ///|
-/// 启动全量灌入（module 装配处调，取数闭包来自 config dao）
-pub fn ConfigHolder::load_items(self : ConfigHolder, items : Array[@entity.Config]) -> Unit {
-  for c in items {
-    self.put(c.code, c.content)
+/// 全量灌入（sys 模块装配处调：读 sys_config 后喂 (code, content) 元组）
+pub fn ConfigHolder::load_items(self : ConfigHolder, items : Array[(String, String?)]) -> Unit {
+  for item in items {
+    self.put(item.0, item.1)
   }
 }
 

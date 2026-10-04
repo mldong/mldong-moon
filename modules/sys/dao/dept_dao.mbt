@@ -14,4 +14,6 @@ pub(open) trait DeptDao {
   async fn check_unique(Self, String, Int64?, String) -> Unit raise @core.MldongError
   /// 分页：Wrapper 由 service 组装（业务说了算），返回 (总数, 当页行)
   async fn page(Self, @core.Wrapper, Int, Int) -> (Int, Array[@entity.Dept]) raise @core.MldongError
+  /// 全量部门（树端点取数；sort 升序）——二次开发（树表）
+  async fn list_all(Self) -> Array[@entity.Dept] raise @core.MldongError
 }

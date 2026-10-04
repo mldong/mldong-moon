@@ -68,3 +68,32 @@ pub extend ConfigMysqlDao with @dao.ConfigDao::{
   page,
   find_by_ids,
 }
+
+///|
+/// PUBLIC 前缀且启用的配置（like_pat 原样通配：前缀匹配 PUBLIC%）——二次开发（公开配置）
+pub async fn ConfigMysqlDao::list_public(self : ConfigMysqlDao) -> Array[@entity.Config] raise @core.MldongError {
+  let (sql, params) = @core.build_select(
+    "sys_config",
+    self.base.table.cols,
+    self.base.base_where().like_pat("code", "PUBLIC%").eq("enabled", @core.I(1)),
+    orders=[("code", false)],
+  )
+  let out : Array[@entity.Config] = []
+  for r in self.base.query(sql, params) {
+    out.push((self.base.table.from_row)(r))
+  }
+  out
+}
+
+///|
+/// 全量配置（启动灌入 holder 用；未删除范围，code 序）
+pub async fn ConfigMysqlDao::list_all(self : ConfigMysqlDao) -> Array[@entity.Config] raise @core.MldongError {
+  let out : Array[@entity.Config] = []
+  for r in self.base.query(
+    "SELECT " + self.base.table.cols.join(", ") + " FROM sys_config WHERE is_deleted = 0 ORDER BY code",
+    [],
+  ) {
+    out.push((self.base.table.from_row)(r))
+  }
+  out
+}

@@ -27,6 +27,8 @@ pub(open) trait UserService {
   async fn reset_password(Self, Array[Int64]) -> Int raise @core.MldongError
   /// 用户下拉选项（userName/realName LIKE，上限 50）
   async fn select_options(Self, String) -> Array[@entity.User] raise @core.MldongError
+  /// 全量轻量用户（部门用户树用；未删除范围）
+  async fn list_simple(Self) -> Array[@entity.User] raise @core.MldongError
   /// 修改个人信息（只动 realName/nickName/sex，其余字段忽略；对齐 boot2 ValidInfo 组）
   async fn update_info(Self, @dto.UserSaveReq) -> Unit raise @core.MldongError
   /// 修改个人密码（验旧密 md5(旧+盐)；新盐 + md5(新+盐)；boot2 updatePwd 同语义）
@@ -221,6 +223,11 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn select_opt
 }
 
 ///|
+pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn list_simple(self) {
+  self.dao.list_simple()
+}
+
+///|
 pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update_info(self, req) {
   let old = match self.dao.find_by_id(req.id) {
     Some(u) => u
@@ -324,4 +331,5 @@ pub extend UserServiceImpl with UserService::{
   update_info,
   update_password,
   update_avatar,
+  list_simple,
 }
