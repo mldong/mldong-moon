@@ -42,6 +42,15 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] module(
     @ctrl.register_dept_trees(ctx, async fn() raise @core.MldongError { dept_dao.list_all() }, async fn() raise @core.MldongError { user_dao.list_simple() }, g) catch {
       e => abort("sys 模块树路由注册失败: \{e}")
     }
+    // config —— cmd/gen 生成 + public 二次开发（config_public.mbt 手写面）
+    let config_dao = @mysql.ConfigMysqlDao::make(config)
+    let config_svc = @svc.ConfigServiceImpl::{ dao: config_dao }
+    @ctrl.register_config(ctx, config_svc, g) catch {
+      e => abort("sys 模块 config 路由注册失败: \{e}")
+    }
+    @ctrl.register_config_public(ctx, async fn() raise @core.MldongError { config_dao.list_public() }) catch {
+      e => abort("sys 模块 config 公开端点注册失败: \{e}")
+    }
   })
 }
 
@@ -60,5 +69,5 @@ pub fn policy() -> @guard.RoutePolicy {
       @web.merge_policy(@ctrl.dept_policy(), @ctrl.post_policy()),
     ),
     @ctrl.dept_tree_policy(),
-  )
+  ).exempt("/sys/config/public")
 }

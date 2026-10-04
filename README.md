@@ -86,6 +86,8 @@ mldong-moon/
 | `/sys/dept/list` | `sys:dept:list` | 部门树（parent_id 内存建树，root=0；手写扩展面） |
 | `/sys/post/{save,remove,update,detail,page}` | `sys:post:*` | 岗位 CRUD（**gen 生成**） |
 | `/sys/user/getDeptUserTree` | `sys:user:getDeptUserTree` | 部门用户树（部门节点挂用户叶，boot2 DeptUserTreeVO 同形） |
+| `/sys/config/{save,remove,update,detail,page}` | `sys:config:*` | 系统配置 CRUD（**gen 生成** + code 唯一） |
+| `/sys/config/public` | 豁免 | 公开配置 `{code: content}` map（`PUBLIC%` 前缀且启用；登录页/版权等免登录读，boot2 同位） |
 | `/dev/schema/dbTable` | `dev:schema:dbTable` OR `dev:schema:importTable` | 库表清单（keywords 滤表名/注释） |
 | `/dev/schema/column/list` | `dev:schema:columnList` | 列清单（信息模式 + gen 字段类型映射） |
 

@@ -280,22 +280,26 @@ pub fn build_select(
 }
 
 ///|
-/// INSERT 构建
+/// INSERT 构建：值为 N 的列跳过（null 不插入，列默认值生效——MyBatis-Plus 同语义；
+/// 全跳过时报错防零列插入）
 pub fn build_insert(table : String, pairs : Array[SetPair]) -> (String, Array[SqlValue]) {
-  if pairs.is_empty() {
-    abort("build_insert: empty pairs")
-  }
   let cols = StringBuilder()
   let marks = StringBuilder()
   let params : Array[SqlValue] = []
-  for i, p in pairs {
-    if i > 0 {
+  for p in pairs {
+    if p.val is N {
+      continue
+    }
+    if params.length() > 0 {
       cols.write_string(",")
       marks.write_string(",")
     }
     cols.write_string(p.col)
     marks.write_string("?")
     params.push(p.val)
+  }
+  if params.is_empty() {
+    abort("build_insert: all pairs are N")
   }
   ("INSERT INTO \{table} (\{cols.to_string()}) VALUES (\{marks.to_string()})", params)
 }

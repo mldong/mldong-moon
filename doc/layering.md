@@ -101,6 +101,7 @@ pub(open) trait UserDao {
   `name/cols/insert_cols/update_cols/from_row/id_of/del_col/order_col`；
   `get` 返回 `N` 的列不写/不覆盖（MyBatis-Plus updateById 语义在 builder 层统一）；
   `del_col: Some("is_deleted")` = 逻辑删，BaseDao 自动追加 `del_col = 0` 过滤；
+  **insert 跳过 N 值列**（null 不插入，列默认值生效——MyBatis-Plus 同语义，build_insert 实现）；
 - **单表 CRUD 不写 SQL**——`BaseDao[T]` 模板全包（`insert/update_by_id/remove_by_ids/find_by_id/
   find_one/list/count/page`）；业务查询（join、专列）才手写 SQL（`user_page.mbt` 是样板）；
 - 行映射 `row_user` 按列名取（`row_text/row_i64/row_opt_*`，MyBatis resultMap 的手写对应物）；
