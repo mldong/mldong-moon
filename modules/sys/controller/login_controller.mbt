@@ -26,30 +26,12 @@ pub fn[S : @port.TokenStore, P, R : @svc.RbacService] register_login(
       fail_auth(responder, @core.MldongError::Business("验证码错误或已过期"))
       return
     }
-    // 存在性检查；错密与不存在同话术（防枚举，boot2 两支同抛 USER_NOT_EXIST 同设计）
-    let ua = rbac.find_user_auth_by_name(user_name)
-    let ua = match ua {
-      None => {
-        fail_auth(responder, @core.MldongError::Business("用户名或密码错误"))
-        return
-      }
-      Some(ua) => ua
-    }
-    if ua.is_locked == Some(1) {
-      fail_auth(responder, @core.MldongError::Business("用户已锁定"))
-      return
-    }
-    // 密文校验（boot2 同式：md5(密码明文 + 盐) 小写 hex）
-    if !@core.password_matches(password, ua.password, ua.salt) {
-      fail_auth(responder, @core.MldongError::Business("用户名或密码错误"))
-      return
-    }
     // appCode：登录头（mldong 框架 APP_CODE_KEY="appCode"），缺省 platform
     let app_code = match request.headers.get("appCode") {
       Some(v) => if v.is_empty() { "platform" } else { v.to_owned() }
       None => "platform"
     }
-    // extra 会话属性：appCode + 登录 ip + 原样 UA（boot2 toLoginUser 三件套同物）
+    // 会话属性：appCode + 登录 ip + 原样 UA（boot2 toLoginUser 三件套同物）
     let kvs : Array[(String, String)] = [("appCode", app_code)]
     match request.ip() {
       Some(ip) => kvs.push(("ip", ip.to_owned()))
@@ -59,10 +41,11 @@ pub fn[S : @port.TokenStore, P, R : @svc.RbacService] register_login(
       Some(ua) => kvs.push(("ua", ua.to_owned()))
       None => ()
     }
-    let extra : Map[String, String] = Map::from_iter(kvs.iter())
-    let result = auth.login(ua.id.to_string(), device="pc", extra=Some(extra)) catch {
+    // 凭证编排收口 auth_service（存在性/锁定/密文校验 + 签会话）；
+    // 失败统一走 fail_auth 99990401 信封（错密与不存在同话术防枚举）
+    let result = @svc.login_by_password(auth, rbac, user_name, password, kvs) catch {
       err => {
-        fail_auth(responder, @core.MldongError::Internal(err.message()))
+        fail_auth(responder, err)
         return
       }
     }

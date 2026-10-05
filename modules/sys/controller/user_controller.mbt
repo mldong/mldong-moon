@@ -185,24 +185,14 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
     }
     let data = @dto.user_info_json(u, p.roles, p.super_admin, dept_name, last_login)
     // ext.isPlayer 扮演标记（vben5 fetchUserInfo 读 data.ext?.isPlayer 驱动"退出扮演"入口；
-    // boot2 LoginUser.ext 同位）——从当前会话 extra 投影，非扮演会话恒 false
+    // boot2 LoginUser.ext 同位）——投影 helper 收口 auth_service，未来审计切面共用
     let current_session = auth.read_session(current_token) catch {
       _ => None
     }
-    let is_player = match current_session {
-      Some(ss) => ss.extra("isPlayer").unwrap_or("") == "true"
-      None => false
-    }
+    let (is_player, player_account) = @svc.player_markers_of(current_session)
     let ext_fields : Array[(String, Json)] = [("isPlayer", Json::boolean(is_player))]
     if is_player {
-      match current_session {
-        Some(ss) =>
-          match ss.extra("playUserAccount") {
-            Some(acc) => ext_fields.push(("playUserAccount", Json::string(acc)))
-            None => ()
-          }
-        None => ()
-      }
+      ext_fields.push(("playUserAccount", Json::string(player_account)))
     }
     let ext_map : Map[String, Json] = Map::from_iter(ext_fields.iter())
     match data {
@@ -540,9 +530,8 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
     }
     @core.ok_empty()
   })
-  // 扮演（boot2 AuthServiceImpl.playUser 同构：双会话设计——给目标签真会话，
-  // 操作者信息盖进 extra，操作者自己的会话原封不动；moon-token Coexist 策略不会
-  // 踢掉目标的既有登录，权限快照 per-token 天然按目标解析）
+  // 扮演（boot2 /sys/playUser 同位）：编排收口 auth_service.play——controller 只提取
+  // 请求事实（目标 id、操作者主体、ip/ua），守卫/盖章/签会话在 service
   let play_user_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
     let body = @web.json_body(request)
     let target_id = @core.get_i64(body, "userId").unwrap_or(0L)
@@ -553,124 +542,40 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
         Some(p) => p
         None => raise @core.MldongError::NotFound("会话无主体")
       }
-      // 目标存在性 + 超管守卫（boot2 同话术：非超级管理员不能扮演超级管理员）
-      let target = rbac.find_user_auth_by_id(target_id)
-      match target {
-        None => raise @core.MldongError::NotFound("用户不存在: \{target_id}")
-        Some(ua) =>
-          if ua.admin_type == Some(1) && !p.super_admin {
-            @core.fail(99999999, "非超级管理员不能扮演超级管理员")
-          } else {
-            let operator_token = @web.token_of(request)
-            let operator_id = @svc.parse_user_id(p.login_id).unwrap_or(0L)
-            let operator_account = match rbac.find_user_auth_by_id(operator_id) {
-              Some(op) => op.user_name
-              None => ""
-            }
-            // 盖扮演标记（unPlay 凭 playerToken/playerUserId 回跳；playerRefreshToken
-            // 兜底原 access 2h 滑动过期的场景——moon 特有，boot2 token 长活无此步）
-            let op_session = auth.read_session(operator_token) catch {
-              _ => None
-            }
-            let kvs : Array[(String, String)] = [
-              ("isPlayer", "true"),
-              ("playerToken", operator_token),
-              ("playerUserId", p.login_id),
-              ("playUserAccount", operator_account),
-              (
-                "playerRefreshToken",
-                match op_session {
-                  Some(ss) => ss.refresh_token()
-                  None => ""
-                },
-              ),
-              (
-                "appCode",
-                match op_session {
-                  Some(ss) => ss.extra("appCode").unwrap_or("platform")
-                  None => "platform"
-                },
-              ),
-            ]
-            // ip/ua 继承操作者（在线列表审计口径）
-            match request.headers.get("User-Agent") {
-              Some(ua) => kvs.push(("ua", ua.to_owned()))
-              None => ()
-            }
-            match request.ip() {
-              Some(ip) => kvs.push(("ip", ip.to_owned()))
-              None => ()
-            }
-            let extra : Map[String, String] = Map::from_iter(kvs.iter())
-            let result = auth.login(target_id.to_string(), device="pc", extra=Some(extra)) catch {
-              err => raise @core.MldongError::Internal(err.message())
-            }
-            @core.ok_data({
-              "userId": result.login_id,
-              "token": result.token,
-              "refreshToken": result.refresh_token,
-            })
-          }
+      let client_kvs : Array[(String, String)] = []
+      match request.headers.get("User-Agent") {
+        Some(ua) => client_kvs.push(("ua", ua.to_owned()))
+        None => ()
       }
+      match request.ip() {
+        Some(ip) => client_kvs.push(("ip", ip.to_owned()))
+        None => ()
+      }
+      let r = @svc.play(
+        auth,
+        rbac,
+        p.login_id,
+        @web.token_of(request),
+        p.super_admin,
+        target_id,
+        client_kvs,
+      )
+      @core.ok_data({
+        "userId": r.login_id,
+        "token": r.token,
+        "refreshToken": r.refresh_token,
+      })
     }
   })
-  // 退出扮演（boot2 unPlayUser 同构：登出 played 会话，凭 extra 里保存的
-  // 操作者 token/refresh 回跳；原 access 已过期时走 rotate 兜底换全新对）
+  // 退出扮演（boot2 /sys/unPlayUser 同位）：编排收口 auth_service.unplay——
+  // 回跳决策（原会话活直回 / rotate 兜底）在 service
   let un_play_user_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
-    let token = @web.token_of(request)
-    let ss = auth.read_session(token) catch {
-      _ => None
-    }
-    let player_token = match ss {
-      None => raise @core.MldongError::Business("登录状态已失效")
-      Some(s) =>
-        match s.extra("playerToken") {
-          Some(t) if !t.is_empty() => t
-          _ => raise @core.MldongError::Business("当前会话不是扮演会话")
-        }
-    }
-    let player_user_id = match ss {
-      Some(s) => s.extra("playerUserId").unwrap_or("")
-      None => ""
-    }
-    let origin = auth.read_session(player_token) catch {
-      _ => None
-    }
-    match origin {
-      // 原会话仍活：直接回跳
-      Some(origin_session) => {
-        auth.logout(token) catch {
-          err => raise @core.MldongError::Internal(err.message())
-        }
-        @core.ok_data({
-          "userId": player_user_id,
-          "token": player_token,
-          "refreshToken": origin_session.refresh_token(),
-        })
-      }
-      // 原 access 已过期：rotate 保底（全量轮转换全新对；extra 随转）
-      None => {
-        let prt = match ss {
-          Some(s) => s.extra("playerRefreshToken").unwrap_or("")
-          None => ""
-        }
-        if prt.is_empty() {
-          @core.fail(99990401, "登录状态已失效，请重新登录")
-        } else {
-          let r = auth.rotate(prt) catch {
-            _ => raise @core.MldongError::Business("登录状态已失效，请重新登录")
-          }
-          auth.logout(token) catch {
-            _ => ()
-          }
-          @core.ok_data({
-            "userId": player_user_id,
-            "token": r.token,
-            "refreshToken": r.refresh_token,
-          })
-        }
-      }
-    }
+    let r = @svc.unplay(auth, @web.token_of(request))
+    @core.ok_data({
+      "userId": r.login_id,
+      "token": r.token,
+      "refreshToken": r.refresh_token,
+    })
   })
   g.post(ctx, "/sys/user/logoutByTokenValue", logout_by_token_handler)
   g.post(ctx, "/sys/user/kickoutByTokenValue", kickout_by_token_handler)

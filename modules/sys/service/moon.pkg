@@ -2,9 +2,18 @@ import {
   "moonbitlang/async/fs" @fs,
   "moonbitlang/core/env" @env,
   "mldong/moon-core" @core,
+  "mldong/moon-token/app" @app,
+  "mldong/moon-token/domain" @domain,
   "mldong/moon-token-store/port" @port,
   "mldong/moon-sys/entity" @entity,
   "mldong/moon-sys/dao" @dao,
   "mldong/moon-sys/dto" @dto,
-  "mldong/moon-sys/enums" @enums,
+  "mldong/moon-sys/enums" @enums
 }
+
+import {
+  "moonbitlang/async",
+  "moonbitlang/core/ref" @ref,
+  "mldong/moon-token/style" @style,
+  "mldong/moon-token-store/memory" @mem,
+} for "wbtest"
