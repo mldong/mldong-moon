@@ -20,7 +20,7 @@ mldong-moon 是 mldong 快速开发框架的 **MoonBit 语言实现**，与 mldo
 mldong-moon/
 ├── moon.work            # workspace: ./core ./core-web ./modules/{sys,dev,app} ./cmd ./cmd/gen
 ├── AGENTS.md            # 本文件
-├── README.md            # 面向人的总览（启动/接口/路线图）
+├── README.md            # 面向人的总览（快速开始/文档导航/路线图；接口细节在 doc/api.md）
 ├── core/                # mldong/moon-core —— 框架无关底座，零 web/ORM 依赖
 │   ├── error.mbt        #   MldongError（99990000~99990004 码表）
 │   ├── result.mbt       #   响应信封 ok_empty/ok_data/fail/ok_page
@@ -51,6 +51,7 @@ mldong-moon/
 └── doc/                 # 深入文档（AI 上手按序读）
     ├── layering.md      #   分层规范（六件套、依赖规则、BaseDao、sqlbuilder、m_）
     ├── permissions.md   #   权限鉴权（moon-token 集成、RBAC 链、appCode）
+    ├── api.md           #   接口文档（全部端点 + 权限码 + 行为语义，按需查）
     ├── adding-module.md #   新增模块/新表操作手册（gen 首选路 + 六件套清单 + 自检清单）
     ├── gen-metadata.md  #   gen 生成器/元数据底座（碰 gen/dev_schema 时读）
     ├── base-contract.md #   家族契约 runner 跑法 + 端点比对结论
@@ -74,7 +75,8 @@ export MLDONG_DB_HOST=127.0.0.1 MLDONG_DB_PORT=3306
 export MLDONG_DB_USER=root MLDONG_DB_PWD=<密码> MLDONG_DB_NAME=mldong-moon
 ```
 
-首次建库：`mysql -u root -p < doc/sql/mysql-schema-all.sql`（一条命令：建库 + 全表 + 种子数据）。
+首次建库：`mysql -u root -p --default-character-set=utf8mb4 < doc/sql/mysql-schema-all.sql`
+（一条命令：建库 + 全表 + 种子；utf8mb4 防中文注释乱码——会被 gen 读进生成物）。
 
 回归（服务起后，真库黑盒矩阵，十六套 370 用例）：
 
@@ -97,13 +99,14 @@ curl -s -X POST http://127.0.0.1:18680/sys/user/page \
 
 ## 4. 上手路线（新会话按此顺序）
 
-1. [README.md](README.md) —— 总览与接口表；
+1. [README.md](README.md) —— 总览与快速开始；
 2. [doc/layering.md](doc/layering.md) —— 分层规范（改代码前必读）；
 3. [doc/permissions.md](doc/permissions.md) —— 权限/鉴权（碰登录、权限码、appCode 前必读）；
 4. [doc/adding-module.md](doc/adding-module.md) —— 加表/加模块时照抄；
 5. [doc/gen-metadata.md](doc/gen-metadata.md) —— 碰 gen/dev_schema/元数据时读；
 6. [doc/base-contract.md](doc/base-contract.md) —— 家族契约 runner 跑法 + 已存在端点比对结论 + 未存在接口按模块清单（补模块前先看）；
-7. 模板样板真身在 `modules/sys`（user 全链 + role + RBAC 中间表），文档与源码冲突时**以源码为准**并回来修文档。
+7. [doc/api.md](doc/api.md) —— 端点行为按需查（不用通读）；
+8. 模板样板真身在 `modules/sys`（user 全链 + role + RBAC 中间表），文档与源码冲突时**以源码为准**并回来修文档。
 
 ## 5. 关键认知 / 坑（先读再动手）
 
