@@ -75,6 +75,8 @@ python scripts/contract-tests/contract_runner.py \
 - **登录失败码**：家族各栈本就不一（boot2 10000001 / goframe gerror 默认 50 / moon 99990401）——
   vben5 只看 code≠0 + msg，不构成契约破坏；保持 99990401。
 - **时间格式**：moon 统一 UTC（`format_unix_utc`），boot2 用服务器时区；runner 只断键存在不断时区。
+- **dict clearCache**：moon 枚举注册表为启动期快照 + 自定义字典请求时派生，无运行期缓存可清——
+  端点幂等空响应保持契约形状（boot2 清 Redis 缓存）。
 - **扮演（playUser/unPlayUser，10-05 已实现）**：boot2 双会话同构——给目标签真会话（`login(extra)` 盖 isPlayer/playerToken/playerUserId/playUserAccount），unPlay 凭 extra 回跳操作者 token；moon 特有补充：操作者原 access 2h 滑动过期 → extra 存 playerRefreshToken，unPlay 走 `rotate` 兜底换全新对。全部走 moon-token 0.1.9/0.1.10 公开原语，零源码改动；`/sys/user/info` 增 `ext.isPlayer` 投影（vben5 退出扮演入口开关）。剩余差异：moon 对被禁用目标直接拒登（moon-token login 的 ban 检查，boot2 无此步）。
 - **SM2 登录加密**：moon 无 sm2 依赖，`/sys/getSm2PublicKey` 恒返空公钥=前端不加密分支（boot2 开关关同形状）。
 - **短信通道**：moon 无短信 SDK——sendCode/verifyCode 内存态验证码 + sendNotification/batchSendNotification 模板渲染直落 sys_sms_log（provider=mock）；boot2 走真通道。
