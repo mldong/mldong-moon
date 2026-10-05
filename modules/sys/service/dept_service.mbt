@@ -10,6 +10,10 @@ pub(open) trait DeptService {
   async fn page(Self, @core.Ctx, @dto.DeptPageReq) -> (Int, Array[@entity.Dept]) raise @core.MldongError
   /// 全量部门（树端点取数；sort 升序）——二次开发（树表）
   async fn list_all(Self, @core.Ctx) -> Array[@entity.Dept] raise @core.MldongError
+  /// 自动排序（boot2 autoSort 同式：sort = 层级×10000 + 层内 DFS 序×1000）
+  async fn auto_sort(Self, @core.Ctx) -> Unit raise @core.MldongError
+  /// 批量拖拽排序（[{id,sort}] 逐行直更）
+  async fn update_sort(Self, @core.Ctx, Array[(Int64, Int64)]) -> Unit raise @core.MldongError
 }
 
 ///|
@@ -106,6 +110,56 @@ pub impl[R : @dao.DeptDao] DeptService for DeptServiceImpl[R] with fn list_all(s
 }
 
 ///|
+/// 自动排序：全量建树后 DFS，sort = 层级×10000 + 该层已访序×1000（boot2 autoSort 同式，
+/// 层内计数器是全树共享的——不同父的同层节点也连续编号），逐行 update
+pub impl[R : @dao.DeptDao] DeptService for DeptServiceImpl[R] with fn auto_sort(self, _ctx) -> Unit raise @core.MldongError {
+  fn dfs(nodes : Array[DeptNode], level : Int, counters : Map[Int, Int], updates : Array[@entity.Dept]) -> Unit {
+    for n in nodes {
+      let idx = counters.get(level).unwrap_or(0)
+      counters.set(level, idx + 1)
+      n.dept.sort = Some((level * 10000 + idx * 1000).to_int64())
+      updates.push(n.dept)
+      dfs(n.children, level + 1, counters, updates)
+    }
+  }
+
+  let counters : Map[Int, Int] = Map([], capacity=0)
+  let updates : Array[@entity.Dept] = []
+  dfs(build_dept_tree(self.dao.list_all()), 1, counters, updates)
+  for d in updates {
+    self.dao.update(d)
+  }
+}
+
+///|
+/// 批量拖拽排序：[{id,sort}] 按 id 查回实体后直更 sort（boot2 updateBatchById 同语义）
+pub impl[R : @dao.DeptDao] DeptService for DeptServiceImpl[R] with fn update_sort(
+  self,
+  _ctx,
+  items : Array[(Int64, Int64)],
+) -> Unit raise @core.MldongError {
+  if !items.is_empty() {
+    let ids : Array[Int64] = []
+    for it in items {
+      ids.push(it.0)
+    }
+    let by_id : Map[Int64, @entity.Dept] = Map([], capacity=0)
+    for d in self.dao.find_by_ids(ids) {
+      by_id.set(d.id, d)
+    }
+    for it in items {
+      match by_id.get(it.0) {
+        Some(d) => {
+          d.sort = Some(it.1)
+          self.dao.update(d)
+        }
+        None => ()
+      }
+    }
+  }
+}
+
+///|
 /// 部门树节点（dept 全字段 + children）——二次开发（树表）
 pub(all) struct DeptNode {
   dept : @entity.Dept
@@ -159,4 +213,6 @@ pub extend DeptServiceImpl with DeptService::{
   find_by_id,
   update,
   list_all,
+  auto_sort,
+  update_sort,
 }

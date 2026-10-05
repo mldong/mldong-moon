@@ -1,6 +1,6 @@
 # base-verify 契约跑测 · 差异清单（2026-10-03 首轮）
 
-> 跑批报告：协调仓 `base-verify/reports/2026-10-04-moon-dict-l2.{json,txt}`（字典轮 10/16）、`base-verify/reports/2026-10-04-moon-menu-l2.{json,txt}`（菜单轮 11/16）、`base-verify/reports/2026-10-04-moon-menu2-l2.json`（菜单缺口补齐轮 11/16 无回归）、`base-verify/reports/2026-10-05-moon-dev-l2.json`（dev 台账轮 **12/16**，UC-0303/0306/0310 收口）、`base-verify/reports/2026-10-05-moon-final-l2.json`（**收口轮 16/16 全绿**：message/fileInfo/appversion/sse 四模块落地——base 首批契约全部收口）。boot2 全量 12 端点已对齐（syncRoute 无 base 契约，仓内 e2e 隔离域覆盖）；dev 模块 boot2 22 端点已对齐（无 base 契约的进仓内 e2e matrix_dev 55 例）。
+> 跑批报告：**`base-verify/reports/2026-10-05-moon-batch12-l2.json`（sys/dev 按需增补轮 16/16 全绿保持）**；历史：`base-verify/reports/2026-10-04-moon-dict-l2.{json,txt}`（字典轮 10/16）、`base-verify/reports/2026-10-04-moon-menu-l2.{json,txt}`（菜单轮 11/16）、`base-verify/reports/2026-10-04-moon-menu2-l2.json`（菜单缺口补齐轮 11/16 无回归）、`base-verify/reports/2026-10-05-moon-dev-l2.json`（dev 台账轮 **12/16**，UC-0303/0306/0310 收口）、`base-verify/reports/2026-10-05-moon-final-l2.json`（**收口轮 16/16 全绿**：message/fileInfo/appversion/sse 四模块落地——base 首批契约全部收口）。boot2 全量 12 端点已对齐（syncRoute 无 base 契约，仓内 e2e 隔离域覆盖）；dev 模块 boot2 22 端点已对齐（无 base 契约的进仓内 e2e matrix_dev 55 例）。
 >
 > 用途：对照家族 base 契约 runner（协调仓 `scripts/contract-tests/contract_runner.py`，语言无关纯 HTTP）
 > 逐组给出 mldong-moon 的现状——**已存在端点的契约比对结论 + 未存在端点的按模块清单**。
@@ -56,15 +56,16 @@ python scripts/contract-tests/contract_runner.py \
    deptName 按 dept_id 实时补查（boot2 loginHandler.postLogin 同位）；
    lastLoginTime = 当前 token 的登录时刻（boot2 `new Date(loginTimestamp)` 同物，moon-token 索引直读）。
 
-## 4. 未存在接口 · 按模块清单（后续补齐顺序建议）
+## 4. 未存在接口 · 按模块清单（**2026-10-05 全清**——boot2 sys/dev 扫描 + vben5 消费仲裁后按需补齐）
 
 | 模块（表） | runner 消费的端点 | 备注 |
 |---|---|---|
 | ~~sys_message~~ **已补（10-05）** | `/sys/message/page` | UC-0501；分页五字段 + 行按前端消费口径 |
 | ~~sys_file_info~~ **已补（10-05）** | `/sys/fileInfo/{upload,getFileInfoByIds,remove}` | UC-0601/0602/0606：upload 返 `{url,fileInfoId}`（id 字符串）、回查 `{id,uid,name,url,status}` |
 | ~~app 模块~~ **已补（10-05，moon 档蒲公英外呼降级见 §2 UC-0610 行）** | `/app/appVersion/check` | UC-0610：免登录、不查库、转调蒲公英自比较 `buildVersionNo`、任何失败降级 `data:null`（家族 13 栈 2026-09-20 已全量对齐，goframe `fd88b94` 为基准） |
-| ~~dev_schema 模型~~ **已补（10-05）** | boot2 dev 22 端点全量：schema 11（save/remove/update/detail/page/dbTable/importTable/getByTableName/updateDesigner/updateListKeys/updateSearchFormKeys）+ schemaGroup 5 + schemaField 6（含 updateSort 拖拽） | 台账面与裸切面并存照旧：`/dev/schema/column/list`（gen 专用裸切面）保留，dbTable 并入台账面带 disabled；getByTableName 豁免面三段自校验（token → appId/appSecret〔sys_config SCHEMA_APP_ID/SECRET，默认 admin/123456〕→ 99990403）+ DEFAULT_SCHEMA_AUTO_IMPORT 自愈落库；importTable 先删同名历史再重建 + 表名首段匹配 group.code + 推断器（boot2 SchemaFieldInferUtil 逐规则 + goframe UC-0309 增补：备注 Textarea/可排序/列宽）；4 个 dev 字典枚举入册（dev_schema_field_data_type 字符串码 dataType=1） |
-| ~~SSE~~ **已补（10-05）** | `/sse/events` | UC-0608：text/event-stream + 首帧 `data:{userId,type:"init",msg}`；站内信已读提醒等前端实时面依赖它 |
+| ~~dev_schema 模型~~ **已补（10-05）** | boot2 dev 22 端点全量 | 见下节"dev 模块"行 |
+| ~~SSE~~ **已补（10-05）** | `/sse/events` | UC-0608 |
+| ~~sys/sys 增补面~~ **已补（10-05 按需增补轮）** | 低代码下拉三路由 + RBAC 授权 7 端点 + 踢人四件套 + captcha 三件套 + dept tree/autoSort/updateSort + dict clearCache + 日志两表 CRUD5 + sms 六面 + timer 内存态 9 端点 + 任务队列/历史 cancel/restore | 仲裁口径：**boot2 sys/dev 全表扫描 → vben5 实际消费 → 按需补**。明确不做（前端零消费）：oauth2、thirdParty/relThirdAccount、machine 信息、notice 孤表、dict generateExportUrl/importTo、querySchema 运行时消费 |
 
 ## 5. 已记录的语义差异（不拦 runner，记账待议）
 
@@ -73,3 +74,9 @@ python scripts/contract-tests/contract_runner.py \
 - **登录失败码**：家族各栈本就不一（boot2 10000001 / goframe gerror 默认 50 / moon 99990401）——
   vben5 只看 code≠0 + msg，不构成契约破坏；保持 99990401。
 - **时间格式**：moon 统一 UTC（`format_unix_utc`），boot2 用服务器时区；runner 只断键存在不断时区。
+- **扮演（playUser/unPlayUser）**：moon-token 无扮演原语——moon 诚实报业务错 99999999（boot2 返回扮演 token）；待 moon-token 出能力后接真实现。
+- **SM2 登录加密**：moon 无 sm2 依赖，`/sys/getSm2PublicKey` 恒返空公钥=前端不加密分支（boot2 开关关同形状）。
+- **短信通道**：moon 无短信 SDK——sendCode/verifyCode 内存态验证码 + sendNotification/batchSendNotification 模板渲染直落 sys_sms_log（provider=mock）；boot2 走真通道。
+- **定时任务**：moon 无 cron 调度器/runner bean——/sys/timer/* 为进程内存态（boot2 TimerCache 同物），executeImmediate 幂等空响应；save/remove 为 moon 补面（vben5 timer.ts 有调、boot2 未暴露）。
+- **vis_log 写入**：boot2 切面在登录/登出写 vis_log 行——moon 本轮仅管理面 CRUD5（runner/vben5 均不消费该写入），后续补切面等价物。
+- **moonback Trie 路由坑（实现留档）**：put_route 注册模式串时先 search 后 insert——同形静态路由重复注册、或先挂 `/:module/:table/*` 再挂 `/lowCode/:tableName/*` 都会 RouteConflict；必须**先挂带静态前缀的、后挂通配**，且 `/sys/user/select` 专属语义由 user_controller 自带端点承载。

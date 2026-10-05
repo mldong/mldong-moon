@@ -26,7 +26,11 @@ async fn main raise {
         .exempt("/sys/login")
         .exempt("/sys/logout")
         .exempt("/sys/refreshToken")
-        .exempt("/sys/getCaptchaOpenFlag"),
+        .exempt("/sys/getCaptchaOpenFlag")
+        .exempt("/sys/captcha")
+        .exempt("/sys/getSm2PublicKey")
+        .exempt("/sys/sms/sendCode")
+        .exempt("/sys/sms/verifyCode"),
       @sys.policy(),
     ),
     @web.merge_policy(@dev.policy(), @appmod.policy()),

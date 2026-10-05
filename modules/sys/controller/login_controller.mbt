@@ -20,6 +20,12 @@ pub fn[S : @port.TokenStore, P, R : @svc.RbacService] register_login(
     let body = @web.json_body(request)
     let user_name = @core.text_or(body, "userName", "")
     let password = @core.text_or(body, "password", "")
+    // 图形验证码（MOLE_CAPTCHA_OPEN 开启时启用，salvo/gin 同口径：防爆破先于账密校验，
+    // 一次性消费 + 10 分钟 TTL；开关关闭时行为与改造前一致）
+    if captcha_flag_of() && !verify_captcha(@core.text_or(body, "uuid", ""), @core.text_or(body, "code", "")) {
+      fail_auth(responder, @core.MldongError::Business("验证码错误或已过期"))
+      return
+    }
     // 存在性检查；错密与不存在同话术（防枚举，boot2 两支同抛 USER_NOT_EXIST 同设计）
     let ua = rbac.find_user_auth_by_name(user_name)
     let ua = match ua {

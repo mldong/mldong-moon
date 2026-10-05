@@ -1,5 +1,8 @@
+supported_targets = "+native+wasm"
+
 import {
   "moonbitlang/async" @async,
+  "moonbitlang/core/random" @random,
   "moonbitlang/core/string" @string,
   "moonbitlang/core/encoding/utf8" @utf8,
   "mldong/moon-core" @core,
@@ -10,6 +13,8 @@ import {
   "mldong/moon-token-store/port" @port,
   "mldong/moon-sys/dto" @dto,
   "mldong/moon-sys/entity" @entity,
+  "mldong/moon-sys/dao" @dao,
+  "mldong/moon-sys/repository" @repo,
   "mldong/moon-sys/service" @svc,
   "moonbitlang/moonback" @mb,
 }

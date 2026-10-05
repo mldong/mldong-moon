@@ -216,4 +216,141 @@ pub extend RbacRepository with @dao.RbacDao::{
   grant_menus,
   find_menu_ids_by_user,
   remove_role_menus_by_menu_ids,
+  remove_user_role_pairs,
+  grant_data_scope,
+  find_menu_ids_by_role,
+  page_users_by_role,
+  grant_user_role_pairs
+}
+
+// ── RBAC 授权面（boot2 RbacController/RoleController#grantDataScope 同位）──
+
+///|
+pub impl @dao.RbacDao for RbacRepository with fn find_menu_ids_by_role(self, role_id) {
+  let conn = open_conn(self.config)
+  let rows = q(
+    conn,
+    "SELECT menu_id FROM sys_role_menu WHERE role_id = ?",
+    [@moondb.Int64(role_id)],
+  )
+  conn.close()
+  let out : Array[Int64] = []
+  for r in rows {
+    out.push(row_i64(r, "menu_id"))
+  }
+  out
+}
+
+///|
+pub impl @dao.RbacDao for RbacRepository with fn grant_user_role_pairs(self, pairs) {
+  let conn = open_conn(self.config)
+  errdefer close_conn(conn)
+  for pair in pairs {
+    let (user_id, role_id) = pair
+    // 增量插（IGNORE 防重复对；uk_user_role 唯一键兜底）
+    let _ = x(
+      conn,
+      "INSERT IGNORE INTO sys_user_role (id, user_id, role_id) VALUES (?, ?, ?)",
+      [@moondb.Int64(@core.next_id()), @moondb.Int64(user_id), @moondb.Int64(role_id)],
+    )
+  }
+  conn.close()
+}
+
+///|
+pub impl @dao.RbacDao for RbacRepository with fn remove_user_role_pairs(self, pairs) {
+  let conn = open_conn(self.config)
+  errdefer close_conn(conn)
+  for pair in pairs {
+    let (user_id, role_id) = pair
+    let _ = x(
+      conn,
+      "DELETE FROM sys_user_role WHERE user_id = ? AND role_id = ?",
+      [@moondb.Int64(user_id), @moondb.Int64(role_id)],
+    )
+  }
+  conn.close()
+}
+
+///|
+pub impl @dao.RbacDao for RbacRepository with fn page_users_by_role(
+  self,
+  role_id,
+  in_role,
+  w,
+  page_num,
+  page_size,
+) {
+  let conn = open_conn(self.config)
+  errdefer close_conn(conn)
+  let join = if in_role {
+    "JOIN sys_user_role ur ON ur.user_id = u.id AND ur.role_id = ?"
+  } else {
+    "LEFT JOIN sys_user_role ur ON ur.user_id = u.id AND ur.role_id = ?"
+  }
+  let not_exists = if in_role { "" } else { " AND ur.id IS NULL" }
+  let (wsql_raw, wparams) = w.build()
+  // Wrapper::build 返回带 "WHERE " 前缀——这里主 WHERE 已自拼，剥前缀留裸条件
+  let wsql = if wsql_raw.has_prefix("WHERE ") { wsql_raw["WHERE ".length():].to_owned() } else { wsql_raw }
+  let where_sql = if wsql.is_empty() {
+    " WHERE u.is_deleted = 0\{not_exists}"
+  } else {
+    " WHERE u.is_deleted = 0 AND \{wsql}\{not_exists}"
+  }
+  let params : Array[@core.SqlValue] = [@core.L(role_id)]
+  for p in wparams {
+    params.push(p)
+  }
+  let count_rows = q(
+    conn,
+    "SELECT COUNT(*) AS c FROM sys_user u \{join}\{where_sql}",
+    to_db_values(params),
+  )
+  let total = if count_rows.is_empty() { 0 } else { row_int_d(count_rows[0], "c", 0) }
+  let rows = q(
+    conn,
+    "SELECT u.* FROM sys_user u \{join}\{where_sql} ORDER BY u.id ASC LIMIT \{page_size} OFFSET \{(page_num - 1) * page_size}",
+    to_db_values(params),
+  )
+  conn.close()
+  let out : Array[@entity.User] = []
+  for r in rows {
+    out.push(row_user(r))
+  }
+  (total, out)
+}
+
+///|
+pub impl @dao.RbacDao for RbacRepository with fn grant_data_scope(self, role_id, data_scope, dept_ids) {
+  let conn = open_conn(self.config)
+  errdefer {
+    try {
+      tx_rollback(conn)
+    } catch {
+      _ => ()
+    }
+    close_conn(conn)
+  }
+  tx_begin(conn)
+  match data_scope {
+    Some(ds) => {
+      let _ = x(
+        conn,
+        "UPDATE sys_role SET data_scope = ?, update_time = ? WHERE id = ?",
+        [@moondb.Int(ds), @moondb.Text(@core.now_str()), @moondb.Int64(role_id)],
+      )
+    }
+    None => ()
+  }
+  // 部门明细全量替换（自定义范围(5)才有非空清单；boot2 同语义）
+  let _ = x(conn, "DELETE FROM sys_role_dept WHERE role_id = ?", [@moondb.Int64(role_id)])
+  for dept_id in dept_ids {
+    let _ = x(
+      conn,
+      "INSERT INTO sys_role_dept (id, role_id, dept_id) VALUES (?, ?, ?)",
+      [@moondb.Int64(@core.next_id()), @moondb.Int64(role_id), @moondb.Int64(dept_id)],
+    )
+  }
+  tx_commit(conn)
+  conn.close()
 }

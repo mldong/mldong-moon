@@ -339,18 +339,25 @@ pub fn parse_order_by(body : Json) -> Array[(String, Bool)] {
       }
     _ => ""
   }
+  parse_order_by_raw(raw)
+}
+
+///|
+/// orderBy 原串解析（通用下拉/lowCode 网关用：入参已是字符串；逗号拆段，
+/// 每段 `col [desc|descend]`，列名过 is_field_safe 形状白名单）
+pub fn parse_order_by_raw(raw : String) -> Array[(String, Bool)] {
   let out : Array[(String, Bool)] = []
   if raw.is_empty() {
     return out
   }
   for seg in raw.split(",") {
-    let seg = seg.trim(chars=" \t").to_owned()
+    let seg = seg.trim(chars=" 	").to_owned()
     if seg.is_empty() {
       continue
     }
     let parts : Array[String] = []
     for p in seg.split(" ") {
-      let p = p.trim(chars=" \t").to_owned()
+      let p = p.trim(chars=" 	").to_owned()
       if !p.is_empty() {
         parts.push(p)
       }

@@ -4,6 +4,8 @@
 ///|
 /// 权限码片段——与端点同文件声明；全部显式 rule（推导兜底已被 main 关闭）
 pub fn dept_policy() -> @guard.RoutePolicy {
+  let tree_rule = @guard.RouteRule::make("/sys/dept/tree", ["sys:dept:tree", "sys:role:grantDataScope"])
+  tree_rule.perm_mode = @port.Or
   @guard.RoutePolicy::new()
     .rule(@guard.RouteRule::make("/sys/dept/save", ["sys:dept:save"]))
     .rule(@guard.RouteRule::make("/sys/dept/remove", ["sys:dept:remove"]))
@@ -12,6 +14,10 @@ pub fn dept_policy() -> @guard.RoutePolicy {
     .rule(@guard.RouteRule::make("/sys/dept/page", ["sys:dept:page"]))
     // 二次开发（树表）：部门树端点
     .rule(@guard.RouteRule::make("/sys/dept/list", ["sys:dept:list"]))
+    // 部门树（boot2 双码 OR：授权数据范围弹窗借道部门树）
+    .rule(tree_rule)
+    .rule(@guard.RouteRule::make("/sys/dept/autoSort", ["sys:dept:autoSort"]))
+    .rule(@guard.RouteRule::make("/sys/dept/updateSort", ["sys:dept:updateSort"]))
 }
 
 ///|
@@ -68,7 +74,44 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.DeptService]
     }
     @core.ok_data(Json::array(arr))
   })
+  // 部门树（boot2 /sys/dept/tree 同位：与 list 同数据源，双码 OR 供授权弹窗借道）
+  let tree_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let ctx = @web.ctx_of(request)
+    let tree = @svc.build_dept_tree(svc.list_all(ctx))
+    let arr : Array[Json] = []
+    for n in tree {
+      arr.push(dept_node_json(n))
+    }
+    @core.ok_data(Json::array(arr))
+  })
+  // 自动排序（boot2 autoSort：sort = 层级×10000 + 层内序×1000）
+  let auto_sort_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let ctx = @web.ctx_of(request)
+    svc.auto_sort(ctx)
+    @core.ok_empty()
+  })
+  // 批量拖拽排序（boot2 updateSort：[{id,sort}] 直更）
+  let update_sort_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let ctx = @web.ctx_of(request)
+    let items : Array[(Int64, Int64)] = []
+    match @web.json_body(request) {
+      Array(rows) =>
+        for row in rows {
+          let id = @core.get_i64(row, "id").unwrap_or(0L)
+          let sort = @core.get_i64(row, "sort").unwrap_or(0L)
+          if id != 0L {
+            items.push((id, sort))
+          }
+        }
+      _ => ()
+    }
+    svc.update_sort(ctx, items)
+    @core.ok_empty()
+  })
   g.post(ctx, "/sys/dept/list", list_handler)
+  g.post(ctx, "/sys/dept/tree", tree_handler)
+  g.post(ctx, "/sys/dept/autoSort", auto_sort_handler)
+  g.post(ctx, "/sys/dept/updateSort", update_sort_handler)
 }
 
 ///|

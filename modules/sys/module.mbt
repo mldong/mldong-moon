@@ -18,6 +18,8 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] install(
     let rbac_dao = @repo.RbacRepository::make(config)
     let rbac_svc = @svc.RbacServiceImpl::{ dao: rbac_dao }
     @ctrl.register_login(ctx, auth, rbac_svc, fn() { holder.get_bool("MOLE_CAPTCHA_OPEN", false) })
+    // 验证码 + SM2 公钥（公开面 ctx 直挂，豁免在 main 免名单；登录联动在 login_controller）
+    @ctrl.register_captcha(ctx)
     // 常量 holder（boot2 ConstantContext 同位）：启动灌入，config 写路刷新；
     // 默认密码等系统参数从这读（env 优先），user service 经闭包注入不依赖 holder 类型
     let user_dao = @repo.UserRepository::make(config)
@@ -100,6 +102,45 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] install(
     @ctrl.register_fileinfo(ctx, fileinfo_svc, g) catch {
       e => abort("sys 模块 fileInfo 路由注册失败: \{e}")
     }
+    // lowcode —— 通用下拉 /{module}/{table}/select + /lowCode 动态表网关
+    // （仅登录无权限码；controller 直用 GenericDao——纯基础设施无业务语义）
+    @ctrl.register_lowcode(ctx, @repo.GenericDao::make(config), g)
+    // rbac —— 授权关系面（角色-菜单/用户-角色/数据范围，boot2 RbacController 同位）
+    @ctrl.register_rbac(ctx, rbac_dao, g) catch {
+      e => abort("sys 模块 rbac 路由注册失败: \{e}")
+    }
+    // 日志两表 + sms 两表 + 任务队列/历史（boot2 管理面 CRUD5，cmd/gen 生成 + 表配置按真实 schema 二开：
+    // op_log/vis_log/sms_log/task_* 无 is_deleted 物理删，sms_log 无审计列）
+    let oplog_svc = @svc.OpLogServiceImpl::{ dao: @repo.OpLogRepository::make(config) }
+    @ctrl.register_oplog(ctx, oplog_svc, g) catch {
+      e => abort("sys 模块 opLog 路由注册失败: \{e}")
+    }
+    let vislog_svc = @svc.VisLogServiceImpl::{ dao: @repo.VisLogRepository::make(config) }
+    @ctrl.register_vislog(ctx, vislog_svc, g) catch {
+      e => abort("sys 模块 visLog 路由注册失败: \{e}")
+    }
+    let smstemplate_svc = @svc.SmsTemplateServiceImpl::{ dao: @repo.SmsTemplateRepository::make(config) }
+    @ctrl.register_smstemplate(ctx, smstemplate_svc, g) catch {
+      e => abort("sys 模块 smsTemplate 路由注册失败: \{e}")
+    }
+    let smslog_svc = @svc.SmsLogServiceImpl::{ dao: @repo.SmsLogRepository::make(config) }
+    @ctrl.register_smslog(ctx, smslog_svc, g) catch {
+      e => abort("sys 模块 smsLog 路由注册失败: \{e}")
+    }
+    let taskhistory_dao = @repo.TaskExecutionHistoryRepository::make(config)
+    let taskqueue_dao = @repo.TaskExecutionQueueRepository::make(config)
+    let taskqueue_svc = @svc.TaskExecutionQueueServiceImpl::{ dao: taskqueue_dao }
+    @ctrl.register_taskexecutionqueue(ctx, taskqueue_svc, g, taskhistory_dao) catch {
+      e => abort("sys 模块 taskExecutionQueue 路由注册失败: \{e}")
+    }
+    let taskhistory_svc = @svc.TaskExecutionHistoryServiceImpl::{ dao: taskhistory_dao }
+    @ctrl.register_taskexecutionhistory(ctx, taskhistory_svc, g, taskqueue_dao) catch {
+      e => abort("sys 模块 taskExecutionHistory 路由注册失败: \{e}")
+    }
+    // sms 发送面（四端点：sendCode/verifyCode 公开 + sendNotification/batchSendNotification 权限码）
+    @ctrl.register_sms(ctx, smslog_svc, smstemplate_svc.dao, g)
+    // timer —— 内存态定时任务面（boot2 TimerCache 同位，无表）
+    @ctrl.register_timer(ctx, g)
     // sse —— 站内信实时推送面（流式 + 心跳；仅登录无权限码，boot2 同位）
     @ctrl.register_sse(ctx, g)
     let dict_item_svc = @svc.DictItemServiceImpl::{
@@ -137,6 +178,15 @@ pub fn policy() -> @guard.RoutePolicy {
     @ctrl.menu_policy(),
     @ctrl.message_policy(),
     @ctrl.fileinfo_policy(),
+    @ctrl.rbac_policy(),
+    @ctrl.oplog_policy(),
+    @ctrl.vislog_policy(),
+    @ctrl.smstemplate_policy(),
+    @ctrl.smslog_policy(),
+    @ctrl.sms_policy(),
+    @ctrl.taskexecutionqueue_policy(),
+    @ctrl.taskexecutionhistory_policy(),
+    @ctrl.timer_policy(),
   ]
   let mut p = @guard.RoutePolicy::new()
   for f in fragments {

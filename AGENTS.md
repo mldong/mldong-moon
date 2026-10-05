@@ -45,7 +45,7 @@ mldong-moon/
 │   ├── metadata/ + metadata-mysql/  #   MetadataDao 端口 + information_schema 实现（gen/importTable 一件两用）
 ├── cmd/main/            # 装配入口：鉴权 + 模块挂载 + listen :18680
 ├── cmd/gen/             # 代码生成器（读 MetadataDao 产六件套，gen-out/ 不入仓）
-├── e2e/                 # 黑盒回归矩阵（run.sh 总入口，十套 183 用例，真库）
+├── e2e/                 # 黑盒回归矩阵（run.sh 总入口，十七套 364 用例，真库）
 └── doc/                 # 深入文档（AI 上手按序读）
     ├── layering.md      #   分层规范（六件套、依赖规则、BaseDao、sqlbuilder、m_）
     ├── permissions.md   #   权限鉴权（moon-token 集成、RBAC 链、appCode）

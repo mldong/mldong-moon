@@ -60,6 +60,27 @@ pub fn text_or(data : Json, key : String, default : String) -> String {
 ///|
 /// 提取 Int64 数组（remove 的 ids、grantRole 的 roleIds 等批量入参；
 /// 雪花 id 兼容字符串/数字两种形态，字符串为准防 JS 精度丢失）
+/// JSON 数组取字符串数组（key 不存在/非数组返回空；元素逐个强转字符串形态）
+pub fn get_text_array(body : Json, key : String) -> Array[String] {
+  let out : Array[String] = []
+  match body {
+    Object(map) =>
+      match map.get(key) {
+        Some(Array(items)) =>
+          for it in items {
+            match it {
+              String(v) => out.push(v)
+              Number(v, ..) => out.push(v.to_string())
+              _ => ()
+            }
+          }
+        _ => ()
+      }
+    _ => ()
+  }
+  out
+}
+
 pub fn get_i64_array(body : Json, key : String) -> Array[Int64] {
   let out : Array[Int64] = []
   match body {

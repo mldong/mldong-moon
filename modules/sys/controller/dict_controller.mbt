@@ -10,6 +10,7 @@ pub fn dict_policy() -> @guard.RoutePolicy {
     .rule(@guard.RouteRule::make("/sys/dict/update", ["sys:dict:update"]))
     .rule(@guard.RouteRule::make("/sys/dict/detail", ["sys:dict:detail"]))
     .rule(@guard.RouteRule::make("/sys/dict/page", ["sys:dict:page"]))
+    .rule(@guard.RouteRule::make("/sys/dict/clearCache", ["sys:dict:clearCache"]))
 }
 
 ///|
@@ -73,4 +74,10 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.DictService]
   g.post(ctx, "/sys/dict/getByDictType", get_by_type_handler)
   g.post(ctx, "/sys/dict/enumDictList", enum_list_handler)
   g.post(ctx, "/sys/dict/customDictList", custom_list_handler)
+  // 清字典缓存（boot2 clearCache 同位）：moon 枚举注册表为启动期快照 + 自定义字典请求时
+  // 派生，无运行期缓存可清——幂等空响应保持契约形状（差异记 base-contract §4）
+  let clear_cache_handler : @mb.Handler = @web.wrap(fn(_request) -> Json {
+    @core.ok_empty()
+  })
+  g.post(ctx, "/sys/dict/clearCache", clear_cache_handler)
 }

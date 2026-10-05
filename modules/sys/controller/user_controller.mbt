@@ -27,6 +27,12 @@ pub fn user_policy() -> @guard.RoutePolicy {
     .rule(@guard.RouteRule::make("/sys/user/resetPassword", ["sys:user:resetPassword"]))
     .rule(@guard.RouteRule::make("/sys/user/select", ["sys:user:select"]))
     .rule(@guard.RouteRule::make("/sys/user/onlineUserList", ["sys:user:onlineUserList"]))
+    // 踢人四件套（boot2 UserController 同码）
+    .rule(@guard.RouteRule::make("/sys/user/logoutByTokenValue", ["sys:user:logoutByTokenValue"]))
+    .rule(@guard.RouteRule::make("/sys/user/kickoutByTokenValue", ["sys:user:kickoutByTokenValue"]))
+    .rule(@guard.RouteRule::make("/sys/user/logoutByLoginId", ["sys:user:logoutByLoginId"]))
+    .rule(@guard.RouteRule::make("/sys/user/kickoutByLoginId", ["sys:user:kickoutByLoginId"]))
+    .rule(@guard.RouteRule::make("/sys/playUser", ["sys:playUser"]))
     // 个人中心族（permCode/info/updateInfo/updatePwd/updateAvatar/onlineDevice）不在此列：
     // main 关掉 by_convention 后，未列端点一律只验登录——boot2 同语义（notes 里写 sys:user:xxx 只是文档）
 }
@@ -455,6 +461,72 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
     @core.ok_data(Json::array(arr))
   })
   g.post(ctx, "/sys/user/getDeptUserTree", dept_user_tree_handler)
+  // 踢人四件套（boot2 UserService 同语义：注销=漏斗全清、踢下线=标记 Kicked 拒重入）
+  let kick_str_ids : (Json) -> Array[String] = fn(body) {
+    let out : Array[String] = []
+    for v in @core.get_text_array(body, "ids") {
+      out.push(v)
+    }
+    out
+  }
+  let kick_id_ids : (Json) -> Array[String] = fn(body) {
+    let out : Array[String] = []
+    for v in @core.get_i64_array(body, "ids") {
+      out.push(v.to_string())
+    }
+    out
+  }
+  let logout_by_token_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    for token in kick_str_ids(@web.json_body(request)) {
+      // 单个 token 无效静默跳过（boot2 sa-token logout 按 token 不抛同口径）
+      auth.logout(token) catch {
+        _ => ()
+      }
+    }
+    @core.ok_empty()
+  })
+  let kickout_by_token_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    for token in kick_str_ids(@web.json_body(request)) {
+      // moon-token kickout 按 login_id+device 标记：先反查会话再踢（token 无效跳过）
+      let session = auth.read_session(token) catch {
+        _ => None
+      }
+      match session {
+        Some(ss) => {
+          let _ = auth.kickout(ss.login_id(), device=ss.device().id) catch { _ => 0 }
+        }
+        None => ()
+      }
+    }
+    @core.ok_empty()
+  })
+  let logout_by_login_id_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    for login_id in kick_id_ids(@web.json_body(request)) {
+      let _ = auth.logout_by_id(login_id) catch { _ => 0 }
+    }
+    @core.ok_empty()
+  })
+  let kickout_by_login_id_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    for login_id in kick_id_ids(@web.json_body(request)) {
+      let _ = auth.kickout(login_id) catch { _ => 0 }
+    }
+    @core.ok_empty()
+  })
+  // 扮演（boot2 /sys/playUser 同位）：moon-token 无扮演能力，诚实报业务错
+  let play_user_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let body = @web.json_body(request)
+    let _ = @core.get_i64(body, "userId")
+    @core.fail(99999999, "moon 栈扮演暂未实现")
+  })
+  let un_play_user_handler : @mb.Handler = @web.wrap(fn(_request) -> Json {
+    @core.fail(99999999, "moon 栈扮演暂未实现")
+  })
+  g.post(ctx, "/sys/user/logoutByTokenValue", logout_by_token_handler)
+  g.post(ctx, "/sys/user/kickoutByTokenValue", kickout_by_token_handler)
+  g.post(ctx, "/sys/user/logoutByLoginId", logout_by_login_id_handler)
+  g.post(ctx, "/sys/user/kickoutByLoginId", kickout_by_login_id_handler)
+  g.post(ctx, "/sys/playUser", play_user_handler)
+  g.post(ctx, "/sys/unPlayUser", un_play_user_handler)
 }
 
 ///|

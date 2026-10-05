@@ -18,4 +18,21 @@ pub(open) trait RbacDao {
   async fn find_menu_ids_by_user(Self, user_id : Int64, app_code : String) -> Array[Int64] raise @core.MldongError
   /// role_menu 按菜单 id 清理（syncRoute 删菜单时级联）——二次开发
   async fn remove_role_menus_by_menu_ids(Self, menu_ids : Array[Int64]) -> Unit raise @core.MldongError
+  /// 角色 → 菜单 id 清单（roleMenuIds 回显）
+  async fn find_menu_ids_by_role(Self, role_id : Int64) -> Array[Int64] raise @core.MldongError
+  /// 用户-角色增量授权（saveUserRole 逐对插，不动存量）
+  async fn grant_user_role_pairs(Self, pairs : Array[(Int64, Int64)]) -> Unit raise @core.MldongError
+  /// 用户-角色移除（removeUserRole 逐对删）
+  async fn remove_user_role_pairs(Self, pairs : Array[(Int64, Int64)]) -> Unit raise @core.MldongError
+  /// 角色下用户分页（userListByRoleId=true / userListExcludeRoleId=false）
+  async fn page_users_by_role(
+    Self,
+    role_id : Int64,
+    in_role : Bool,
+    w : @core.Wrapper,
+    page_num : Int,
+    page_size : Int,
+  ) -> (Int, Array[@entity.User]) raise @core.MldongError
+  /// 数据范围授权（sys_role_dept 全量替换 + sys_role.data_scope 直更）
+  async fn grant_data_scope(Self, role_id : Int64, data_scope : Int?, dept_ids : Array[Int64]) -> Unit raise @core.MldongError
 }
