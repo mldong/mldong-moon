@@ -17,9 +17,9 @@ description = "mldong-moon 启动装配"
 import {
   "mldong/moon-core@0.1.0",
   "mldong/moon-core-web@0.1.0",
-  "mldong/moon-token@0.1.9",
-  "mldong/moon-token-store@0.1.9",
-  "mldong/moon-token-moonback@0.1.9",
+  "mldong/moon-token@0.1.10",
+  "mldong/moon-token-store@0.1.10",
+  "mldong/moon-token-moonback@0.1.10",
   "mldong/moon-sys@0.1.0",
   "mldong/moon-dev@0.1.0",
   "mldong/moon-app@0.1.0",

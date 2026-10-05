@@ -51,11 +51,24 @@ check('A6 kickoutByLoginId 全会话踢下线', r['code']==0 and r2['code']==999
 r=post('/sys/user/logoutByTokenValue',{'ids':['bogus-token']},t)
 check('A7 无效 token 幂等 0', r['code']==0, str(r))
 
-# ---- playUser/unPlayUser（moon-token 无扮演，诚实业务错）----
+# ---- 扮演往返（boot2 双会话同构：目标签真会话 + extra 盖操作者标记）----
 r=post('/sys/playUser',{'userId':uid},t)
-check('A8 playUser 99999999', r['code']==99999999, str(r))
-r=post('/sys/unPlayUser',{},t)
-check('A9 unPlayUser 99999999', r['code']==99999999, str(r))
+check('A8 playUser 发 token+refreshToken 对', r['code']==0 and r['data']['token'] and r['data']['refreshToken'], str(r))
+pt=r['data']['token']
+d=post('/sys/user/info',{},pt)['data']
+check('A9 身份切换到目标 + ext.isPlayer', d['id']==uid and d.get('ext',{}).get('isPlayer')==True, str(d.get('ext')))
+d2=post('/sys/user/info',{},t)['data']
+check('A10 操作者会话未动且非扮演', d2['userName']=='superAdmin' and d2['ext']['isPlayer']==False, str(d2.get('ext')))
+r2=post('/sys/unPlayUser',{},pt)
+check('A11 unPlay 回跳操作者原 token', r2['code']==0 and r2['data']['token']==t, str(r2)[:100])
+r3=post('/sys/user/info',{},pt)
+check('A12 played token 已失效', r3['code']==99990403, str(r3))
+r4=post('/sys/user/info',{},r2['data']['token'])
+check('A13 操作者原会话重入 ok', r4['code']==0 and r4['data']['userName']=='superAdmin', str(r4)[:60])
+r5=post('/sys/playUser',{'userId':'999'},t)
+check('A14 目标不存在 99990002', r5['code']==99990002, str(r5))
+r6=post('/sys/unPlayUser',{},t)
+check('A15 非扮演会话 unPlay 非 0', r6['code']!=0, str(r6)[:80])
 
 # ---- captcha 三件套（公开面）----
 r=post('/sys/captcha',{},None)

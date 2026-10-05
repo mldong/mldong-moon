@@ -16,8 +16,8 @@ description = "mldong-moon 控制层通用工具的 moonback 适配（错误统�
 
 import {
   "mldong/moon-core@0.1.0",
-  "mldong/moon-token@0.1.9",
-  "mldong/moon-token-moonback@0.1.9",
+  "mldong/moon-token@0.1.10",
+  "mldong/moon-token-moonback@0.1.10",
   "moonbitlang/moonback@0.8.6",
-  "mldong/moon-token-store@0.1.9",
+  "mldong/moon-token-store@0.1.10",
 }

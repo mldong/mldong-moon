@@ -5,6 +5,8 @@
 pub(open) trait RbacService {
   /// 登录身份视图（userName 查用户；登录端点验存在/锁定用）
   async fn find_user_auth_by_name(Self, String) -> @entity.UserAuth? raise @core.MldongError
+  /// 按 id 查登录身份视图（扮演端点：目标存在性/超管守卫 + 操作者账号回填）
+  async fn find_user_auth_by_id(Self, Int64) -> @entity.UserAuth? raise @core.MldongError
   /// 用户授权角色（user_role 全量替换）
   async fn grant_user_roles(Self, user_id : Int64, role_ids : Array[Int64]) -> Unit raise @core.MldongError
   /// 角色授权菜单（role_menu 全量替换）
@@ -22,6 +24,14 @@ pub impl[D : @dao.RbacDao] RbacService for RbacServiceImpl[D] with fn find_user_
   user_name,
 ) {
   self.dao.find_user_auth_by_name(user_name)
+}
+
+///|
+pub impl[D : @dao.RbacDao] RbacService for RbacServiceImpl[D] with fn find_user_auth_by_id(
+  self,
+  user_id,
+) {
+  self.dao.find_user_auth_by_id(user_id)
 }
 
 ///|
@@ -109,6 +119,7 @@ pub impl[D : @dao.RbacDao] @port.PermissionProvider for RbacServiceImpl[D] with 
 ///|
 pub extend RbacServiceImpl with RbacService::{
   find_user_auth_by_name,
+  find_user_auth_by_id,
   grant_user_roles,
   grant_role_menus,
 }

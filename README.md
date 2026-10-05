@@ -2,7 +2,7 @@
 
 mldong 快速开发框架的 **MoonBit 语言实现**。目标是与 mldong 框架的接口契约保持一致：同样的 URL、同样的 `{"code":0,"msg":"..","data":..}` 信封、同样的分页形状、同样的权限码与鉴权失败码。
 
-当前已落：`sys_user` 全链 16 端点（CRUD + 状态/个人中心/在线用户/**踢人四件套**）+ `sys_role`/`sys_dept`/`sys_post`/`sys_config` CRUD + **`sys_dict`/`sys_dict_item` 字典全链**（CRUD + getByDictType/enumDictList/customDictList/clearCache）+ **`sys_menu` 菜单全链**（CRUD + tree/list + appList + 用户路由菜单三版 + syncRoute）+ 登录/注销/refreshToken + **图形验证码三件套**（captcha SVG 手绘 + getCaptchaOpenFlag 登录联动 + getSm2PublicKey 空公钥占位）+ moon-token 鉴权（RBAC 真码链 + appCode 多应用）+ **RBAC 授权面**（saveRoleMenu/roleMenuIds/saveUserRole/removeUserRole/userListByRoleId/Exclude + grantDataScope + 扮演诚实报错）+ **部门树/排序**（tree 双码 OR + autoSort + updateSort）+ **通用下拉 lowCode 三路由**（/:module/:table/select + /sys/user/select 专属 + /lowCode 动态表网关，goframe 协议同构：labelKey/valueKey/extFieldNames/includeType 回显/keywords+searchKeys OR-LIKE/orderBy 安全解析/真列白名单）+ **日志两表**（opLog/visLog CRUD5，物理删）+ **短信**（smsTemplate/smsLog CRUD5 + sendCode/verifyCode 内存态一次性消费 + sendNotification/batchSendNotification mock 模板渲染）+ **定时任务内存态**（timer 9 端点，boot2 TimerCache 同物）+ **任务队列/历史**（taskExecutionQueue/taskExecutionHistory CRUD5 + cancelTask 转历史 + restore 重排队）+ **站内信**（8 端点：接收人隔离 + appCode biz_type 前缀端隔离 + setRead/未读计数）+ **文件上传**（multipart 本地盘直写 + Ant 形状回查）+ **APP 检查升级**（免登录 UC-0610，蒲公英转调降级语义）+ **SSE 实时推送**（首帧 init + 10s 心跳）+ `dev` 模块 **dev_schema 台账三件套全量**（22 端点 + 4 个 dev 字典枚举入册）。同时是后续模块与代码生成器的**模板骨架**。
+当前已落：`sys_user` 全链 16 端点（CRUD + 状态/个人中心/在线用户/**踢人四件套**）+ `sys_role`/`sys_dept`/`sys_post`/`sys_config` CRUD + **`sys_dict`/`sys_dict_item` 字典全链**（CRUD + getByDictType/enumDictList/customDictList/clearCache）+ **`sys_menu` 菜单全链**（CRUD + tree/list + appList + 用户路由菜单三版 + syncRoute）+ 登录/注销/refreshToken（moon-token 家族 0.1.10）+ **图形验证码三件套**（captcha SVG 手绘 + getCaptchaOpenFlag 登录联动 + getSm2PublicKey 空公钥占位）+ moon-token 鉴权（RBAC 真码链 + appCode 多应用）+ **RBAC 授权面**（saveRoleMenu/roleMenuIds/saveUserRole/removeUserRole/userListByRoleId/Exclude + grantDataScope）+ **扮演往返**（playUser/unPlayUser 双会话同构）+ **部门树/排序**（tree 双码 OR + autoSort + updateSort）+ **通用下拉 lowCode 三路由**（/:module/:table/select + /sys/user/select 专属 + /lowCode 动态表网关，goframe 协议同构：labelKey/valueKey/extFieldNames/includeType 回显/keywords+searchKeys OR-LIKE/orderBy 安全解析/真列白名单）+ **日志两表**（opLog/visLog CRUD5，物理删）+ **短信**（smsTemplate/smsLog CRUD5 + sendCode/verifyCode 内存态一次性消费 + sendNotification/batchSendNotification mock 模板渲染）+ **定时任务内存态**（timer 9 端点，boot2 TimerCache 同物）+ **任务队列/历史**（taskExecutionQueue/taskExecutionHistory CRUD5 + cancelTask 转历史 + restore 重排队）+ **站内信**（8 端点：接收人隔离 + appCode biz_type 前缀端隔离 + setRead/未读计数）+ **文件上传**（multipart 本地盘直写 + Ant 形状回查）+ **APP 检查升级**（免登录 UC-0610，蒲公英转调降级语义）+ **SSE 实时推送**（首帧 init + 10s 心跳）+ `dev` 模块 **dev_schema 台账三件套全量**（22 端点 + 4 个 dev 字典枚举入册）。同时是后续模块与代码生成器的**模板骨架**。
 
 ## 技术栈
 
@@ -87,7 +87,9 @@ mldong-moon/
 | `/sys/user/onlineUserList` / `onlineDevice` | `sys:user:onlineUserList` / 仅登录 | 在线用户（按人分组带 tokenList/ip/ua/剩余时长，moon-token 会话枚举） |
 | `/sys/user/{logoutByTokenValue,kickoutByTokenValue}` | 各自码 | 按 token 强制注销/踢下线（注销=漏斗全清；踢下线=标记 Kicked 拒重入；boot2 同语义） |
 | `/sys/user/{logoutByLoginId,kickoutByLoginId}` | 各自码 | 按登录 ID 批量注销/踢下线；无效 token 幂等 0 |
-| `/sys/playUser` / `/sys/unPlayUser` | `sys:playUser` / 仅登录 | 扮演/退出扮演：**moon-token 无扮演能力，诚实业务错 99999999**（差异记 base-contract §4） |
+| `/sys/playUser` | `sys:playUser` | 扮演用户（boot2 AuthServiceImpl 同构双会话）：目标存在 + 超管守卫（非超管不能扮演超管）→ 给目标签真会话（extra 盖 isPlayer/playerToken/playerUserId/playUserAccount + 操作者 ip/ua 继承）→ 返 `{userId,token,refreshToken}` 前端就地换 token；Coexist 策略不踢目标既有登录，权限快照 per-token 天然按目标解析；操作者会话原封不动 |
+| `/sys/unPlayUser` | 仅登录 | 退出扮演：读当前会话 extra 回跳操作者 token 并登出 played 会话；原 access 已过期（2h 滑动）走存储的 refreshToken rotate 兜底换全新对——moon-token 原语全公开 API，零源码改动 |
+| `/sys/user/info` 的 `ext.isPlayer` | —（随 info 返回） | vben5 `fetchUserInfo` 读 `data.ext?.isPlayer` 驱动"退出扮演"入口（boot2 LoginUser.ext 同位）；从会话 extra 投影，非扮演恒 false |
 | `/sys/dept/{save,remove,update,detail,page}` | `sys:dept:*` | 部门 CRUD（**gen 生成**） |
 | `/sys/dept/list` | `sys:dept:list` | 部门树（parent_id 内存建树，root=0；手写扩展面） |
 | `/sys/dept/tree` | `sys:dept:tree` **OR** `sys:role:grantDataScope` | 部门树（boot2 双码 OR：授权数据范围弹窗借道） |
@@ -215,7 +217,7 @@ moon run --target wasm cmd/gen/main -- sys_dept sys_post   # 产出到 gen-out/�
 - [x] **sys/dev 按需增补轮（boot2 扫描 + vben5 消费仲裁）**：通用下拉 lowCode 三路由（goframe 协议同构）+ RBAC 授权面 7 端点（saveRoleMenu/roleMenuIds/saveUserRole/removeUserRole/userListByRoleId|Exclude/grantDataScope）+ 踢人四件套 + captcha 三件套（SVG 手绘 + 登录联动）+ dept tree/autoSort/updateSort + dict clearCache + 日志两表 CRUD5 + 短信六面（模板/日志 CRUD5 + 发送四端点 mock 渲染）+ timer 内存态 9 端点 + 任务队列/历史（cancelTask/restore 往返）——**runner 16/16 保持全绿，e2e 十七套 364/364**（10-05）
 - [ ] 登录/登出写 vis_log 行（boot2 切面语义；本轮未做——runner/vben5 均不消费，差异记 base-contract §4）
 - [ ] 短信真通道（阿里云/腾讯云 provider SPI；现为 mock 渲染直落日志）
-- [ ] 扮演（playUser/unPlayUser）：待 moon-token 出扮演原语后接真实现（现诚实报 99999999）
+- [x] **扮演往返（playUser/unPlayUser）**：boot2 双会话同构（目标真会话 + extra 盖操作者标记 + unPlay 回跳 + 2h 过期 rotate 兜底）；moon-token 家族依赖升 0.1.10（对 0.1.9 零代码 diff，纯版本轮）；e2e 扮演往返 8 例（10-05）
 - [x] 家族契约 runner 首轮：已存在端点 5 组全 pass（认证/refresh/在线/角色页/配置页），缺模块清单见 doc/base-contract.md（10-03）
 - [x] 字典模块（sys_dict + sys_dict_item 全链 + getByDictType/enumDictList/customDictList + ext 空不出键统一到 dept/post）：e2e 9 套 142/142 + 契约 runner **10/16 pass**（10-04）
 - [x] 菜单模块（sys_menu CRUD + tree/list + appList + 用户路由菜单三版 + syncRoute 隔离域验证）：e2e 10 套 **178/178** + 契约 runner **11/16 pass**（10-04）
