@@ -18,7 +18,7 @@ mldong-moon 是 mldong 快速开发框架的 **MoonBit 语言实现**，与 mldo
 
 ```
 mldong-moon/
-├── moon.work            # workspace: ./core ./core-web ./modules/sys ./cmd
+├── moon.work            # workspace: ./core ./core-web ./modules/{sys,dev,app} ./cmd ./cmd/gen
 ├── AGENTS.md            # 本文件
 ├── README.md            # 面向人的总览（启动/接口/路线图）
 ├── core/                # mldong/moon-core —— 框架无关底座，零 web/ORM 依赖
@@ -29,27 +29,31 @@ mldong-moon/
 │   ├── jsonx.mbt        #   Json 取值（get_i64/text_or/get_i64_array…）
 │   ├── id_gen.mbt       #   雪花 ID（next_id）+ 时间
 │   ├── config_holder.mbt#   配置常量 Holder（框架件：main 建实例传各模块，sys 灌入/刷新，dev/biz 只读）
+│   ├── ctx.mbt         #   请求上下文 Ctx（审计操作人显式传参，禁全局 holder）
+│   ├── password.mbt    #   md5(密码+盐) + 随机盐（登录密文校验）
+│   ├── op.mbt          #   SqlValue 构造（S/I/L/D/B/N）
 │   ├── enum_dict.mbt    #   枚举字典注册中心（框架件：IntVal/int_dict + DictModel/Registry，各模块装配期灌自己的声明；sys 样板 modules/sys/enums/ 逐枚举一文件）
 │   └── mysql_config.mbt #   MysqlConfig::from_env（MLDONG_DB_*）
 ├── core-web/            # mldong/moon-core-web —— moonback 适配层（全工程 web 依赖唯一收口）
 │   ├── common.mbt       #   wrap（统一错误转信封）+ json_body
-│   └── guard.mbt        #   merge_policy / on_error（99990401/403 信封）/ token_of（剥 Bearer）
+│   └── guard.mbt        #   merge_policy / on_error（鉴权失败恒 200+99990403 信封）/ token_of（剥 Bearer）
 ├── modules/sys/         # mldong/moon-sys —— 业务模块样板（六件套）
 │   ├── entity/ dto/ dao/ repository/ service/ controller/
 │   ├── enums/           #   18 个业务枚举逐文件（常量 + all()；registry.mbt 装配期灌注册中心）
 │   └── module.mbt       #   模块自注册 + policy() 聚合 + rbac_provider()
 ├── modules/dev/         # mldong/moon-dev —— dev_schema 台账三件套（boot2 dev 22 端点）+ 库元数据底座（doc/gen-metadata.md）
-├── modules/app/         # mldong/moon-app —— APP 检查升级（免登录 UC-0610；校验失败 99999999 = core InvalidParam 新档）
-│   ├── entity/ dto/ dao/ repository/ service/ controller/
-│   ├── enums/           #   4 个 dev 枚举逐文件（registry 装配期灌注册中心；field_data_type 字符串码）
-│   ├── metadata/ + metadata-mysql/  #   MetadataDao 端口 + information_schema 实现（gen/importTable 一件两用）
+│   ├── entity/ dto/ dao/ repository/ service/ controller/ + enums/（4 个 dev 枚举）
+│   └── metadata/ + metadata-mysql/  #   MetadataDao 端口 + information_schema 实现（gen/importTable 一件两用）
+├── modules/app/         # mldong/moon-app —— APP 检查升级（免登录 UC-0610；校验失败 99999999 = core InvalidParam 新档；薄模块仅 controller）
 ├── cmd/main/            # 装配入口：鉴权 + 模块挂载 + listen :18680
 ├── cmd/gen/             # 代码生成器（读 MetadataDao 产六件套，gen-out/ 不入仓）
-├── e2e/                 # 黑盒回归矩阵（run.sh 总入口，十七套 364 用例，真库）
+├── e2e/                 # 黑盒回归矩阵（run.sh 总入口，十六套 370 用例，真库）
 └── doc/                 # 深入文档（AI 上手按序读）
     ├── layering.md      #   分层规范（六件套、依赖规则、BaseDao、sqlbuilder、m_）
     ├── permissions.md   #   权限鉴权（moon-token 集成、RBAC 链、appCode）
-    ├── adding-module.md #   新增模块/新表操作手册（六件套清单）
+    ├── adding-module.md #   新增模块/新表操作手册（gen 首选路 + 六件套清单 + 自检清单）
+    ├── gen-metadata.md  #   gen 生成器/元数据底座（碰 gen/dev_schema 时读）
+    ├── base-contract.md #   家族契约 runner 跑法 + 端点比对结论
     └── sql/             #   mysql-schema-all.sql（建库+全表+种子，一条命令初始化）
 ```
 
@@ -72,7 +76,7 @@ export MLDONG_DB_USER=root MLDONG_DB_PWD=<密码> MLDONG_DB_NAME=mldong-moon
 
 首次建库：`mysql -u root -p < doc/sql/mysql-schema-all.sql`（一条命令：建库 + 全表 + 种子数据）。
 
-回归（服务起后，真库黑盒矩阵，十三套 269 用例）：
+回归（服务起后，真库黑盒矩阵，十六套 370 用例）：
 
 ```bash
 BASE=http://127.0.0.1:18680 bash e2e/run.sh   # 汇总 "总计: OK n FAIL 0" 为绿
@@ -84,7 +88,7 @@ BASE=http://127.0.0.1:18680 bash e2e/run.sh   # 汇总 "总计: OK n FAIL 0" 为
 
 ```bash
 curl -s -X POST http://127.0.0.1:18680/sys/login \
-  -H 'Content-Type: application/json' -d '{"userName":"superAdmin"}'
+  -H 'Content-Type: application/json' -d '{"userName":"superAdmin","password":"123456"}'
 # 用返回的 token 打受保护端点：
 curl -s -X POST http://127.0.0.1:18680/sys/user/page \
   -H "Authorization: Bearer <token>" -H 'Content-Type: application/json' \
@@ -124,7 +128,7 @@ curl -s -X POST http://127.0.0.1:18680/sys/user/page \
 - **模块包别名速查**（moon.pkg）：`@core`=moon-core、`@web`=moon-core-web、
   `@mb`=moonback、`@mbguard`=moon-token-moonback/guard、`@app`=moon-token/app、
   `@guard`=moon-token/guard、`@port`=moon-token-store/port、`@style`=moon-token/style、
-  `@mem`=moon-token-store/memory；模块内 `@entity/@dto/@dao/@mysql/@svc/@ctrl` 指 moon-sys 子包。
+  `@mem`=moon-token-store/memory；模块内 `@entity/@dto/@dao/@repo/@svc/@ctrl` 指 moon-sys 子包。
 - **审计四件套**（create_time/create_user/update_time/update_user）：时间由 service/codec
   填；**操作人走框架 Ctx**——`core/ctx.mbt`（goframe ctx 显式第一参同位）：controller
   `@web.ctx_of(request)` 从登录主体装配 → **service 全方法第一参 `ctx : @core.Ctx`** →

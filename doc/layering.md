@@ -112,7 +112,9 @@ pub(open) trait UserDao {
 - **单表 CRUD 不写 SQL**——`BaseDao[T]` 模板全包（`insert/update_by_id/remove_by_ids/find_by_id/
   find_one/list/count/page`）；业务查询（join、专列）才手写 SQL（`user_page.mbt` 是样板）；
 - 行映射 `row_user` 按列名取（`row_text/row_i64/row_opt_*`，MyBatis resultMap 的手写对应物）；
-  不回显的列（password/salt/avatar）不进 `cols`；
+  敏感列**照常进 `cols`**（读面需要：password/salt 登录密文校验/改密要读）；
+  「不回显」的落点在 **dto 出参装配**——`user_json` 不装配该键即可（user_table.mbt 头注原话），
+  把列剪出 cols 会让行映射恒 None 直接断业务；
 - 连接缝在 `repository/dialect.mbt`：`Conn` trait（query/execute/begin/commit/rollback/close）+ 每库一个 Box 包装 + `open_conn` 按 `MLDONG_DB_DRIVER` 分发（现仅 mysql，新方言=新 Box+新分支）；q/x/close_conn/tx_* 全部泛型中性，行映射走 moondb.Row——**BaseDao/SQL builder 零方言**。事务写法见 §5。
 
 ### 3.5 service（业务唯一收口）
@@ -135,10 +137,11 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn save(self,
   分页过滤 `admin_type <> 1` 会因 NULL 三值逻辑漏行，落 NULL 是事故；
 - **密码机制**（对齐 boot2）：save 不收用户自报密码，发默认密码 + 8 位随机盐
   （散列 `md5(明文+盐)` 小写 hex，见 `core/password.mbt`）；默认密码走**配置常量 Holder**
-  （`service/config_holder.mbt`，boot2 ConstantContextHolder 同位：env 优先 → 常量表 →
+  （框架件 `core/config_holder.mbt`，module.mbt 装配闭包注入 service，boot2 ConstantContextHolder 同位：env 优先 → 常量表 →
   默认值回填；key `M_DEFAULT_PASSWORD` 缺省 `@core.DEFAULT_PASSWORD`="123456"，config
   写路即时刷新），service 经构造闭包注入不依赖 holder 类型；TableCodec 只把 password/salt
-  放进 `insert_cols`，读面 `cols` 不带（detail 不回显密文）；改密是独立端点的活；
+  放进 `insert_cols`；password/salt **也进读面 `cols`**（登录密文校验必须可读），
+  不回显靠 dto 出参装配不带这两个键（detail 永不泄密文）；改密是独立端点的活；
 - 查询组装：业务硬条件 + `w.append(req.m)`（m_ 动态条件）+ keywords 多列 OR（`w.raw`），
   参考 `UserServiceImpl::page`。
 
@@ -148,12 +151,16 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn save(self,
 // 权限码片段与端点同文件（对齐 boot2 @SaCheckPermission 注解位置）——详见 [permissions.md](permissions.md)
 pub fn user_policy() -> @guard.RoutePolicy { ... }
 
-pub fn[S, P, T : @svc.UserService, R : @svc.RbacService] register(ctx, svc, rbac, g) -> Unit raise {
+pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService, R : @svc.RbacService]
+  register(ctx, svc, rbac, g, auth, dept_list) -> Unit raise {
   let save_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
-    let id = svc.save(@dto.parse_save(@web.json_body(request)))
+    let ctx = @web.ctx_of(request)
+    let id = svc.save(ctx, @dto.parse_save(@web.json_body(request)))
     @core.ok_data(Json::string(id.to_string()))
   })
-  g.post(ctx, "/sys/user/save", save_handler) catch { e => raise e }
+  // register 本身带 raise；注册失败由 module.mbt 组合根统一 abort（不要 catch 透传，
+  // fragile_catch_all warning 会破「warnings 基线 = 0」）
+  g.post(ctx, "/sys/user/save", save_handler)
   ...
 }
 ```
@@ -196,7 +203,8 @@ let (sql, params) = @core.build_select("sys_user", cols, w, orders=[("create_tim
 - 模块 = moon.work 的一个 member（如 `modules/sys` = `mldong/moon-sys`）+ 六件套子包 +
   根包 `module.mbt` 自注册；
 - `module.mbt`：dao/service 构造 + `register_*` 路由注册全收模块内，main 每模块一行
-  `ctx.use_(@<mod>.module(config, g, auth))`；注册失败 `abort`（启动期错误响亮失败）；
+  `ctx.use_(@<mod>.install(config, g, auth, holder, enum_registry))`（**装配函数叫 `install`**——`module` 是保留字；
+  holder/enum_registry 是框架级常量与枚举字典注册中心，main 建实例传入）；注册失败 `abort`（启动期错误响亮失败）；
 - 权限码片段由模块聚合：`@sys.policy()` = `merge_policy(user_policy, role_policy)`，
   main 再并全局豁免面——详见 [permissions.md](permissions.md)；
 - 新模块/新表操作手册：[adding-module.md](adding-module.md)。
@@ -205,6 +213,8 @@ let (sql, params) = @core.build_select("sys_user", cols, w, orders=[("create_tim
 
 - 信封：HTTP 恒 200 + `{"code":0,"msg":"ok","data":..}`；分页 data 形状 `recordCount/totalPage/pageSize/pageNum/rows`；
 - 业务错误 `MldongError`（`core/error.mbt`）：`Internal 99990000` / `InvalidInput 99990001` /
-  `NotFound 99990002` / `Conflict 99990003` / `Business 99990004`——raise 上抛，wrap 统一转信封；
-- 鉴权错误走 moon-token：`99990401`（未登录，HTTP 401）/ `99990403`（无权限，HTTP 403），
-  由 `core-web/guard.mbt` 的 `on_error` 产出——见 [permissions.md](permissions.md)。
+  `NotFound 99990002` / `Conflict 99990003` / `Business 99990004` / `InvalidParam 99999999`
+  （@Validated 参数校验档，UC-0610 在用）——raise 上抛，wrap 统一转信封；
+- 鉴权错误走 moon-token：**HTTP 恒 200**，`99990403`（未登录/token 失效/无权限共用）由
+  `core-web/guard.mbt` 的 `on_error` 产出；`99990401` 只归登录端点「用户名或密码错误」——
+  详见 [permissions.md](permissions.md) §4.4。

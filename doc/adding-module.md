@@ -1,11 +1,14 @@
 # 新增模块 / 新表操作手册
 
 > 本仓是代码生成器的模板骨架——加表/加模块**必须**照 `modules/sys` 的写法。
-> **首选路 = 代码生成器**（读活库元数据产出六件套，一步到位）：
+> **首选路 = 代码生成器**（读活库元数据产出六件套源码——entity/dto/dao/repository×2/service/controller
+> 共 7 个文件，一步到位）：
 >
 > ```bash
 > export MLDONG_DB_* && moon run --target wasm cmd/gen/main -- <表名>...
 > # 产物落 gen-out/（不入仓），拷进 modules/<模块>/ 对应包目录，再走 ⑧ 注册
+> # 注意：gen-out/ 里可能有历史跑批残留（dept/post/config…），只拷本次表名对应的 7 个文件
+> # （repository 层产 *_repository.mbt + *_table.mbt 两件）
 > ```
 >
 > 生成面 = 标准 CRUD 五端点 + 权限码片段 + check_unique/find_by_ids；树表/状态机等特性
@@ -20,6 +23,8 @@
 ### ① 建表 SQL
 
 - 追加进 `doc/sql/mysql-schema-all.sql`（保持"一条命令初始化"约定）；
+- Windows 导入带中文 COMMENT 的 DDL 加 `mysql --default-character-set=utf8mb4`——否则注释乱码
+  会被 gen 从 information_schema 读进生成物注释（不只是美观问题）；
 - 列命名 snake_case；主键 `bigint` 雪花（应用侧生成，不 auto_increment）；
 - 常备列：`create_time datetime(3)`、`update_time`、`create_user/update_user`、
   `is_deleted tinyint(1)`（逻辑删）；NOT NULL 列想清楚默认值（NULL 三值逻辑坑见 layering §3.5）。
@@ -48,7 +53,8 @@
 - `TableCodec[Post]`：`name/cols/insert_cols/update_cols/from_row/id_of/del_col/order_col`
   （照抄 `user_table.mbt`；`update_cols` 放"可覆盖列 + update_time"；
   `del_col: Some("is_deleted")`）；
-- 行映射 `row_post`（`row_text/row_i64/row_opt_*` 按列名取）；不回显的列不进 `cols`；
+- 行映射 `row_post`（`row_text/row_i64/row_opt_*` 按列名取）；敏感列照常进 `cols`（读面要读），
+  「不回显」在 dto 出参装配层做（见 user_table.mbt 头注）；
 - `PostRepository::make(config)` + `pub impl @dao.PostDao for PostRepository with ...`
   ——单表 CRUD 直接调 `BaseDao` 方法（`base.mbt`），业务查询手写 SQL 用
   `@core.build_select(...)` + `self.query/query_one`。
@@ -84,10 +90,13 @@ let post_svc = @svc.PostServiceImpl::{ dao: post_dao }
    moon.mod）+ 根 `moon.pkg`（imports 抄 `modules/sys/moon.pkg`，按需删）+ 六件套子目录
    （各含 `moon.pkg`，imports 抄 sys 对应子包）；
 2. `moon.work` 的 members 加 `"./modules/<mod>"`；
-3. 根包 `module.mbt`：`pub fn[S, P] module(config, g, auth) -> @mb.Module { ... }`
-   （模块内装配 + 注册，抄 `modules/sys/module.mbt`；模块无鉴权端点可去 auth/g 参数，看需）；
-4. `cmd/main` 挂一行：`ctx.use_(@dev.module(config, g, auth)) catch { _ => abort(...) }`
-   （moon.pkg 加 `"mldong/moon-<mod>" @dev`）；
+3. 根包 `module.mbt`：`pub fn[S, P] install(config, g, auth, holder, enum_registry) -> @mb.Module { ... }`
+   （**函数名必须是 `install`**——`module` 是 MoonBit 保留字，照抄会编译失败）
+   （模块内装配 + 注册，抄 `modules/sys/module.mbt`；参数**顺序各模块自定**——dev 是
+   `(config, g, holder, enum_registry, auth)`、sys 是 `(config, g, auth, holder, enum_registry)`，
+   照抄调用方时以该模块 install 真实签名为准）；
+4. `cmd/main` 挂一行：`ctx.use_(@<mod>.install(config, g, auth, holder, enum_registry)) catch { _ => abort(...) }`
+   （cmd/main 的 moon.pkg 加 `"mldong/moon-<mod>" @<mod>`——别名自定，别照抄 @dev）；
 5. 权限码：新模块自己的 policy 聚合函数导出，main 里 `merge_policy` 并进总策略；
 6. **枚举字典**（有业务枚举才做）：模块根包建 `enums/` 子包（moon.pkg import `@core`），
    **逐枚举一文件**（goframe「每枚举一文件 + init() 注册」同位）：每文件 = 业务常量
@@ -106,6 +115,10 @@ let post_svc = @svc.PostServiceImpl::{ dao: post_dao }
 - [ ] URL / 信封 / 分页形状 / 错误码与 mldong 接口契约一致（layering §7）；
 - [ ] 所有 id 出入 JSON 都是字符串；HTTP 200 恒定；
 - [ ] 每个端点有显式权限码 rule（漏 = 只验登录态）；
+- [ ] **新权限码进 `sys_menu` 种子行**（按钮型 type=4，code=权限码）——非超管角色的码链来自
+  role_menu→menu.code，superAdmin 走 admin_type 旁路**测不出漏种子**，上线后普通用户必 99990403；
+- [ ] 新表进回归：`e2e/` 加 matrix_<域>.py（抄现有套件形状）并挂进 run.sh 循环——
+  模板仓的契约面靠它守护；
 - [ ] 真库冒烟一轮：login → save → page（含 `m_EQ_xxx` 一发）→ detail → update → remove → 负向；
 - [ ] 动了鉴权/RBAC → 复跑 [permissions.md](permissions.md) §7 矩阵；
 - [ ] 建表 SQL 已进 `doc/sql/mysql-schema-all.sql`；

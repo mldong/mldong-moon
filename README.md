@@ -9,7 +9,7 @@ mldong 快速开发框架的 **MoonBit 语言实现**。目标是与 mldong 框�
 | 件 | 选型 | 说明 |
 |---|---|---|
 | Web 框架 | [moonbitlang/moonback](https://github.com/moonbitlang/moonback) 0.8.6 | MoonBit 官方 Web 框架 |
-| 权限认证 | [mldong/moon-token](https://github.com/mldong/moon-token) 0.1.9 | 登录态/会话/RBAC 标准件（逐路由守卫 + 供数端口 + extra 会话属性） |
+| 权限认证 | [mldong/moon-token](https://github.com/mldong/moon-token) 0.1.10 | 登录态/会话/RBAC 标准件（逐路由守卫 + 供数端口 + extra 会话属性） |
 | 表单校验 | [Betterlol/moon_zod](https://github.com/Betterlol/moon_zod) 0.8.2 | 规则式校验，schema 收口在 dto 层 |
 | DB 访问 | moonbitstack/moondb 0.2.0 + moonbitstack/moonmysql 0.7.3 | 手写 SQL（MyBatis 式 mapper），moondb 接口缝 + moonmysql 驱动 |
 | 运行档位 | wasm（moonrun） | native 档可在 CI（Linux）构建 |
@@ -39,7 +39,7 @@ core-web（moonback 适配：wrap 统一错误转信封 / 守卫工具——全�
 
 ```
 mldong-moon/
-├── moon.work                  # members: core / core-web / modules/sys / cmd
+├── moon.work                  # members: core / core-web / modules/{sys,dev,app} / cmd / cmd/gen
 ├── core/                      # mldong/moon-core：错误码、响应信封、分页、Json 取值、时钟、雪花 ID
 ├── core-web/                  # mldong/moon-core-web：wrap/json_body、guard 工具（policy 合并/失败信封/token_of）
 ├── modules/sys/               # mldong/moon-sys
@@ -63,7 +63,7 @@ mldong-moon/
 
 ## 接口（对齐 mldong 接口契约）
 
-全部 `POST`，请求/响应 `application/json`，HTTP 恒 200，`code=0` 成功；鉴权端点带 `Authorization: Bearer <token>`。
+除标注 GET 外全部 `POST`，请求/响应 `application/json`，HTTP 恒 200，`code=0` 成功；鉴权端点带 `Authorization: Bearer <token>`。
 
 | 端点 | 权限码 | 说明 |
 |---|---|---|
@@ -137,18 +137,25 @@ mldong-moon/
 | `/sys/taskExecutionHistory/{save,remove,update,detail,page,restore}` | `sys:taskExecutionHistory:*` | 任务历史 CRUD5 + 恢复（历史行复制为新队列行 state=0 未开始/新雪花 id/variable 兜底 "{}"，历史保留——boot2 同语义） |
 | `POST /sse/events` | 仅登录 | SSE 实时推送（UC-0608）：text/event-stream + 首帧 `{userId,type:"init",msg}` + 10s 心跳注释行保活（boot2 SseTaskRunner 同位） |
 
-- 未登录 `HTTP 401 + {"code":99990401}`；无权限 `HTTP 403 + {"code":99990403}`；
+- **HTTP 恒 200（含鉴权失败）**，业务码进 body：未登录/token 失效 `99990403`、无权限同 `99990403`、
+  `99990401` 只归登录「用户名或密码错误」（boot2 GlobalExceptionHandler 同约定，vben5 按 code 分支）；
 - 分页请求 `{pageNum, pageSize, keywords?, searchKeys?, m_{OP}_{col}?...}`，响应 data 形状
   `recordCount/totalPage/pageSize/pageNum/rows`；
 - `m_` 通用查询 13 操作符（EQ/NE/GT/GE/LT/LE/LIKE/NLIKE/LLIKE/RLIKE/BT/IN/NIN），
   3 段式 `m_EQ_userName` / 4 段式（带表别名）`m_t_LIKE_userName`；列名 camelCase 自动转
   snake_case，空值跳过、非法操作符跳过、列名形状白名单防注入；
 - 错误码（骨架子集，码表对齐 mldong 框架约定）：`99990000` 内部 / `99990001` 参数校验失败 /
-  `99990002` 数据不存在 / `99990003` 业务冲突 / `99990004` 业务失败；
+  `99990002` 数据不存在 / `99990003` 业务冲突 / `99990004` 业务失败 / `99999999` @Validated
+  参数校验档（UC-0610 在用）；
 - `appCode`：登录头（缺省 `platform`）定会话应用上下文，role/menu 按 `app_code` 双过滤，
   同用户不同 app 会话共存。
 
 ## 快速启动
+
+> 本机工具链为便携装（`G:\dev-tools\moon`，不入 PATH）：Git Bash 先
+> `export MOON_HOME=/g/dev-tools/moon PATH=/g/dev-tools/moon/bin:$PATH`（**必须 `/g/` 盘符写法**，
+> `G:/` 写法 PATH 解析不到 .exe）；MySQL 客户端导入种子加 `--default-character-set=utf8mb4`
+> （否则表注释乱码、会被 gen 读进生成物）。
 
 前置：[MoonBit 工具链](https://docs.moonbitlang.com)（moon + moonrun），MySQL 5.7+/8.0。
 
@@ -168,7 +175,7 @@ moon run --target wasm cmd/main     # 默认 127.0.0.1:18680
 
 # 登录拿 token
 curl -s -X POST http://127.0.0.1:18680/sys/login \
-  -H "Content-Type: application/json" -d '{"userName":"superAdmin"}'
+  -H "Content-Type: application/json" -d '{"userName":"superAdmin","password":"123456"}'
 # 打受保护端点
 curl -s -X POST http://127.0.0.1:18680/sys/user/page \
   -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \
@@ -205,7 +212,7 @@ moon run --target wasm cmd/gen/main -- sys_dept sys_post   # 产出到 gen-out/�
 ## 路线图
 
 - [x] moon-token 鉴权接入（登录/注销 + 逐路由守卫 + RBAC 真码链 + appCode 多应用，10-03）
-- [x] `m_` 动态查询通用件（core/query.mbt，22 用例过）
+- [x] `m_` 动态查询通用件（core/query.mbt；单测 3 块 + matrix_dict 7 条 m_ 专项断言覆盖）
 - [x] 登录密文校验（`md5(密码+盐)` 对齐 boot2，mooncrypt md5 + 单测 3 例，10-04）
 - [x] `POST /sys/refreshToken`（rotate 端点，UC-0113 全量轮转 + 登出联动，矩阵 10/10，10-03）
 - [ ] 事务模板（参照 jeeflow-moon `MysqlTxTemplate`：环境连接 + 嵌套复用；现为 grant 局部事务）
@@ -214,16 +221,13 @@ moon run --target wasm cmd/gen/main -- sys_dept sys_post   # 产出到 gen-out/�
 - [x] dev 模块元数据底座（MetadataDao 端口 + information_schema 实现 + dbTable/column/list 端点，10-04）
 - [x] dev 模块 dev_schema 台账三件套全量（boot2 22 端点 + 4 字典枚举 + 种子 2 模型全字段 + 探针表，runner 12/16 UC-0303 组收口，10-05）
 - [x] **base 首批契约全收口 16/16**：message 8 端点 + fileInfo 上传链 + app 检查升级 + SSE 推送（e2e 十三套 269/269，10-05）
-- [x] **sys/dev 按需增补轮（boot2 扫描 + vben5 消费仲裁）**：通用下拉 lowCode 三路由（goframe 协议同构）+ RBAC 授权面 7 端点（saveRoleMenu/roleMenuIds/saveUserRole/removeUserRole/userListByRoleId|Exclude/grantDataScope）+ 踢人四件套 + captcha 三件套（SVG 手绘 + 登录联动）+ dept tree/autoSort/updateSort + dict clearCache + 日志两表 CRUD5 + 短信六面（模板/日志 CRUD5 + 发送四端点 mock 渲染）+ timer 内存态 9 端点 + 任务队列/历史（cancelTask/restore 往返）——**runner 16/16 保持全绿，e2e 十七套 364/364**（10-05）
+- [x] **sys/dev 按需增补轮（boot2 扫描 + vben5 消费仲裁）**：通用下拉 lowCode 三路由（goframe 协议同构）+ RBAC 授权面 7 端点（saveRoleMenu/roleMenuIds/saveUserRole/removeUserRole/userListByRoleId|Exclude/grantDataScope）+ 踢人四件套 + captcha 三件套（SVG 手绘 + 登录联动）+ dept tree/autoSort/updateSort + dict clearCache + 日志两表 CRUD5 + 短信六面（模板/日志 CRUD5 + 发送四端点 mock 渲染）+ timer 内存态 9 端点 + 任务队列/历史（cancelTask/restore 往返）——**runner 16/16 保持全绿，e2e 十六套 370/370**（10-05）
 - [ ] 登录/登出写 vis_log 行（boot2 切面语义；本轮未做——runner/vben5 均不消费，差异记 base-contract §4）
 - [ ] 短信真通道（阿里云/腾讯云 provider SPI；现为 mock 渲染直落日志）
 - [x] **扮演往返（playUser/unPlayUser）**：boot2 双会话同构（目标真会话 + extra 盖操作者标记 + unPlay 回跳 + 2h 过期 rotate 兜底）；moon-token 家族依赖升 0.1.10（对 0.1.9 零代码 diff，纯版本轮）；e2e 扮演往返 8 例（10-05）
 - [x] 家族契约 runner 首轮：已存在端点 5 组全 pass（认证/refresh/在线/角色页/配置页），缺模块清单见 doc/base-contract.md（10-03）
 - [x] 字典模块（sys_dict + sys_dict_item 全链 + getByDictType/enumDictList/customDictList + ext 空不出键统一到 dept/post）：e2e 9 套 142/142 + 契约 runner **10/16 pass**（10-04）
 - [x] 菜单模块（sys_menu CRUD + tree/list + appList + 用户路由菜单三版 + syncRoute 隔离域验证）：e2e 10 套 **178/178** + 契约 runner **11/16 pass**（10-04）
-- [ ] 事务模板（参照 jeeflow-moon `MysqlTxTemplate`：环境连接 + 嵌套复用；现为 grant 局部事务）
-- [ ] dev 模块：代码生成器（读 MetadataDao 产出六件套源码，见 doc/gen-metadata.md §4）
-- [ ] dev_schema 台账（importTable 落库 + disabled 标记 + /dev/schema/page·getByTableName 契约面，boot2 同位）
 - [ ] CI：GitHub Actions（wasm + native 双档）
 
 ## License

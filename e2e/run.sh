@@ -1,5 +1,5 @@
 #!/bin/bash
-# mldong-moon 黑盒回归矩阵（真库）——十七套 e2e 用例总入口
+# mldong-moon 黑盒回归矩阵（真库）——十六套 e2e 用例总入口
 #
 # 前置：
 #   1. mysql -u root -p < doc/sql/mysql-schema-all.sql （一次）

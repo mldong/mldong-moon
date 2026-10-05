@@ -17,7 +17,8 @@
 
 ## 2. 登录 / 注销（`controller/login_controller.mbt`）
 
-- 端点 `POST /sys/login`、`POST /sys/logout`，走**全局豁免面**（main 里 `.exempt(...)`，guard 不拦）；
+- 端点走**全局豁免面**（main 里 `.exempt(...)`，guard 不拦；以 cmd/main/main.mbt 的清单为准，
+  当前 8 条：login/logout/refreshToken/getCaptchaOpenFlag/captcha/getSm2PublicKey/sms sendCode/verifyCode）；
 - 密文校验对齐 boot2：**`md5(密码明文 + 盐)` 小写 hex**（注意顺序：密码在前盐在后；
   `core/password.mbt` 用 mooncrypt md5 + UTF-8，单测对标准向量）；校验顺序 = 存在 →
   锁定（`is_locked=1` 拒绝）→ 密文；用户不存在与密码错**同话术同码**（99990401
@@ -85,16 +86,17 @@ moon-token 判定：**豁免 > 例外清单（显式 rule）> 推导（derive_pe
 
 ### 4.4 失败响应
 
-`core-web/guard.mbt` 的 `on_error`：HTTP 401/403 + mldong 信封
-HTTP 200 + `{"code":99990403,"msg":<TokenError 原因>,"data":null}`（受保护端点 token 校验失败
+`core-web/guard.mbt` 的 `on_error`：**HTTP 恒 200** + mldong 信封
+`{"code":99990403,"msg":<TokenError 原因>,"data":null}`（受保护端点 token 校验失败
 一律 99990403——boot2 NotLoginException→TOKEN_NOT_EXIST、goframe middleware 同码；无权限 boot2
-走 99990406 NO_RESOURCE_AUTH，本栈暂同 99990403 记账待对齐；400→99990001 / 其余→99990000。
+走 99990406 NO_RESOURCE_AUTH，本栈同 99990403（**决策维持不对齐**，见 base-contract §5；
+vben5 只按 code≠0 分支）；400→99990001 / 其余→99990000。
 99990401 只归登录端点「用户名或密码错误」）。前端按 code 区分跳登录还是报无权限。
 
 ## 5. appCode 多应用机制
 
 对齐 boot2：登录头 `appCode`（缺省 `platform`）→ 会话级定死 → role/menu 按 `app_code` 双过滤。
-**落法 = moon-token 0.1.9 `extra` 会话属性通道**（首版曾复合进 login_id，owner 否了，见 §2）：
+**落法 = moon-token 0.1.10 `extra` 会话属性通道**（首版曾复合进 login_id，owner 否了，见 §2）：
 
 - 登录端点塞 extra 三键：`appCode`（登录头）、`ip`（客户端 IP）、`ua`（原样 User-Agent；
   boot2 `loginBrowser` 存的就是原样 UA，"os" 是日志层解析的，骨架同口径存原样）；
@@ -118,7 +120,8 @@ sys_user_role ──▶ sys_role (app_code 过滤) ──▶ sys_role_menu ─�
 - **中间表 `sys_user_role`/`sys_role_menu` 不立六件套**——boot2 只有 MP 实体无独立
   controller/service；授权挂主表端点（`POST /sys/user/grantRole`，`{userId, roleIds}`），
   **全量替换**式写入（删旧插新，`repository/perm_repository.mbt` 局部事务样板）；
-  `sys_role_menu` 写路 dao 层备好、暂无暴露端点（对齐 mldong 框架约定）；
+  `sys_role_menu` 写路已暴露 `/sys/rbac/saveRoleMenu`（10-05 起，vben5 授权弹窗消费，
+  boot2 RbacController 同位；dao 层 grant_menus 全量替换）；
 - 查询归 `RbacDao` 端口（`dao/perm_dao.mbt`）：`find_user_auth_by_name/by_id`（登录身份）、
   `find_role_codes`、`find_perms_by_user`（码链 join）、`grant_roles/grant_menus`（写路）；
 - `RbacServiceImpl` **双 impl**：`RbacService`（授权业务，登录端点/user 控制器用）+
@@ -137,21 +140,21 @@ sys_user_role ──▶ sys_role (app_code 过滤) ──▶ sys_role_menu ─�
 |---|---|---|
 | A1 | 登录带 `appCode: app1` | `userId` = 纯用户 id（无 `@app1` 后缀） |
 | A2 | app1 会话打已授权端点 | 200（app1 码链生效） |
-| A3 | 不带 appCode 头登录 | = platform；无权限端点 403 |
+| A3 | 不带 appCode 头登录 | = platform；无权限端点 99990403（HTTP 200） |
 | A4 | 超管 + 任意 appCode | 200（超管跨 app） |
-| A5 | 同用户先后登 app1/app2 | 两个 token 共存（app1 会话不被顶，app2 滤空 403） |
+| A5 | 同用户先后登 app1/app2 | 两个 token 共存（app1 会话不被顶，app2 滤空 99990403） |
 | A6 | 空 appCode 头 | = platform |
 | A7 | 头名大小写混写（`appcode:`） | 生效（HTTP 头名不区分大小写） |
-| A8 | 注销后旧 token | 401 |
+| A8 | 注销后旧 token | 99990403（HTTP 200） |
 
 **RBAC 真码（4 例）**：
 
 | # | 用例 | 预期 |
 |---|---|---|
-| R1 | 无 sys:user:page 的用户打 page | 99990403（boot2=99990406，记账待对齐） |
+| R1 | 无 sys:user:page 的用户打 page | 99990403（boot2=99990406，决策维持不对齐） |
 | R2 | SQL 授码后重登打 page | 200（码链生效） |
-| R3 | 同会话打未授权端点（sys:role:page） | 403（精确单码，不多授） |
-| R4 | 撤码后重登 | 403（撤销生效） |
+| R3 | 同会话打未授权端点（sys:role:page） | 99990403（精确单码，不多授） |
+| R4 | 撤码后重登 | 99990403（撤销生效） |
 
 **回归（4 例）**：login 200 且字段齐（token/refreshToken/userId）→ save/update/detail/grantRole/remove
 全 0 → 负向（非法 JSON/缺字段）99990001 → 未带 token 打受保护端点 99990403（HTTP 200）。
@@ -161,7 +164,7 @@ sys_user_role ──▶ sys_role (app_code 过滤) ──▶ sys_role_menu ─�
 
 **refreshToken（8 例，UC-0113）**：RR0 login 形状恰为 {token,refreshToken,userId} → RR1 rotate 出全新对 →
 RR2 新 access 打受保护端点 200 → RR3 旧 refresh 重放 99990410 → RR4 旧 access 99990403 →
-RR5 垃圾串 99990410 → RR6 rotate 延续 extra（platform 滤空仍 403、超管轮转后仍 200）→
+RR5 垃圾串 99990410 → RR6 rotate 延续 extra（platform 滤空仍 99990403、超管轮转后仍 code=0）→
 RR7 登出后其 refresh 联动失效 99990410（moon-token logout 单一漏斗内建）。
 
 ## 8. 已知 TODO

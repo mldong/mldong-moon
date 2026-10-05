@@ -104,7 +104,7 @@ pub(all) struct ColumnMeta {
 ## 5. 已验证
 
 10-04 冒烟（裸切面）：dbTable keywords=sys_user → 2 行；column/list sys_user → 21 列（id→Int64+isPk）；
-守卫在位：未登录 401、空 tableName 99990001、不存在表 → 空数组。
+守卫在位：未登录 99990403（HTTP 200）、空 tableName 99990001、不存在表 → 空数组。
 
 10-05 dev 台账轮全量门禁：moon check 0E/0W + 单测 **16/16**（推断器/拖拽算法/命名派生）+
 e2e **十一套 233/233**（matrix_dev 55 例：三台账 CRUD + importTable 探针推断四支 + getByTableName

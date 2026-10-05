@@ -13,14 +13,14 @@
 export MLDONG_DB_HOST=... MLDONG_DB_PWD=... MLDONG_DB_NAME=mldong-moon
 moon run --target wasm cmd/main     # 默认 127.0.0.1:18680
 
-# 契约 runner（协调仓根；16 组用例，本仓只读 5 组 + 缺模块 11 组）
+# 契约 runner（协调仓根；16 组用例全量覆盖）
 python scripts/contract-tests/contract_runner.py \
   --base-url http://127.0.0.1:18680 --user-name superAdmin --password 123456 \
   --no-redis --with-writes --with-file-upload \
   --report base-verify/reports/2026-10-03-moon-l2.json
 ```
 
-## 2. 最新结果（2026-10-04 菜单轮：**11 pass / 5 fail**，fail 全部是 404 缺模块）
+## 2. 最新结果（2026-10-05 收口轮：**16 pass / 0 fail** 全绿）
 
 | 用例组 | 端点 | 结果 | 说明 |
 |---|---|---|---|
@@ -70,7 +70,8 @@ python scripts/contract-tests/contract_runner.py \
 ## 5. 已记录的语义差异（不拦 runner，记账待议）
 
 - **无权限码**：boot2 NotPermissionException → 99990406 NO_RESOURCE_AUTH；moon 暂同 99990403
-  （runner 未测该支，superAdmin 全通行；补 menu 模块后建议对齐 99990406）。
+  （menu 模块 10-04 已上线、runner 全绿，vben5 只按 code≠0 分支——**决策：维持 99990403 不对齐**，
+  boot2 语义差异记账即可；若将来 vben5 出现"区分 401/403 跳转"需求再启）。
 - **登录失败码**：家族各栈本就不一（boot2 10000001 / goframe gerror 默认 50 / moon 99990401）——
   vben5 只看 code≠0 + msg，不构成契约破坏；保持 99990401。
 - **时间格式**：moon 统一 UTC（`format_unix_utc`），boot2 用服务器时区；runner 只断键存在不断时区。

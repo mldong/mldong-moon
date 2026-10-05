@@ -21,7 +21,7 @@ pub fn merge_policy(total : @guard.RoutePolicy, part : @guard.RoutePolicy) -> @g
 ///|
 /// mldong 风格的鉴权失败响应：**HTTP 恒 200**，业务码进信封（boot2 GlobalExceptionHandler
 /// 返回 CommonResult / goframe WriteJson(base.Fail(...)) 同约定——vben5 按 code 分支不走 HTTP 状态），
-/// code 99990401 未登录 / 99990403 token 无效，msg 取 TokenError 精确原因。
+/// 未登录/token 无效/无权限一律 HTTP 200 + code 99990403（99990401 只归登录密码错），msg 取 TokenError 精确原因。
 /// 经 Guard::with_on_error 挂上，替换 moon-token 默认的空体响应。
 pub async fn on_error(
   _request : @mb.Request,
