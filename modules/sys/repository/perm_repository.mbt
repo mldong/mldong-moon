@@ -1,5 +1,5 @@
 // RBAC MySQL 仓储 —— 权限链 join 查询 + 中间表授权写路（删旧插新，局部事务：
-// BEGIN → DELETE → 批量 INSERT → COMMIT，errdefer ROLLBACK——事务模板（§6.4.1）落地前的
+// BEGIN → DELETE → 批量 INSERT → COMMIT，errdefer ROLLBACK——请求作用域事务模板（后续轮）落地前的
 // 最小原地实现，模板就位后收敛过去）
 
 ///|

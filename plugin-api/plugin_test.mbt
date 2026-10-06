@@ -106,7 +106,7 @@ impl @moon-plugin-api.Plugin for BetaPlugin with fn on_disable(
 }
 
 ///|
-test "卡0验收：Array[&Plugin] 装两个异构实现并遍历 descriptor" {
+test "descriptor 验收：Array[&Plugin] 装两个异构实现并遍历 descriptor" {
   let a : &@moon-plugin-api.Plugin = AlphaPlugin::{ version: "1.0.0" }
   let b : &@moon-plugin-api.Plugin = BetaPlugin::{ version: "0.2.0" }
   let ps : Array[&@moon-plugin-api.Plugin] = [a, b]
@@ -119,7 +119,7 @@ test "卡0验收：Array[&Plugin] 装两个异构实现并遍历 descriptor" {
 }
 
 ///|
-test "卡0验收：MigrationDecl/RouteDecl/MenuDecl/DictDecl 字段齐全可构造" {
+test "契约类型验收：MigrationDecl/RouteDecl/MenuDecl/DictDecl 字段齐全可构造" {
   let m : @moon-plugin-api.MigrationDecl = {
     version: 2,
     ddl: "ALTER TABLE `p_beta_registration` ADD COLUMN `note` varchar(255) NULL",

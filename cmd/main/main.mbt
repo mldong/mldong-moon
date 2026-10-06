@@ -2,12 +2,12 @@
 // 起法：export MLDONG_DB_PWD=... && moon run --target wasm cmd/main   （默认 127.0.0.1:18680）
 //
 // ⚠ TokenAuth 必须在 main 内构造（不能顶层 let）：wasm 档顶层 let 在 __moonbit_init 阶段
-//   求值，那时平台熵未装好，opaque_style() 当场 abort（hub moonback 复测报告 §12 实测）。
+//   求值，那时平台熵未装好，opaque_style() 当场 abort（wasm 档真机实测）。
 
 ///|
 async fn main raise {
   let config = @core.MysqlConfig::from_env()
-  // 基线增量（先于鉴权/模块装配——插件的 DDL 可能依赖框架的新列，
+  // ② 基线增量（先于鉴权/模块装配——插件的 DDL 可能依赖框架的新列，
   //   且清单必须在 Guard 前被读到）：__framework__ 从
   //   MLDONG_MIGRATIONS_DIR（默认 doc/sql/migrations，相对启动 cwd）装载并应用；
   //   失败 = 拒绝启动，消息含组名 + version + 驱动原文
