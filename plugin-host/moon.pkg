@@ -4,11 +4,14 @@ import {
   "mldong/moon-core" @core,
   "mldong/moon-plugin-api" @api,
   "mldong/moon-sys/repository" @repo,
+  "moonbitlang/async" @async,
   "moonbitlang/async/fs" @fs,
+  "moonbitstack/moondb" @moondb,
 }
 
 import {
   "moonbitlang/async",
   "mldong/moon-core" @core,
+  "mldong/moon-plugin-api" @moon-plugin-api,
   "moonbitlang/async/fs" @fs,
 } for "test"
