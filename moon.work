@@ -1,9 +1,9 @@
 members = [
   "./core",
   "./core-web",
-  "./plugin-api",
-  "./plugin-host",
-  "./plugin-jeeflow",
+  "./plugins/api",
+  "./plugins/host",
+  "./plugins/jeeflow",
   "./modules/sys",
   "./modules/dev",
   "./modules/app",
