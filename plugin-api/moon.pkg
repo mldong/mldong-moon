@@ -1,0 +1,5 @@
+import {
+  "mldong/moon-core" @core,
+  "moonbitlang/moonback" @mb,
+  "moonbitstack/moondb" @moondb,
+}
