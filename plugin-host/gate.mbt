@@ -4,16 +4,19 @@
 // 防误用不防恶意（单用户连接防不住恶意），但"不给裸 Conn"那档是可用性防护——见 ScopedDb。
 
 ///|
-/// 装载期归属闸的输入：框架黑名单（information_schema 现读）+ 本轮注册的全部 descriptor。
+/// 装载期归属闸的输入：框架黑名单（information_schema 现读）+ 本轮注册的全部 descriptor
+/// + 契约路由前缀白名单（装配级；官方契约插件可声明白名单前缀下的路由，第三方仍锁 /plugin/<name>/）。
 pub(all) struct OwnershipGate {
   framework_tables : Array[String] // 基线表全名（sys_*/wf_*/dev_*/biz_*…现读）
   plugins : Array[@api.PluginDescriptor]
+  contract_prefixes : Array[String] // 如 ["/wf/"]；白名单前缀两两不撞（两插件同用一前缀即拒）
 }
 
 ///|
 /// 全量校验：任一违规即 raise，消息点名违规方（表名 / 插件名 / 路由），30 秒能定位。
 pub fn OwnershipGate::validate(self : OwnershipGate) -> Unit raise @core.MldongError {
   let declared : Map[String, String] = Map([], capacity=8) // "p_<name>_<suffix>" → owner
+  let claimed_prefix : Map[String, String] = Map([], capacity=4) // 契约前缀 → 插件名
   for p in self.plugins {
     validate_name(p.name)
     // 表命名空间段 = name（构造性）；声明后缀拼名后不得撞框架黑名单
@@ -33,14 +36,39 @@ pub fn OwnershipGate::validate(self : OwnershipGate) -> Unit raise @core.MldongE
         None => declared[full] = p.name
       }
     }
-    // 路由闸：path 必须 /plugin/<name>/ 开头；name == 路由前缀段逐字相等
-    //（四处逐字相等里"包名尾段"编译期已定、"表命名空间段"由拼名构造，这两处运行时无从写错）
+    // 路由闸：path 以 /plugin/<name>/ 开头，或命中装配级契约前缀白名单（如 /wf/，
+    // 官方契约插件与 13 栈同一 URL 契约）；同一契约前缀只许一个插件使用
     let prefix = "/plugin/\{p.name}/"
     for r in p.routes {
-      if r.path.length() < prefix.length() || r.path[0:prefix.length()].to_owned() != prefix {
+      let ok_plugin = r.path.length() >= prefix.length() &&
+        r.path[0:prefix.length()].to_owned() == prefix
+      let mut ok_contract = false
+      for cp in self.contract_prefixes {
+        if r.path.length() >= cp.length() && r.path[0:cp.length()].to_owned() == cp {
+          ok_contract = true
+        }
+      }
+      if !(ok_plugin || ok_contract) {
         raise @core.MldongError::Business(
-          "路由越界: 插件 \{p.name} 的路由 \{r.http_method} \{r.path} 不以 \{prefix} 开头",
+          "路由越界: 插件 \{p.name} 的路由 \{r.http_method} \{r.path} 不以 \{prefix} 开头也不在契约前缀白名单内",
         )
+      }
+    }
+    for cp in self.contract_prefixes {
+      let mut uses = false
+      for r in p.routes {
+        if r.path.length() >= cp.length() && r.path[0:cp.length()].to_owned() == cp {
+          uses = true
+        }
+      }
+      if uses {
+        match claimed_prefix.get(cp) {
+          Some(other) =>
+            raise @core.MldongError::Business(
+              "契约前缀冲突: \{cp} 被两个插件使用（\{other} 与 \{p.name}）",
+            )
+          None => claimed_prefix[cp] = p.name
+        }
       }
     }
     // migration 目标表扫描（一条一语句 ⇒ 取 token 即可，不做完整 parser）

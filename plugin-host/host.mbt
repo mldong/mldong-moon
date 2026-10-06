@@ -27,6 +27,18 @@ const CREATE_SYS_PLUGIN : String = "CREATE TABLE IF NOT EXISTS `sys_plugin` (`id
 const CREATE_SYS_PLUGIN_MIGRATION : String = "CREATE TABLE IF NOT EXISTS `sys_plugin_migration` (`id` bigint(20) NOT NULL COMMENT '主键', `plugin` varchar(64) NOT NULL COMMENT '插件名（含保留值 __framework__）', `version` int(11) NOT NULL COMMENT '组内单调递增，与 ddl_md5 一起做篡改检测', `ddl_md5` char(32) NOT NULL COMMENT '语句文本指纹；改历史必撞', `applied_time` datetime(3) DEFAULT NULL COMMENT '应用时间', `create_time` datetime(3) DEFAULT NULL COMMENT '创建时间', PRIMARY KEY (`id`), UNIQUE KEY `uk_plugin_version` (`plugin`, `version`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='migration 台账（append-only；插件与 __framework__ 同表同规则）'"
 
 ///|
+/// descriptor → 装载组（插件 migrations 进 apply_all 的桥梁；__framework__ 组之外的各插件组）
+pub fn descriptor_group(d : @api.PluginDescriptor) -> MigrationGroup {
+  {
+    name: d.name,
+    plugin_version: d.plugin_version,
+    spec_version: d.spec_version,
+    tables: d.tables,
+    migrations: d.migrations,
+  }
+}
+
+///|
 /// 语句文本指纹：统一 trim 后取 md5（人编辑文件补个换行不该误报篡改）。
 /// ddl 归一化（trim）在装载点做，这里只对已归一文本取指纹。
 pub fn ddl_md5(ddl : String) -> String {

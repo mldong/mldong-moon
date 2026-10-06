@@ -23,21 +23,28 @@ async fn main raise {
       abort("基线增量装载失败")
     }
   }
-  @host.apply_all(config, [fw_group]) catch {
+  // 官方插件注册表（第一插件 = jeeflow-moon；引擎 Facade 进程级一个）
+  let plugins = registry()
+  let groups : Array[@host.MigrationGroup] = [fw_group]
+  for p in plugins {
+    groups.push(@host.descriptor_group(p.descriptor()))
+  }
+  @host.apply_all(config, groups) catch {
     e => {
       println("[plugin-host][fatal] 基线增量应用失败: \{@core.MldongError::message(e)}")
       abort("基线增量应用失败")
     }
   }
   // 三方对账 + 归属闸（合一现读，规则与消息见 plugin-host/reconcile.mbt）：
-  //   不一致 = 拒绝启动，消息点名缺/多的是哪一方、哪些表
+  //   不一致 = 拒绝启动，消息点名缺/多的是哪一方、哪些表；
+  //   契约前缀白名单（/wf/）= 官方契约插件与 13 栈同一 URL 契约
   let mut fw_max = 0
   for m in fw_group.migrations {
     if m.version > fw_max {
       fw_max = m.version
     }
   }
-  @host.load_check(config, registry(), fw_max) catch {
+  @host.load_check(config, plugins, fw_max, ["/wf/"]) catch {
     e => {
       println("[plugin-host][fatal] 装载校验失败: \{@core.MldongError::message(e)}")
       abort("装载校验失败")
@@ -69,7 +76,7 @@ async fn main raise {
         .exempt("/sys/sms/verifyCode"),
       @sys.policy(),
     ),
-    @web.merge_policy(@dev.policy(), @appmod.policy()),
+    @web.merge_policy(@web.merge_policy(@dev.policy(), @appmod.policy()), plugin_policy(plugins)),
   )
   // 关推导：全显式声明，未列端点一律只验登录（个人中心族 boot2 同语义；
   // 推导兜底不用——权限码的最终形状一律写在各 controller 的 policy 片段里）
@@ -91,6 +98,17 @@ async fn main raise {
     // app 模块（APP 检查升级，UC-0610 免登录）
     ctx.use_(@appmod.install(g)) catch {
       _ => abort("app 模块挂载失败")
+    }
+    // 官方插件挂载：PluginContext（ScopedDb + 路由 sink + system Ctx）→ initialize
+    //   路由经 guard 注册（鉴权/权限码与框架自有端点零差别），policy 片段已在 Guard 前合入
+    for p in plugins {
+      let d = p.descriptor()
+      let pctx = @host.plugin_context(config, d, PluginRouteSink::{ g, mctx: ctx }) catch {
+        e => abort("插件 \{d.name} 装载失败: \{@core.MldongError::message(e)}")
+      }
+      p.initialize(pctx) catch {
+        e => abort("插件 \{d.name} initialize 失败: \{e}")
+      }
     }
     // 将来新模块各一行：
     // ctx.use_(@biz.module(config, g)) catch { _ => abort("biz 模块挂载失败") }

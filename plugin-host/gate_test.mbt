@@ -36,12 +36,9 @@ test "stmt_tables：ALTER 加列只认目标表，不把列名当表名" {
 
 ///|
 fn gate_of(plugins : Array[@moon-plugin-api.PluginDescriptor]) -> @moon-plugin-host.OwnershipGate {
-  {
-    framework_tables: [
+  { framework_tables: [
       "sys_user", "sys_dict", "sys_menu", "wf_process_define", "dev_schema", "biz_demo",
-    ],
-    plugins,
-  }
+    ], plugins, contract_prefixes: [] }
 }
 
 ///|
@@ -214,4 +211,42 @@ test "ScopedDb：事务语句首词判据（大小写不敏感）" {
   assert_true(@moon-plugin-host.is_transaction_word("START"))
   assert_true(!@moon-plugin-host.is_transaction_word("select"))
   assert_true(!@moon-plugin-host.is_transaction_word("insert"))
+}
+
+///|
+test "归属闸：契约前缀白名单放行官方契约路由（jeeflow /wf/ 形状）" {
+  let g : @moon-plugin-host.OwnershipGate = {
+    framework_tables: ["sys_user", "wf_process_define"],
+    plugins: [
+      plugin_of(
+        "jeeflow",
+        [],
+        [{ http_method: "POST", path: "/wf/processTask/todoList", perms: ["wf:processTask:todoList"], public: false }],
+        [],
+      ),
+    ],
+    contract_prefixes: ["/wf/"],
+  }
+  let mut err = ""
+  let _ = g.validate() catch {
+    e => err = @core.MldongError::message(e)
+  }
+  assert_eq(err, "")
+}
+
+///|
+test "归属闸：契约前缀两两不撞（两插件同用 /wf/ 即拒）" {
+  let g : @moon-plugin-host.OwnershipGate = {
+    framework_tables: [],
+    plugins: [
+      plugin_of("jeeflow", [], [{ http_method: "POST", path: "/wf/a", perms: [], public: false }], []),
+      plugin_of("other", [], [{ http_method: "POST", path: "/wf/b", perms: [], public: false }], []),
+    ],
+    contract_prefixes: ["/wf/"],
+  }
+  let mut err = ""
+  let _ = g.validate() catch {
+    e => err = @core.MldongError::message(e)
+  }
+  assert_true(err.contains("契约前缀冲突"))
 }

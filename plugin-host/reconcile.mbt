@@ -14,6 +14,7 @@ pub async fn load_check(
   config : @core.MysqlConfig,
   plugins : Array[&@api.Plugin],
   fw_max_version : Int,
+  contract_prefixes : Array[String],
 ) -> Unit raise @core.MldongError {
   let conn = @repo.open_conn(config)
   defer @repo.close_conn(conn)
@@ -39,7 +40,7 @@ pub async fn load_check(
   }
   // ④ 归属闸（含两两冲突校验 + migration 目标表扫描）
   let descriptors : Array[@api.PluginDescriptor] = plugins.map(fn(p) { p.descriptor() })
-  let gate : OwnershipGate = { framework_tables, plugins: descriptors }
+  let gate : OwnershipGate = { framework_tables, plugins: descriptors, contract_prefixes }
   gate.validate()
   // 记录方现读：sys_plugin 全集 + 逐插件 migration 计数
   let reg_rows = @repo.q(conn, "SELECT name FROM sys_plugin", [])
