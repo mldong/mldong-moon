@@ -1,6 +1,8 @@
 -- mldong-moon 全量初始化脚本（schema + 种子数据）
 -- 来源：mldong-boot2 doc/sql/mldong-plus1.0.sql，修复 INSERT 与 DDL 列数失配
 -- （sys_dept/sys_dict/sys_dict_item/sys_post/sys_role：variable 列后加未重导，remark 后补 NULL，2026-10-03）
+-- 基线号：本脚本 = doc/sql/migrations/*.sql 增量（__framework__ 组）之上的快照，
+--   基线号与 __framework__ 台账最大版本必须一致（装载期对账，不一致拒绝启动——插件装载器卡 3）。
 -- 用法：mysql -u<user> -p < mysql-schema-all.sql   （内置建库 + USE，可重复执行）
 
 SET NAMES utf8mb4;
@@ -1100,6 +1102,42 @@ CREATE TABLE `sys_sms_log` (
   KEY `idx_status_time` (`status`, `create_time`) USING BTREE,
   KEY `idx_biz_type` (`biz_type`, `create_time`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='短信发送日志';
+
+-- ----------------------------
+-- Table structure for sys_plugin（插件台账——装载器内部件，不进管理面 UI；卡 1）
+-- ----------------------------
+DROP TABLE IF EXISTS `sys_plugin`;
+CREATE TABLE `sys_plugin` (
+  `id` bigint(20) NOT NULL COMMENT '主键',
+  `name` varchar(64) NOT NULL COMMENT '插件名 = 包名尾段 = /plugin/<name>/ = p_<name>_；保留值 __framework__',
+  `plugin_version` varchar(32) NOT NULL COMMENT '插件版本（descriptor.plugin_version）',
+  `spec_version` int(11) NOT NULL COMMENT '契约号（descriptor.spec_version），装载期比对，不匹配拒绝启动',
+  `status` tinyint(1) NOT NULL DEFAULT 1 COMMENT '1=enabled 2=disabled 3=orphan',
+  `table_count` int(11) NOT NULL DEFAULT 0 COMMENT '声明的表数，对账用',
+  `install_time` datetime(3) DEFAULT NULL COMMENT '最近一次装载成功时间',
+  `create_user` bigint(20) DEFAULT NULL COMMENT '创建用户',
+  `create_time` datetime(3) DEFAULT NULL COMMENT '创建时间',
+  `update_user` bigint(20) DEFAULT NULL COMMENT '更新用户',
+  `update_time` datetime(3) DEFAULT NULL COMMENT '更新时间',
+  `remark` varchar(255) DEFAULT NULL COMMENT '备注（exec_raw 越界嫌疑等装载期审计挂这）',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_plugin_name` (`name`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='插件台账（框架所有）';
+
+-- ----------------------------
+-- Table structure for sys_plugin_migration（migration 台账——append-only，幂等性来源是它不是语句）
+-- ----------------------------
+DROP TABLE IF EXISTS `sys_plugin_migration`;
+CREATE TABLE `sys_plugin_migration` (
+  `id` bigint(20) NOT NULL COMMENT '主键',
+  `plugin` varchar(64) NOT NULL COMMENT '插件名（含保留值 __framework__）',
+  `version` int(11) NOT NULL COMMENT '组内单调递增，与 ddl_md5 一起做篡改检测',
+  `ddl_md5` char(32) NOT NULL COMMENT '语句文本指纹；改历史必撞',
+  `applied_time` datetime(3) DEFAULT NULL COMMENT '应用时间',
+  `create_time` datetime(3) DEFAULT NULL COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_plugin_version` (`plugin`, `version`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='migration 台账（append-only；插件与 __framework__ 同表同规则）';
 
 -- ----------------------------
 -- Records of sys_sms_template（mock 厂商占位模板，业务方可改可删）
