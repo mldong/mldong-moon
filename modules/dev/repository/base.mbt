@@ -1,4 +1,4 @@
-// BaseDao[T] —— 单表通用操作模板（BaseMapper 式）：由表编解码器驱动，一次实现全表复用；
+// BaseDao[T] —— 单表通用操作模板：由表编解码器驱动，一次实现全表复用；
 // 业务怎么组合由 service/dao 端口说了算。无反射的代价 = 每实体手写一份 TableCodec
 //（后续 gen 代码生成器补齐这块样板）
 
@@ -84,7 +84,7 @@ async fn[T] BaseDao::insert(self : BaseDao[T], t : T) -> Unit raise @core.Mldong
 }
 
 ///|
-/// UPDATE BY 主键（update_cols 里值为 N 的列不覆盖，MyBatis-Plus updateById 语义）
+/// UPDATE BY 主键（update_cols 里值为 N 的列不覆盖，updateById 语义）
 async fn[T] BaseDao::update_by_id(self : BaseDao[T], t : T) -> Unit raise @core.MldongError {
   let pairs : Array[@core.SetPair] = []
   for c in self.table.update_cols {

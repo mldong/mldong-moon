@@ -1,11 +1,11 @@
 // 登录/注销控制器 —— 对齐 mldong 框架约定：登录在 sys 模块（boot2 SysLoginController 同位）。
 // 密文校验对齐 boot2：md5(密码明文 + 盐) 小写 hex（core/password.mbt）；
-// login_id = sys_user.id 字符串（对齐 sa-token StpUtil.login(user.getId())），
+// login_id = sys_user.id 字符串（对齐 boot2 登录 loginId 口径），
 // 锁定/删除用户拒绝登录。
 // 会话级属性走 moon-token extra（appCode/ip/ua，moon-token 0.1.9 起）——不编进 login_id，
 // 免得污染按 login_id 的搜索面；boot2 LoginUser 三件套同物：
 // appCode=登录头缺省 platform、ip=客户端 IP、ua=原样 User-Agent（boot2 loginBrowser
-// 存的就是原样 UA，os 是日志层 hutool 解析的，骨架同口径存原样）。
+// 存的就是原样 UA，os 由日志层解析，骨架同口径存原样）。
 
 ///|
 pub fn[S : @port.TokenStore, P, R : @svc.RbacService] register_login(

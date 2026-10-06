@@ -106,12 +106,12 @@ pub(open) trait UserDao {
 
 - **每实体一份 `TableCodec[T]`**（无反射的代价，后续 gen 生成器产这份样板）：
   `name/cols/insert_cols/update_cols/from_row/id_of/del_col/order_col`；
-  `get` 返回 `N` 的列不写/不覆盖（MyBatis-Plus updateById 语义在 builder 层统一）；
+  `get` 返回 `N` 的列不写/不覆盖（updateById 语义在 builder 层统一）；
   `del_col: Some("is_deleted")` = 逻辑删，BaseDao 自动追加 `del_col = 0` 过滤；
-  **insert 跳过 N 值列**（null 不插入，列默认值生效——MyBatis-Plus 同语义，build_insert 实现）；
+  **insert 跳过 N 值列**（null 不插入，列默认值生效，build_insert 实现）；
 - **单表 CRUD 不写 SQL**——`BaseDao[T]` 模板全包（`insert/update_by_id/remove_by_ids/find_by_id/
   find_one/list/count/page`）；业务查询（join、专列）才手写 SQL（`user_page.mbt` 是样板）；
-- 行映射 `row_user` 按列名取（`row_text/row_i64/row_opt_*`，MyBatis resultMap 的手写对应物）；
+- 行映射 `row_user` 按列名取（`row_text/row_i64/row_opt_*`，手写行映射（无反射））；
   敏感列**照常进 `cols`**（读面需要：password/salt 登录密文校验/改密要读）；
   「不回显」的落点在 **dto 出参装配**——`user_json` 不装配该键即可（user_table.mbt 头注原话），
   把列剪出 cols 会让行映射恒 None 直接断业务；
@@ -148,7 +148,7 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn save(self,
 ### 3.6 controller（薄端点）
 
 ```moonbit
-// 权限码片段与端点同文件（对齐 boot2 @SaCheckPermission 注解位置）——详见 [permissions.md](permissions.md)
+// 权限码片段与端点同文件（对齐 boot2 权限注解位置）——详见 [permissions.md](permissions.md)
 pub fn user_policy() -> @guard.RoutePolicy { ... }
 
 pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService, R : @svc.RbacService]

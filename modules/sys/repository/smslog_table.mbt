@@ -49,7 +49,7 @@ let smslog_table : TableCodec[@entity.SmsLog] = TableCodec::{
 }
 
 ///|
-/// 行映射按列名取 —— MyBatis resultMap 的手写对应物
+/// 行映射按列名取 —— 手写行映射（无反射）
 fn row_smslog(r : @moondb.Row) -> @entity.SmsLog {
   {
     id: row_i64(r, "id"),

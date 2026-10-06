@@ -52,7 +52,7 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.DictService]
     }
     @core.ok_page(req.page_num, req.page_size, total, arr)
   })
-  // getByDictType（仅登录，boot2 无 @SaCheckPermission 同位）：[{label,value(+ext?)}]，
+  // getByDictType（仅登录，boot2 同位不加权限码）：[{label,value(+ext?)}]，
   // 未知类型空数组（UC-0413）；出口不带 id/dataType（UC-0431③ 纯增量红线）
   let get_by_type_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
     let ctx = @web.ctx_of(request)

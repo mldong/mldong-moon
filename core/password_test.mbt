@@ -1,4 +1,4 @@
-// 密码件单测 —— md5 向量为公开标准值（hutool SecureUtil.md5 同式：UTF-8 小写 hex）
+// 密码件单测 —— md5 向量为公开标准值（UTF-8 小写 hex）
 
 ///|
 test "md5_hex 标准向量" {

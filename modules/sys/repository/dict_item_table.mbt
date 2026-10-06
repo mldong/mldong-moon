@@ -50,7 +50,7 @@ let dictitem_table : TableCodec[@entity.DictItem] = TableCodec::{
 }
 
 ///|
-/// 行映射按列名取 —— MyBatis resultMap 的手写对应物
+/// 行映射按列名取 —— 手写行映射（无反射）
 fn row_dictitem(r : @moondb.Row) -> @entity.DictItem {
   {
     id: row_i64(r, "id"),

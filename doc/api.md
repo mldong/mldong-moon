@@ -9,7 +9,7 @@
 | `/sys/refreshToken` | 豁免 | `{refreshToken}` → 全新 `{token, refreshToken, userId}`（全量轮转：旧 access+旧 refresh 同时失效；失败统一 `99990410` 不泄露原因） |
 | `/sys/logout` | 豁免 | 注销当前 token |
 | `/sys/user/save` | `sys:user:save` | 新增（用户名查重；不收密码，发默认密码 `123456` + 8 位随机盐，boot2 同机制；雪花 ID 全部字符串出入，防 JS 精度丢失） |
-| `/sys/user/update` | `sys:user:update` | 修改（未传字段不覆盖，MyBatis-Plus updateById 语义） |
+| `/sys/user/update` | `sys:user:update` | 修改（未传字段不覆盖，updateById 语义） |
 | `/sys/user/remove` | `sys:user:remove` | 逻辑删除 `{ids:[..]}` |
 | `/sys/user/detail` | `sys:user:detail` | 单个 `{id}` |
 | `/sys/user/page` | `sys:user:page` | 分页：join dept/post 名称 + m_ 动态条件 + keywords |

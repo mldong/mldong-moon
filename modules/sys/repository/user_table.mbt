@@ -75,7 +75,7 @@ fn opt_l(v : Int64?) -> @core.SqlValue {
 }
 
 ///|
-/// 行映射按列名取 —— MyBatis resultMap 的手写对应物（avatar/password/salt 等骨架不回显）
+/// 行映射按列名取 —— 手写行映射（无反射）（avatar/password/salt 等骨架不回显）
 fn row_user(r : @moondb.Row) -> @entity.User {
   {
     id: row_i64(r, "id"),

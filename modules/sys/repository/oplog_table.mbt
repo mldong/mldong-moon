@@ -75,7 +75,7 @@ let oplog_table : TableCodec[@entity.OpLog] = TableCodec::{
 }
 
 ///|
-/// 行映射按列名取 —— MyBatis resultMap 的手写对应物
+/// 行映射按列名取 —— 手写行映射（无反射）
 fn row_oplog(r : @moondb.Row) -> @entity.OpLog {
   {
     id: row_i64(r, "id"),

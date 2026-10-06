@@ -393,7 +393,7 @@ pub fn render_table(plan : TablePlan) -> String {
   o.line("}")
   o.line("")
   o.line("///|")
-  o.line("/// 行映射按列名取 —— MyBatis resultMap 的手写对应物")
+  o.line("/// 行映射按列名取 —— 手写行映射（无反射）")
   o.line("fn row_" + plan.lc + "(r : @moondb.Row) -> @entity." + plan.class_name + " {")
   o.line("  {")
   o.line("    id: row_i64(r, \"id\"),")

@@ -1,5 +1,5 @@
 // 时钟 + 雪花 ID —— clock 算法抄 jeeflow-moon（civil_from_days, Howard Hinnant）；
-// 雪花对齐 MyBatis-Plus IdWorker 同 ID 空间（EPOCH=1288834974657），worker 骨架期固定 1
+// 雪花 ID（EPOCH=1288834974657，与 boot2 同 ID 空间——两栈同库共存 ID 不相撞），worker 骨架期固定 1
 
 ///|
 pub fn epoch_millis() -> Int64 {

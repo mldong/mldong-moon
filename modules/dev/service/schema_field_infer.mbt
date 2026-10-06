@@ -1,5 +1,5 @@
 // 字段配置智能推断 —— boot2 SchemaFieldInferUtil 逐规则 port + goframe schema_field_infer.go
-// 的 SQL 类型映射（moon 直读 information_schema，无 MyBatis-Plus ColumnType 可用）与
+// 的 SQL 类型映射（moon 直读 information_schema）与
 // UC-0309 增补（备注语义 Textarea 优先 / 日期数字列可排序 / columnWidth 默认列宽）。
 // 纯函数零 IO——moon test 直跑（单测在 service/schema_field_infer_test.mbt）。
 

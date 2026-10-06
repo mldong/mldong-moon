@@ -1,6 +1,6 @@
 // moon-token 集成工具 —— 权限码模块化收集与 mldong 信封失败响应
 //
-// 收集模式（对齐 boot2 @SaCheckPermission 注解位置）：权限码声明在端点旁——
+// 收集模式（对齐 boot2 权限注解位置）：权限码声明在端点旁——
 // 各实体 controller 导出 policy() 片段（显式 rule 例外 + 豁免，与端点同文件维护），
 // 模块聚合、main 合并进总 policy 后交 Guard；推导（derive_perm）只作兜底，
 // URL 与权限码不一致的场景（如 boot2 /sys/user/locked 双码 OR）一律显式 rule 表达。
@@ -46,7 +46,7 @@ pub async fn on_error(
 
 ///|
 /// 从请求取 token（头优先、同名 cookie 兜底），并剥 "Bearer " 前缀——
-/// 与 TokenConfig.token_prefix 同一约定（mldong 框架：sa-token token-prefix + vben5 发 "Bearer <token>"）。
+/// 与 TokenConfig.token_prefix 同一约定（mldong 框架：token-prefix 头约定 + vben5 发 "Bearer <token>"）。
 /// 豁免面端点（登录/注销）不走 guard 的 extract_token，手取头时必须用本函数对齐，
 /// 否则拿到带前缀的串查不到会话且 logout 幂等不报错（静默失效，已踩）。
 pub fn token_of(request : @mb.Request) -> String {

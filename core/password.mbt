@@ -1,5 +1,5 @@
-// 密码散列与盐 —— 对齐 boot2 口径：md5(密码明文 + 盐) 小写 hex（hutool SecureUtil.md5 同物），
-// 盐 = 8 位小写字母+数字随机串（hutool RandomUtil.randomString 同字母表）。
+// 密码散列与盐 —— 对齐 boot2 口径：md5(密码明文 + 盐) 小写 hex，
+// 盐 = 8 位小写字母+数字随机串（boot2 生成件同字母表）。
 // 默认密码机制对齐 boot2 save/resetPwd：新建/重置用户发 DEFAULT_PASSWORD，不收用户自报密码。
 
 ///|
@@ -15,7 +15,7 @@ pub fn md5_hex(s : String) -> String {
 }
 
 ///|
-/// 8 位盐：小写字母 + 数字（hutool RandomUtil.randomString(8) 同字母表）
+/// 8 位盐：小写字母 + 数字（boot2 同字母表）
 pub fn random_salt() -> String {
   let charset = "abcdefghijklmnopqrstuvwxyz0123456789"
   let rand = @random.Rand::new()

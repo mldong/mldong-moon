@@ -1,6 +1,6 @@
 # 权限与鉴权（moon-token 集成）
 
-> 鉴权底座 = [mldong/moon-token](https://github.com/mldong/moon-token)（owner 自研，Sa-Token 机制
+> 鉴权底座 = [mldong/moon-token](https://github.com/mldong/moon-token)（owner 自研，原版会话件机制
 > 的 MoonBit 重写）。本文讲三件事：登录态怎么签发流转、权限码从哪来到哪去、appCode 多应用怎么隔离。
 > 改鉴权/RBAC 相关代码前必读；改完按 §7 矩阵复跑。
 
@@ -25,7 +25,7 @@
   “用户名或密码错误”，防枚举，boot2 两支同抛 USER_NOT_EXIST 同设计；mldong 框架登录失败码各自
   为政——boot2=10000001、其余各语言实现自定，本栈定案 99990401 走登录失败语义）；
   **鉴权失败 HTTP 恒 200**，业务码进信封（boot2 GlobalExceptionHandler / goframe WriteJson 同约定）；
-- `login_id = sys_user.id 字符串`（对齐 sa-token `StpUtil.login(user.getId())`），
+- `login_id = sys_user.id 字符串`（对齐 boot2 登录 loginId 口径），
   **纯 id，不含任何后缀**——appCode 等会话属性走 extra（§5），别复合进 login_id
   （会污染按 login_id 的搜索面，owner 定过案）；
 - 响应 data：`token / refreshToken / userId`（契约字段名对齐 mldong 框架约定 LoginVO，userId = login_id = sys_user.id 字符串）；
@@ -36,7 +36,7 @@
 
 ```moonbit
 let token_cfg = @app.TokenConfig::default()
-token_cfg.token_prefix = "Bearer"                       // 对齐 mldong 框架约定（sa-token token-prefix + vben5）
+token_cfg.token_prefix = "Bearer"                       // 对齐 mldong 框架约定（token-prefix 头约定 + vben5）
 let auth = @app.TokenAuth::new("user", token_cfg,
   @mem.MemoryStore::new("user"),
   @sys.rbac_provider(config),                            // 供数方 = RBAC 真实现
@@ -56,7 +56,7 @@ let g = @mbguard.Guard::new(auth, policy).with_on_error(@web.on_error)
 
 ## 4. 权限码：声明、收集、判定
 
-### 4.1 声明位置——与端点同文件（对齐 boot2 `@SaCheckPermission` 注解位置）
+### 4.1 声明位置——与端点同文件（对齐 boot2 权限注解位置）
 
 每个实体 controller 导出 `policy()` 片段，全部**显式 rule**：
 
@@ -104,7 +104,7 @@ vben5 只按 code≠0 分支）；400→99990001 / 其余→99990000。
   SQL 里 `role.app_code`/`menu.app_code` 双过滤；
 - 超管判定（`admin_type=1`）只看用户属性，**与 appCode 无关**（boot2 同）；
 - 会话语义：moon-token 默认 `Coexist` + max_sessions=12——**同用户不同 appCode 的会话共存**
-  （各自独立 token，互不顶），与 boot2 sa-token is-concurrent 同语义；
+  （各自独立 token，互不顶），与 boot2 is-concurrent 同语义；
 - extra 随 rotate 存活（moon-token 单测覆盖）；新增会话级属性照三键模式塞 extra，别走 login_id。
 
 ## 6. RBAC 真码链

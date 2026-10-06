@@ -4,7 +4,7 @@
 ///|
 /// 权限码片段——与端点同文件声明；全部显式 rule（推导兜底已被 main 关闭）
 pub fn message_policy() -> @guard.RoutePolicy {
-  // boot2 对齐：仅 save/update 有 @SaCheckPermission；remove/detail/page/setRead/
+  // boot2 对齐：仅 save/update 有权限码；remove/detail/page/setRead/
   // 未读计数无注解 = 仅登录（runner UC-0501 注释同口径："消息 page 为无权限接口"）
   @guard.RoutePolicy::new()
     .rule(@guard.RouteRule::make("/sys/message/save", ["sys:message:save"]))

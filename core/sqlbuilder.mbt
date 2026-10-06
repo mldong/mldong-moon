@@ -1,4 +1,4 @@
-// SQL 构建器 —— MyBatis-Plus QueryWrapper 式的条件组与单表语句构建
+// SQL 构建器 —— 链式条件组与单表语句构建
 // 绑定值用中性 SqlValue（core 零 ORM 依赖），dao-mysql 侧转 @moondb.Value；
 // 全部值走 ? 占位参数，永不拼进 SQL 文本（注入安全同 mldong 框架口径）
 
@@ -217,7 +217,7 @@ pub fn Wrapper::build(self : Wrapper) -> (String, Array[SqlValue]) {
 }
 
 ///|
-/// SET 键值对（update 用；值为 N 的列在 build_update 时跳过 —— 对齐 MyBatis-Plus
+/// SET 键值对（update 用；值为 N 的列在 build_update 时跳过 ——
 /// updateById 的 null 字段不覆盖语义）
 pub(all) struct SetPair {
   col : String
@@ -280,7 +280,7 @@ pub fn build_select(
 }
 
 ///|
-/// INSERT 构建：值为 N 的列跳过（null 不插入，列默认值生效——MyBatis-Plus 同语义；
+/// INSERT 构建：值为 N 的列跳过（null 不插入，列默认值生效；
 /// 全跳过时报错防零列插入）
 pub fn build_insert(table : String, pairs : Array[SetPair]) -> (String, Array[SqlValue]) {
   let cols = StringBuilder()

@@ -4,7 +4,7 @@
 // update=sys:user:update detail=sys:user:detail page=sys:user:page
 
 ///|
-/// 权限码片段——与端点同文件声明（对齐 boot2 @SaCheckPermission 注解位置）。
+/// 权限码片段——与端点同文件声明（对齐 boot2 权限注解位置）。
 /// 全部显式 rule：URL 与码不一致的场景（boot2 /sys/user/locked 双码 OR 那类）就改这里，
 /// 推导只作兜底不依赖。guard 下一轮挂时这些码已是最终形状。
 pub fn user_policy() -> @guard.RoutePolicy {
@@ -117,7 +117,7 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
 
   // ---- 个人中心族（principal_of 取登录主体；main 已关推导，这些端点只验登录）----
 
-  // 当前权限标识（boot2 permCode = StpUtil.getPermissionList()）
+  // 当前权限标识（boot2 permCode 口径）
   let perm_code_handler : @mb.Handler = @web.wrap(fn(request) -> Json raise @core.MldongError {
     let codes = match @mbguard.principal_of(request) {
       Some(p) => p.permissions
@@ -496,7 +496,7 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
   }
   let logout_by_token_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
     for token in kick_str_ids(@web.json_body(request)) {
-      // 单个 token 无效静默跳过（boot2 sa-token logout 按 token 不抛同口径）
+      // 单个 token 无效静默跳过（boot2 logout 按 token 不抛同口径）
       auth.logout(token) catch {
         _ => ()
       }

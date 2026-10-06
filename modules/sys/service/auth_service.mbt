@@ -91,7 +91,7 @@ pub async fn[S : @port.TokenStore, P, R : RbacService] play(
     (
       "playerRefreshToken",
       // moon 特有兜底：操作者原 access 2h 滑动过期后，unPlay 靠它 rotate 换全新对
-      // （boot2 sa-token token 长活无此步）
+      // （boot2 token 长活无此步）
       match op_session {
         Some(ss) => ss.refresh_token()
         None => ""
