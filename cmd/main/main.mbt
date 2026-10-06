@@ -7,6 +7,28 @@
 ///|
 async fn main raise {
   let config = @core.MysqlConfig::from_env()
+  // 基线增量（先于鉴权/模块装配——插件的 DDL 可能依赖框架的新列，
+  //   且清单必须在 Guard 前被读到）：__framework__ 从
+  //   MLDONG_MIGRATIONS_DIR（默认 doc/sql/migrations，相对启动 cwd）装载并应用；
+  //   失败 = 拒绝启动，消息含组名 + version + 驱动原文
+  let migrations_dir = match @env.get_env_var("MLDONG_MIGRATIONS_DIR") {
+    Some(v) => if v.is_empty() { "doc/sql/migrations" } else { v }
+    None => "doc/sql/migrations"
+  }
+  let fw_group = @host.framework_group(migrations_dir) catch {
+    e => {
+      // ⚠ wasm 档 abort 的消息不落日志（10-06 实测 run3：只有 RuntimeError 栈）——
+      //   拒绝启动的消息必须先 println 再 abort，否则"消息点名"判据测的是空气
+      println("[plugin-host][fatal] 基线增量装载失败: \{@core.MldongError::message(e)}")
+      abort("基线增量装载失败")
+    }
+  }
+  @host.apply_all(config, [fw_group]) catch {
+    e => {
+      println("[plugin-host][fatal] 基线增量应用失败: \{@core.MldongError::message(e)}")
+      abort("基线增量应用失败")
+    }
+  }
   // 鉴权装配（熵依赖运行时，必须在 main 内构造）
   // token_prefix="Bearer"：对齐 mldong 接口契约（sa-token token-prefix + vben5 发 "Bearer <token>"）
   // 供数方 = sys 模块的 RBAC 真实现（码链走库：user_role → role_menu → menu.code）

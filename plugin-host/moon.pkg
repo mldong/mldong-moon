@@ -1,0 +1,14 @@
+supported_targets = "+native+wasm"
+
+import {
+  "mldong/moon-core" @core,
+  "mldong/moon-plugin-api" @api,
+  "mldong/moon-sys/repository" @repo,
+  "moonbitlang/async/fs" @fs,
+}
+
+import {
+  "moonbitlang/async",
+  "mldong/moon-core" @core,
+  "moonbitlang/async/fs" @fs,
+} for "test"
