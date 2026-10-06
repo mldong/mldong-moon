@@ -195,7 +195,12 @@ let (sql, params) = @core.build_select("sys_user", cols, w, orders=[("create_tim
 
 现状：**多写操作在 repository 原地开局部事务**（`perm_repository.mbt` 的 `grant_roles/grant_menus`
 是样板）：`open_conn → begin → errdefer{rollback; close} → 语句 → commit → close`。
-正式的事务模板（环境连接 + 嵌套复用，参照 jeeflow-moon `MysqlTxTemplate`）在路线图上，
+正式的事务模板在路线图上，但**参照对象不是 jeeflow-moon 的旧形状**：它原来把"环境连接"做成进程级全局
+`Ref`，并发请求会互相提交、并把别人已确认的写入抹掉（真库实测复现过）。该缺陷在 jeeflow-moon 0.1.27 修掉，
+现读参照＝修后的形状：**句柄随仓储实例走、请求边界新建派生实例**（见其
+[`docs/CHANGELOG.md`](https://github.com/mldong/jeeflow-moon/blob/master/docs/CHANGELOG.md) 的 0.1.27 一节）。
+本仓的对应载体是 `core.Ctx`（service 第一参已经是它 ⇒ 派生入口挂在 `Ctx` 上，不在仓储上再挂一层）——
+**不要**照搬 contextvars/AsyncLocalStorage 那种类比，本栈没有 task-local。
 就位后 grant 写路收敛过去——新写多语句事务先照 grant 样板，别发明第三种写法。
 
 ## 6. 模块化（sys/dev/biz）
