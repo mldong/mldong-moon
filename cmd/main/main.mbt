@@ -29,6 +29,20 @@ async fn main raise {
       abort("基线增量应用失败")
     }
   }
+  // 三方对账 + 归属闸（合一现读，规则与消息见 plugin-host/reconcile.mbt）：
+  //   不一致 = 拒绝启动，消息点名缺/多的是哪一方、哪些表
+  let mut fw_max = 0
+  for m in fw_group.migrations {
+    if m.version > fw_max {
+      fw_max = m.version
+    }
+  }
+  @host.load_check(config, registry(), fw_max) catch {
+    e => {
+      println("[plugin-host][fatal] 装载校验失败: \{@core.MldongError::message(e)}")
+      abort("装载校验失败")
+    }
+  }
   // 鉴权装配（熵依赖运行时，必须在 main 内构造）
   // token_prefix="Bearer"：对齐 mldong 接口契约（sa-token token-prefix + vben5 发 "Bearer <token>"）
   // 供数方 = sys 模块的 RBAC 真实现（码链走库：user_role → role_menu → menu.code）

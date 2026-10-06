@@ -4,6 +4,7 @@ import {
   "mldong/moon-core" @core,
   "mldong/moon-core-web" @web,
   "mldong/moon-plugin-host" @host,
+  "mldong/moon-plugin-api" @api,
   "mldong/moon-token/app" @app,
   "mldong/moon-token/guard" @guard,
   "mldong/moon-token/style" @style,
