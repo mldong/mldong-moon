@@ -177,5 +177,12 @@ check('S8 平台域零波及', len(plat['data'])>0 and find_v2(plat['data'],'syn
 r=spost('/sys/menu/tree',{})
 check('S9 域内 tree 可见同步行', r['code']==0 and len(r['data'])==1 and r['data'][0]['code']=='sync_menu', str(r['data'])[:80])
 
+# ---- 菜单徽标配置（/badgeConfig：前端 badge.ts 进页面拉一次、之后每 5 分钟一次）----
+r=post('/badgeConfig',{},t)
+check('BD1 badgeConfig 信封+data 数组（当前是空数组占位）',
+      r['code']==0 and isinstance(r['data'],list) and len(r['data'])==0, str(r)[:80])
+r=post('/badgeConfig',{})
+check('BD2 未登录 99990403（只验登录、无权限码）', r['code']==99990403, str(r)[:80])
+
 print('OK %d FAIL %d'%(ok,bad))
 raise SystemExit(0 if bad==0 else 1)

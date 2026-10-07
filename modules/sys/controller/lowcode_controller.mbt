@@ -142,6 +142,19 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, R : @svc.RbacService]
   // 自带的 select 端点承载（U1 契约 {label,value}），这里不再重复注册——
   // moonback Trie 的 put_route 先查后插：同形静态路由二次注册会 RouteConflict。
   //
+  // 菜单徽标配置（boot2 `LowCodeController:/badgeConfig`、fastapi `low_code_controller:/badgeConfig` 同位）：
+  // 前端 `apps/web-antd/src/badge.ts` 登录后进页面就拉一次、之后每 5 分钟拉一次，消费形状是
+  // `data: Array<{menuCode, badge, badgeType, badgeVariants}>`（`responseReturn:'body'` 取整信封后读 .data）。
+  // boot2 那份内容由 wf 待办数聚合 + 各模块 `MenuBadgeConfigProvider` 拼出来，moon 侧还没有徽标来源，
+  // 先出空数组：`Array.isArray` 分支直接短路，不贴脏值也不报错，等接工作流时再按同一形状供数。
+  // 只验登录、无权限码（boot2 那一条只有 @RequestMapping、fastapi 也没挂 @SaCheckPermission）。
+  // 形状同 dict_controller 的 clear_cache_handler：`@web.wrap(fn…) -> Json` 不带 async——
+  // 写了 `async` 就会隐式打开 `Error` 效果而与 wrap 要求的 `raise @core.MldongError` 判型不符。
+  let badge_config_handler : @mb.Handler = @web.wrap(fn(_request) -> Json {
+    let empty : Array[Json] = []
+    @core.ok_data(Json::array(empty))
+  })
+  //
   // 注册顺序敏感（moonback Trie 特性）：put_route 对模式串做 search 时，首段 :module
   // 会先撞已存在的静态子再落到根 param 子——若先注册 /:module/:table/select，后注册
   // 的 /lowCode/:tableName/* 会在查型阶段沿 param 链误命中前者的 Route（同深度同尾段）
@@ -157,5 +170,8 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, R : @svc.RbacService]
   }
   g.post(ctx, "/:module/:table/select", select_handler) catch {
     _ => abort("通用 select 路由注册失败（路由冲突?）")
+  }
+  g.post(ctx, "/badgeConfig", badge_config_handler) catch {
+    _ => abort("badgeConfig 路由注册失败（路由冲突?）")
   }
 }

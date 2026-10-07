@@ -66,7 +66,7 @@ python scripts/contract-tests/contract_runner.py \
 | ~~app 模块~~ **已补（10-05，moon 档蒲公英外呼降级见 §2 UC-0610 行）** | `/app/appVersion/check` | UC-0610：免登录、不查库、转调蒲公英自比较 `buildVersionNo`、任何失败降级 `data:null`（家族 13 栈 2026-09-20 已全量对齐，goframe `fd88b94` 为基准） |
 | ~~dev_schema 模型~~ **已补（10-05）** | boot2 dev 22 端点全量 | 见下节"dev 模块"行 |
 | ~~SSE~~ **已补（10-05）** | `/sse/events` | UC-0608 |
-| ~~sys/sys 增补面~~ **已补（10-05 按需增补轮）** | 低代码下拉三路由 + RBAC 授权 7 端点 + 踢人四件套 + captcha 三件套 + dept tree/autoSort/updateSort + dict clearCache + 日志两表 CRUD5 + sms 六面 + timer 内存态 9 端点 + 任务队列/历史 cancel/restore | 仲裁口径：**boot2 sys/dev 全表扫描 → vben5 实际消费 → 按需补**。明确不做（前端零消费）：oauth2、thirdParty/relThirdAccount、machine 信息、notice 孤表、dict generateExportUrl/importTo、querySchema 运行时消费 |
+| ~~sys/sys 增补面~~ **已补（10-05 按需增补轮）** | 低代码下拉三路由 + RBAC 授权 7 端点 + 踢人四件套 + captcha 三件套 + dept tree/autoSort/updateSort + dict clearCache + 日志两表 CRUD5 + sms 六面 + timer 内存态 9 端点 + 任务队列/历史 cancel/restore + 菜单徽标 `/badgeConfig`（10-07 补，前端 `badge.ts` 有调、当前出空数组占位） | 仲裁口径：**boot2 sys/dev 全表扫描 → vben5 实际消费 → 按需补**。明确不做（前端零消费）：oauth2、thirdParty/relThirdAccount、machine 信息、notice 孤表、dict generateExportUrl/importTo、querySchema 运行时消费 |
 
 ## 5. 已记录的语义差异（不拦 runner，记账待议）
 
