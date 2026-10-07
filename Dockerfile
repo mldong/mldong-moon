@@ -43,4 +43,5 @@ WORKDIR /app
 # 基线增量目录随镜像走（装载器 MLDONG_MIGRATIONS_DIR 默认相对 cwd）
 COPY doc/sql/migrations doc/sql/migrations
 EXPOSE 18680
+# MLDONG_LISTEN_HOST=0.0.0.0 由 docker run -e / compose 传入（本仓默认 127.0.0.1 仅本机 dev）
 CMD ["moonrun", "/app/main.wasm"]

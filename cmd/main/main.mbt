@@ -115,7 +115,12 @@ async fn main raise {
   })
   let app = @mb.App(root)
   defer app.close()
-  let server = @mb.listen(host="127.0.0.1", port=18680)
+  // 监听地址可配（容器/镜像形态须 0.0.0.0 才能被端口映射到；本机 dev 默认 127.0.0.1）
+  let listen_host = match @env.get_env_var("MLDONG_LISTEN_HOST") {
+    Some(v) => if v.is_empty() { "127.0.0.1" } else { v }
+    None => "127.0.0.1"
+  }
+  let server = @mb.listen(host=listen_host, port=18680)
   println("mldong-moon listening on http://127.0.0.1:18680")
   println("端点：POST /sys/login /sys/logout /sys/refreshToken /sys/getCaptchaOpenFlag + /sys/user/*（含 grantRole） /sys/role|dept|post|config|dict|dictItem/*（带鉴权） /dev/schema/*")
   app.serve(server)
