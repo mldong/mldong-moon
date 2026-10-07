@@ -62,7 +62,10 @@ pub let jeeflow_actions : Array[String] = [
 ]
 
 ///|
-/// 权限码：wf:{action，/→:}（boot4 同规律）——wf:processInstance:stats:overview 形
+/// 权限码：`wf:{action，/→:}`（boot4 `WfFlowController.checkPermission` 同规律）——
+/// 形如 `wf:processInstance:stats:overview`。**前缀必须有**：菜单种子里那 49 条 wf 按钮码全带 `wf:`
+/// （现读 `sys_menu where code like 'wf:%'`），漏掉前缀会让非超管账号即使被授了权也恒 99990406
+/// ——超管走 `is_super_admin` 豁免，所以这条只在真实授权账号上暴露，10-07 由 owner 前端走查抓出。
 pub fn perm_code(action : String) -> String {
   let sb = StringBuilder()
   for i in 0..<action.length() {
@@ -76,7 +79,7 @@ pub fn perm_code(action : String) -> String {
       None => ()
     }
   }
-  sb.to_string()
+  "wf:" + sb.to_string()
 }
 
 ///|

@@ -128,5 +128,21 @@ if del_ids:
     left, _ = wf_msgs('wf_task')
     check('W11 探针消息自清', d.get('code') == 0 and not left, left)
 
+# ---- 非超管授权档（10-07 前端走查抓出的集成遗漏回归闸）----
+# 超管走 is_super_admin 豁免，权限码前缀写错它照样绿；种子账号 u0010 挂 role「manage」。
+# 负向码**从该账号现读的 permCode 里挑**（种子 sys_menu 有多行同码 wf:processTask:todoList，
+# 按 sys_role_menu 反查"未授"会挑到其实已授的那条——现读 34 码里就含 todoList）：
+# wf:processInstance:stats:overview 现读不在授权集内，且是只读端点，拿它当负向最稳。
+try:
+    tu = post('/sys/login', {'userName': 'u0010', 'password': '123456'})['data']['token']
+    granted = post('/wf/processInstance/page', {'pageNum': 1, 'pageSize': 5}, tu)
+    check('W12 授权账号调已授 wf 端点放行', granted.get('code') == 0, granted)
+    denied = post('/wf/processInstance/stats/overview', {}, tu)
+    check('W13 未授 wf 端点 99990406 且码带 wf: 前缀',
+          denied.get('code') == 99990406
+          and 'wf:processInstance:stats:overview' in (denied.get('msg') or ''), denied)
+except Exception as e:  # 种子账号不在了也要报出来，别静默跳过
+    check('W12/W13 非超管档可跑', False, e)
+
 print('== wf_lifecycle: OK %d FAIL %d' % (ok, bad))
 raise SystemExit(0 if bad == 0 else 1)
