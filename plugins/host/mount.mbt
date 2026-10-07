@@ -10,8 +10,9 @@ pub async fn plugin_context(
   routes : &@api.PluginRoutes,
   sys_query : &@api.SysQueryApi,
   dicts : &@api.PluginDictApi,
+  messages : &@api.PluginMessageApi,
 ) -> @api.PluginContext raise @core.MldongError {
   let conn = @repo.open_conn(config)
   let db : &@api.PluginDb = plugin_db_of(conn, d.name, d.tables)
-  { ctx: @core.Ctx::system(), db, routes, sys_query, dicts }
+  { ctx: @core.Ctx::system(), db, routes, sys_query, dicts, messages }
 }

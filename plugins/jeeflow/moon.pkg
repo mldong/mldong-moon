@@ -10,6 +10,7 @@ import {
   "mldong/jeeflow-core/error" @jerr,
   "mldong/jeeflow-core/interceptor" @itl,
   "mldong/jeeflow-core/metadata" @jmeta,
+  "mldong/jeeflow-core/event" @event,
   "mldong/jeeflow-core/id_gen" @id_gen,
   "mldong/jeeflow-facade" @facade,
   "mldong/jeeflow-repository-mysql/repo" @jrepo,

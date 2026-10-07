@@ -53,3 +53,6 @@ pub impl @api.PluginDictApi for FrameworkDictSink with fn answer(
 ) -> Unit {
   self.enums.register(model)
 }
+
+///|
+pub extend FrameworkDictSink with @api.PluginDictApi::{expose, answer}

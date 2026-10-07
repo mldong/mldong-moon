@@ -106,12 +106,14 @@ async fn main raise {
     for p in plugins {
       let d = p.descriptor()
       let sys_query : &@api.SysQueryApi = @sysapi.SysQueryApiImpl::make(config)
+      let msg_api : &@api.PluginMessageApi = @sysapi.SysMessageApiImpl::make(config)
       let pctx = @host.plugin_context(
         config,
         d,
         PluginRouteSink::{ g, mctx: ctx },
         sys_query,
         dict_sink,
+        msg_api,
       ) catch {
         e => abort("插件 \{d.name} 装载失败: \{@core.MldongError::message(e)}")
       }

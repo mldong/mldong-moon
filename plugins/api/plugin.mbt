@@ -222,6 +222,31 @@ pub(all) struct PluginContext {
   routes : &PluginRoutes
   sys_query : &SysQueryApi // 框架查询面（v1：jeeflow 供数；新能力以增量方法/新接口扩展）
   dicts : &PluginDictApi // 自定义字典贡献面（UC-0432 注册中心契约；spec 2→3 那轮随 sys_query 同族加）
+  messages : &PluginMessageApi // 站内信投递面（spec 3→4；引擎事件监听器在插件侧发通知的唯一出口）
+}
+
+///|
+/// 站内信投递入参（契约 DTO；实现在 modules/sys/api，插件不依赖 moon-sys）。
+/// 只放"发一条消息"必需的最小面：雪花 id 由框架生成，`sender_user_id=0`＝系统代发。
+pub(all) struct SysMessageInput {
+  title : String
+  content : String?
+  /// sys_message.msg_type（框架枚举 sys_message_msg_type；1＝系统通知）
+  msg_type : Int
+  /// 未读计数按 biz_type 分组（listByType 的分组键），wf 侧一律 wf_* 前缀
+  biz_type : String
+  biz_id : Int64?
+  receiver_user_id : Int64
+  url : String?
+}
+
+///|
+/// 站内信投递面（issues/146 缺口三的集成侧落点）。
+/// 为什么必须 async：引擎事件监听器自 0.1.28 起是 async 闭包，同步形状写不了库——
+/// boot4 那 383 行 WfMessageProcessEventListener（订阅任务开始/实例结束/抄送创建，
+/// afterCommit 后发站内信）在 moon 上就一直没有落点，缺的正是这一格。
+pub(open) trait PluginMessageApi {
+  async fn send(self : Self, input : SysMessageInput) -> Unit raise @core.MldongError
 }
 
 ///|

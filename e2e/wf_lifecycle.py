@@ -107,5 +107,26 @@ if mine:
 else:
     check('W5 execute', False, 'no task')
 
+# ⑧ issues/146 缺口三集成侧落点：引擎事件 → async 监听器 → 站内信落库。
+#    读回一律走框架自己的 /sys/message/page（biz_type 由 service 自动补 appCode 前缀 platform_，
+#    直连 SQL 按 'wf_%' 过滤会查不到——本轮踩过：判据写错比功能没做更难发现）。
+def wf_msgs(biz):
+    r = post('/sys/message/page', {'pageNum': 1, 'pageSize': 20, 'bizType': 'platform_' + biz}, t)
+    return ((r.get('data') or {}).get('rows') or []), r
+
+task_rows, tr = wf_msgs('wf_task')
+check('W8 wf 待办站内信落库且未读', len(task_rows) >= 1 and str(task_rows[0].get('isRead')) == '0', tr)
+check('W9 wf 待办信发给参与者本人', all(
+    str(x.get('receiverUserId')) == SUPER_ADMIN for x in task_rows), [x.get('receiverUserId') for x in task_rows])
+inst_rows, ir = wf_msgs('wf_instance')
+check('W10 wf 办结站内信落库（实例结束事件可达）', any(
+    '已办结' in (x.get('title') or '') for x in inst_rows), ir)
+# 自清：只删本套件读到的这些消息 id，别给共享库攒垃圾
+del_ids = [str(x.get('id')) for x in (task_rows + inst_rows) if x.get('id')]
+if del_ids:
+    d = post('/sys/message/remove', {'ids': del_ids}, t)
+    left, _ = wf_msgs('wf_task')
+    check('W11 探针消息自清', d.get('code') == 0 and not left, left)
+
 print('== wf_lifecycle: OK %d FAIL %d' % (ok, bad))
 raise SystemExit(0 if bad == 0 else 1)

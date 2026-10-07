@@ -7,7 +7,8 @@
 
 ///|
 /// 契约号：descriptor.spec_version 装载期比对，不匹配拒绝启动；破坏性契约变更时 +1
-pub const SPEC_VERSION : Int = 3 // 2→3：PluginContext 增 dicts 自定义字典贡献面（UC-0432，10-07 集成轮）
+pub const SPEC_VERSION : Int = 4 // 3→4：PluginContext 增 messages 站内信投递面（issues/146 缺口三集成侧落点）
+// 2→3：PluginContext 增 dicts 自定义字典贡献面（UC-0432，10-07 集成轮）
 // 1→2：PluginContext 增 sys_query 框架查询面字段（10-07）
 
 ///|

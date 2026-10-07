@@ -232,6 +232,36 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
     @itl.task_role_assignee_handler(Some(org_fns)),
   )
   println("[jeeflow] 内置取人 handler 注册：7 支（operator/申请部门领导×2/当前部门领导×2/formField/taskRole）")
+  // ⑦ 站内信监听器（boot4 WfMessageProcessEventListener 那 383 行的 moon 同位；issues/146 缺口三）
+  //    订阅引擎已发的三支：任务开始→提醒每位参与者、实例结束→提醒发起人、抄送创建→提醒抄送对象。
+  //    这件事在 0.1.28 之前做不了：监听器是同步闭包，闭包里 await 不了写库。
+  let notifier : (async (@event.ProcessEvent) -> Unit raise @jerr.JeeflowError) = async fn(
+    ev : @event.ProcessEvent
+  ) raise @jerr.JeeflowError {
+    match ev.event_type() {
+      @event.ProcessTaskStart => {
+        let task_id = ev.data.get_i64_or("taskId", 0L)
+        for actor in ev.data.get_string_array("actors") {
+          notify_wf(ctx, "wf_task", "您有新的待办事项", actor, task_id, "/wf/task")
+        }
+      }
+      @event.ProcessInstanceEnd => {
+        // 码 2 的载荷只有 instanceId+state ⇒ 发起人从实例行现读（同一份引擎仓储）
+        match @spi.ProcessRepository::find_instance_by_id(repo, ev.source_id()) {
+          Some(inst) => notify_wf(
+            ctx, "wf_instance", "您的流程已办结", inst.operator, inst.instance_id, "/wf/instance"
+          )
+          None => ()
+        }
+      }
+      @event.CcCreate => match ev.cc_actor_id() {
+        Some(actor) => notify_wf(ctx, "wf_cc", "流程抄送给您", actor, ev.source_id(), "/wf/instance")
+        None => ()
+      }
+      _ => ()
+    }
+  }
+  let _ = ectx5.register_event_listener(notifier)
   // ⑥ wf 字典供数（boot4 WfProcessDictService / CustomDictService 的 moon 同位；契约＝UC-0432）
   //    条目逐字取自引擎注册表（零硬码）。两档分家：
   //      expose → 引擎 7 支枚举字典：进 customDictList（声明即曝光）且 getByDictType 应答；
@@ -351,4 +381,39 @@ fn user_row(u : @api.SysUserDetail) -> Map[String, Json] {
   row["realName"] = @jf.string_of(u.real_name)
   row["deptName"] = @jf.string_of(s_or(u.dept_name, ""))
   row
+}
+
+///|
+/// 发一条 wf 站内信（接收人是字符串 id：非数字直接跳过——流程参与者可以是 applicant/角色码等占位）
+async fn notify_wf(
+  ctx : @api.PluginContext,
+  biz_type : String,
+  title : String,
+  receiver : String,
+  biz_id : Int64,
+  url : String,
+) -> Unit raise @jerr.JeeflowError {
+  let uid_opt = @core.parse_i64_lenient(receiver)
+  match uid_opt {
+    None => ()
+    Some(uid) =>
+      try {
+        ctx.messages.send({
+          title,
+          content: None,
+          msg_type: 1, // 框架枚举 sys_message_msg_type：1＝系统通知
+          biz_type,
+          biz_id: Some(biz_id),
+          receiver_user_id: uid,
+          url: Some(url),
+        })
+      } catch {
+        // 站内信是通知旁路：失败不外抛成流程错误（引擎侧逐监听器兜底已隔离）。
+        // ⚠ 兜底会把这里的 raise 咽掉，所以先 println 留痕——否则"没发消息"查不到原因。
+        e => {
+          println("[jeeflow] 站内信投递失败 biz_type=\{biz_type} 收件人=\{receiver} 原因=\{@core.MldongError::message(e)}")
+          raise @jerr.Internal("站内信投递失败: " + biz_type)
+        }
+      }
+  }
 }
