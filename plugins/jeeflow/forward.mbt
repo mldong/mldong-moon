@@ -21,7 +21,7 @@ fn s_or(v : String?, fallback : String) -> String {
 
 ///|
 fn wf_handler(
-  facade : @facade.Facade[@jrepo.MysqlRepository, @spi.NoExtRepository],
+  facade : @facade.Facade[@jrepo.MysqlRepository, @jrepo.MysqlRepository],
   action : String,
 ) -> @mb.Handler {
   @web.wrap(async fn(request) -> Json raise @core.MldongError {
@@ -101,7 +101,8 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
     password: self.config.password,
     database: self.config.database,
   })
-  let ectx = @spi.Ctx::new(repo, @spi.NoExtRepository::new())
+  // ext 仓储 = 同一 MysqlRepository（wf_process_design 等外置表；boot4 JdbcProcessExtRepository 同位）
+  let ectx = @spi.Ctx::new(repo, repo)
   let gen = @id_gen.DefaultIdGenerator::new(2L)
   let ectx2 = ectx.with_id_generator(fn() { gen.next_id() })
   let ectx3 = ectx2.with_user_provider(fn(uid : String) -> @model.UserInfo? {

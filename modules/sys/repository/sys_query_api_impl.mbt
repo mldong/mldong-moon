@@ -127,11 +127,8 @@ pub impl @api.SysQueryApi for SysQueryApiImpl with fn user_page(
       limit=size,
       offset=offset,
     )
-    let all_params = to_db_values(params)
-    for v in to_db_values([@core.I(size), @core.I(offset)]) {
-      all_params.push(v)
-    }
-    let page_rows = q(conn, sql, all_params)
+    // build_select 在 limit>0 时已把 LIMIT/OFFSET 参数追加进 params，勿重复
+    let page_rows = q(conn, sql, to_db_values(params))
     for r in page_rows {
       rows.push(sys_query_user_row(r))
     }
