@@ -100,7 +100,12 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] install(
       e => abort("sys 模块 message 路由注册失败: \{e}")
     }
     // fileInfo —— cmd/gen 生成 + upload/getFileInfoByIds 二次开发（本地盘直写）
-    let fileinfo_svc = @svc.FileInfoServiceImpl::{ dao: @repo.FileInfoRepository::make(config) }
+    // storage＝FileStorage 端口注入点：首版本地盘（LocalStorage），将来接 MinIO/S3
+    // 只换这里的实现，sys_file_info 台账与四个分片端点都不动
+    let fileinfo_svc = @svc.FileInfoServiceImpl::{
+      dao: @repo.FileInfoRepository::make(config),
+      storage: @svc.LocalStorage::make(@svc.upload_base_path()),
+    }
     @ctrl.register_fileinfo(ctx, fileinfo_svc, g) catch {
       e => abort("sys 模块 fileInfo 路由注册失败: \{e}")
     }

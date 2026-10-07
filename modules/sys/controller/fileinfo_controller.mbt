@@ -69,7 +69,7 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.FileInfoServ
         Some(v) => v
         None => {
           responder.send_json(
-            @core.fail(99990001, "multipart/form-data 文件域缺失"),
+            @core.fail(99999999, "multipart/form-data 文件域缺失"),
             headers=[("Content-Type", "application/json; charset=utf-8")],
           ) catch {
             _ => ()
@@ -127,9 +127,75 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.FileInfoServ
     }
     @core.ok_data(Json::array(svc.list_ant_by_ids(ctx, list)))
   })
+  // ── 分片上传四件套（契约 UC-0604/0605）──
+  // 鉴权面与参考实现一致：boot2 那四条只有 @PostMapping、fastapi 也没有 @SaCheckPermission，
+  // 即**仅登录、无权限码**——main 已关推导，未列进 policy 的端点正好就是这个档位。
+  let initiate_multipart_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let ctx = @web.ctx_of(request)
+    let body = @web.json_body(request)
+    let (file_info_id, upload_id) = svc.initiate_multipart(
+      ctx,
+      @core.get_i64(body, "size").unwrap_or(0L),
+      @core.text_or(body, "originalFilename", ""),
+      @core.text_or(body, "contentType", ""),
+      @core.text_or(body, "objectType", ""),
+    )
+    // fileInfoId 一律字符串（全局约定 §5：雪花 id 出数字面量会在前端 JSON.parse 丢精度）
+    let out : Json = {
+      "fileInfoId": Json::string(file_info_id.to_string()),
+      "uploadId": Json::string(upload_id),
+    }
+    @core.ok_data(out)
+  })
+  let upload_part_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let ctx = @web.ctx_of(request)
+    let raw = request.body.binary() catch {
+      _ => Bytes::from_array([])
+    }
+    let parts = multipart_parts(raw, header_of(request, "Content-Type"))
+    match file_part_of(parts) {
+      None => raise @core.MldongError::InvalidParam("multipart/form-data 文件域缺失")
+      Some(fp) => {
+        // partNumber/fileInfoId 是**表单文本域**（boot2 用 @RequestParam、fastapi 用 Form(...)）
+        let part_number = field_int(parts, "partNumber")
+        let file_info_id = field_int64(parts, "fileInfoId")
+        svc.upload_part(ctx, file_info_id, part_number, fp.content)
+      }
+    }
+    @core.ok_empty()
+  })
+  let complete_multipart_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let ctx = @web.ctx_of(request)
+    let d = svc.complete_multipart(ctx, need_file_info_id(@web.json_body(request)))
+    let out : Json = {
+      // boot2 出口三键：fullUrl（带域名包装）/url/fileInfoId；moon 无域名配置，fullUrl 与 url 同值
+      "fullUrl": Json::string(d.url),
+      "url": Json::string(d.url),
+      "fileInfoId": Json::string(d.id.to_string()),
+    }
+    @core.ok_data(out)
+  })
+  let abort_multipart_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let ctx = @web.ctx_of(request)
+    svc.abort_multipart(ctx, need_file_info_id(@web.json_body(request)))
+    @core.ok_empty()
+  })
   g.post(ctx, "/sys/fileInfo/upload", upload_handler)
   g.post(ctx, "/sys/fileInfo/getFileInfoByIds", by_ids_handler)
   g.post(ctx, "/sys/fileInfo/page", page_handler)
+  g.post(ctx, "/sys/fileInfo/initiateMultipartUpload", initiate_multipart_handler)
+  g.post(ctx, "/sys/fileInfo/uploadPart", upload_part_handler)
+  g.post(ctx, "/sys/fileInfo/completeMultipartUpload", complete_multipart_handler)
+  g.post(ctx, "/sys/fileInfo/abortMultipartUpload", abort_multipart_handler)
+}
+
+///|
+/// complete/abort 的 fileInfoId：字符串/数字双形态都收（全局约定 §5 入参容错），缺/非法即参数错
+fn need_file_info_id(body : Json) -> Int64 raise @core.MldongError {
+  match @core.get_i64(body, "fileInfoId") {
+    Some(v) if v > 0L => v
+    _ => raise @core.MldongError::InvalidParam("fileInfoId 不能为空")
+  }
 }
 
 ///|
@@ -149,14 +215,23 @@ fn query_of(request : @mb.Request, name : String) -> String {
 }
 
 ///|
-/// 最小 multipart/form-data 解析：取第一个带 filename 的文件域。
-/// 返回 (原文件名, 内容字节, part 的 Content-Type)；无文件域 None。
-/// 形状假设（浏览器/urllib 标准体）：boundary 行 --{b}\r\n、头块 \r\n\r\n 结束、尾标 --{b}--。
-fn multipart_parse(raw : Bytes, content_type : String) -> (String, Bytes, String)? {
-  // boundary = content-type 里 boundary= 后到行尾（可带引号）
+/// multipart/form-data 的一段：文本域只有 name，文件域另有 filename/content_type
+priv struct MPart {
+  name : String
+  filename : String
+  content_type : String
+  content : Bytes
+}
+
+///|
+/// 单个扫描器吃下**全部**分段（形状假设同旧版：boundary 行 --{b}\r\n、头块 \r\n\r\n 结束、
+/// 尾标 --{b}--）。uploadPart 要同时拿文件域与 partNumber/fileInfoId 文本域，
+/// upload 只要文件域——两边都走这里，不再养第二份 walker。
+fn multipart_parts(raw : Bytes, content_type : String) -> Array[MPart] {
+  let out : Array[MPart] = []
   let bidx = find_substring(content_type, "boundary=")
   if bidx < 0 {
-    return None
+    return out
   }
   let mut boundary = content_type[bidx + 9:].to_owned()
   if boundary.has_prefix("\"") {
@@ -172,63 +247,106 @@ fn multipart_parse(raw : Bytes, content_type : String) -> (String, Bytes, String
     }
   }
   if boundary.is_empty() {
-    return None
+    return out
   }
   let bmark : Bytes = bytes_of("--" + boundary)
   let n = raw.length()
-  // 逐段扫描 --boundary
   let mut i = 0
   while i < n {
-    // 找下一个 boundary 起点
-    let start = find_bytes(raw[:], bmark[:], i)
-    if start < 0 {
-      return None
+    let start_at = find_bytes(raw[:], bmark[:], i)
+    if start_at < 0 {
+      return out
     }
-    let mut p = start + bmark.length()
-    // 终止标 --boundary-- → 结束
+    let mut p = start_at + bmark.length()
     if p + 1 < n && raw[p] == b'-' && raw[p + 1] == b'-' {
-      return None
+      return out
     }
-    // 跳过 \r\n
     if p + 1 < n && raw[p] == b'\r' && raw[p + 1] == b'\n' {
       p = p + 2
     }
-    // 头块到 \r\n\r\n
     let head_end = find_bytes(raw, bytes_of("\r\n\r\n"), p)
     if head_end < 0 {
-      return None
+      return out
     }
-    let head = bytes_text(raw[p:head_end])
-    // 体到下一个 --boundary（体尾 \r\n 属分隔）
     let next = find_bytes(raw[:], bmark[:], head_end + 4)
     if next < 0 {
-      return None
+      return out
     }
     let mut body_end = next
     if body_end - 2 >= head_end + 4 && raw[body_end - 2] == b'\r' && raw[body_end - 1] == b'\n' {
       body_end = body_end - 2
     }
-    // 有 filename 的域才算文件
-    let fname = header_param(head, "filename")
-    match fname {
-      Some(f) => {
-        let ctype = match header_param(head, "Content-Type") {
-          Some(t) => t
-          None => match header_param(head, "content-type") {
-            Some(t) => t
-            None => ""
-          }
-        }
-        return Some((f, raw[head_end + 4:body_end].to_owned(), ctype))
-      }
-      None => {
-        // 普通域（objectType 等）跳过，继续下一段
-        i = next
-        continue
-      }
+    let head = bytes_text(raw[p:head_end])
+    out.push(MPart::{
+      name: match header_param(head, "name") { Some(v) => v ; None => "" },
+      filename: match header_param(head, "filename") { Some(v) => v ; None => "" },
+      content_type: match header_param(head, "Content-Type") {
+        Some(v) => v
+        None => match header_param(head, "content-type") { Some(v) => v ; None => "" }
+      },
+      content: raw[head_end + 4:body_end].to_owned(),
+    })
+    i = next
+  }
+  out
+}
+
+///|
+/// 第一个带 filename 的分段（普通上传/分片上传取文件内容都靠它）
+fn file_part_of(parts : Array[MPart]) -> MPart? {
+  let mut hit : MPart? = None
+  for p in parts {
+    if !p.filename.is_empty() && hit is None {
+      hit = Some(p)
     }
   }
-  None
+  hit
+}
+
+///|
+fn field_text(parts : Array[MPart], name : String) -> String {
+  let mut out = ""
+  for p in parts {
+    if p.name == name && p.filename.is_empty() && out.is_empty() {
+      out = bytes_text(p.content[:])
+    }
+  }
+  out
+}
+
+///|
+fn field_int(parts : Array[MPart], name : String) -> Int raise @core.MldongError {
+  let text = field_text(parts, name)
+  if text.is_empty() {
+    raise @core.MldongError::InvalidParam("表单字段缺失: " + name)
+  }
+  try {
+    @string.parse_int(text)
+  } catch {
+    _ => raise @core.MldongError::InvalidParam("表单字段非整数: " + name)
+  }
+}
+
+///|
+fn field_int64(parts : Array[MPart], name : String) -> Int64 raise @core.MldongError {
+  let text = field_text(parts, name)
+  if text.is_empty() {
+    raise @core.MldongError::InvalidParam("表单字段缺失: " + name)
+  }
+  try {
+    @string.parse_int64(text)
+  } catch {
+    _ => raise @core.MldongError::InvalidParam("表单字段非整数: " + name)
+  }
+}
+
+///|
+/// 兼容旧出口：只取文件域三元组（原文件名, 内容, part 的 Content-Type）
+fn multipart_parse(raw : Bytes, content_type : String) -> (String, Bytes, String)? {
+  match file_part_of(multipart_parts(raw, content_type)) {
+    Some(p) => Some((p.filename, p.content, p.content_type))
+    None => None
+  }
 }
 
 ///|

@@ -119,7 +119,9 @@ curl -s -X POST http://127.0.0.1:18680/sys/user/page \
 - **moon_zod 是 strip 模式**：schema 里没声明的字段会被**丢弃**。id/deptId 这类"不校验但要存活"
   的字段必须写 `"id": @moon_zod.any().optional()` 占位。
 - **雪花 ID 全链字符串化**：JS Number 53 位精度装不下 64 位雪花，入参出参一律 String
-  （`jsnow`/`id.to_string()`），同款坑统一修。
+  （`jsnow`/`id.to_string()`），同款坑统一修。**服务端这侧同样是硬的**：MoonBit 的 `Json::Number`
+  存的是 `Double`，客户端把 19 位 id 以**数字字面量**发进来就已经掉精度（`get_i64` 无从补救，
+  实测把 detail 打到错 id 上）——所以入参容错只覆盖"字符串→整数"，不覆盖"超 2^53 的数字字面量"。
 - **NULL 三值逻辑**：`admin_type <> 1` 会漏掉 NULL 行——save 必须给 NOT NULL 列默认值
   （admin_type=2、role_type=1），查询超管不可见过滤靠它。
 - **moon_zod 的 like 语义**：LLIKE=`%v`（后缀）、RLIKE=`v%`（前缀），写测试断言别搞反。

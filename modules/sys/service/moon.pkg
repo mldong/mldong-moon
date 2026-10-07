@@ -1,6 +1,7 @@
 import {
   "moonbitlang/async/fs" @fs,
   "moonbitlang/core/env" @env,
+  "moonbitlang/core/string" @string,
   "mldong/moon-core" @core,
   "mldong/moon-token/app" @app,
   "mldong/moon-token/domain" @domain,

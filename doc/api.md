@@ -56,6 +56,10 @@
 | `/dev/schema/column/list` | `dev:schema:columnList` | 列清单裸切面（信息模式 + gen 字段类型映射；与台账面并存，gen 代码生成器专用） |
 | `/sys/message/{save,remove,update,detail,page,setRead,getUnreadCount,getUnreadCountGroupByBizType}` | save/update 挂码，其余仅登录 | 站内信（boot2 8 端点同位）：**接收人隔离**（读写全强制 receiver=当前用户）+ **appCode 端隔离**（biz_type 前缀自动补 + LIKE 过滤，BS/APP 互不可见）；setRead ids 空=本域全部已读；分页 bizTypes 过滤自动补前缀 |
 | `/sys/fileInfo/{save,remove,update,detail,page,upload,getFileInfoByIds}` | CRUD 挂码，upload/byIds 仅登录 | 文件（boot2 同位）：upload multipart 本地盘直写 `{MLDONG_UPLOAD_PATH:-./uploadfiles}/yyyyMM/objectId.ext` 返 `{url,fullUrl,fileInfoId}`；getFileInfoByIds 逗号串回查 Ant 形状 `{id,uid,name,url,status:"done"}`；remove 物理删（family 表无 is_deleted 列） |
+| `/sys/fileInfo/initiateMultipartUpload` | 仅登录 | 分片初始化（UC-0604）：入参 `{size,originalFilename,contentType?,objectType?}`，返 `{fileInfoId(str),uploadId}`；**url 这一步就写入台账**（本地盘有确定性地址）；表无 upload_id 列 ⇒ 会话号落 `attr` JSON |
+| `/sys/fileInfo/uploadPart` | 仅登录 | 单枚分片落盘（multipart 表单：file/partNumber/fileInfoId），暂存 `{root}/.multipart/{uploadId}/part_{n:05d}`；同序号重写＝覆盖（台账序号不追加出两份） |
+| `/sys/fileInfo/completeMultipartUpload` | 仅登录 | 合并（UC-0605）：**按 partNumber 排序**拼接（不看到达序）→ 回写真实 size/sizeInfo → 清暂存；返 `{fullUrl,url,fileInfoId}`；一片未传就 complete → 业务失败 |
+| `/sys/fileInfo/abortMultipartUpload` | 仅登录 | 取消：清暂存 + 删台账行（不留平台侧残留）；对已删行重复取消＝`99990002`，不静默假成功 |
 | `POST /app/appVersion/check` | 免登录（豁免面） | APP 检查升级（UC-0610）：platform 1..3 + versionCode 校验失败 **99999999**（boot2 @Validated 同码）；不查库，蒲公英 `apiv2/app/check` 语义（env `PGYER_API_KEY` + `PGYER_APP_KEY_ANDROID/HARMONYOS/IOS`，真值不进仓库）任何失败降级 `data:null`；**moon 档外呼 HTTP/TLS 客户端未接，恒走降级分支**（moontls 成熟后补真比较） |
 | `POST /sys/captcha` | 豁免 | SVG 图形验证码 `{uuid, base64}`：120×40/4 字符（去易混淆 0O1lI）/干扰线噪点随机旋转，内存 TTL 10 分钟、一次性消费、忽略大小写（salvo/gin 家族同款手绘） |
 | `POST /sys/getSm2PublicKey` | 豁免 | `{publicKey:""}`——moon 无 SM2 依赖恒空串=前端不加密分支（boot2 开关关同形状，差异记 [base-contract.md](base-contract.md) §5） |

@@ -20,6 +20,28 @@ pub(open) trait FileInfoService {
   ) -> @entity.FileInfo raise @core.MldongError
   /// 前端文件列表回查（boot2 AntUploadModel 同形：id/uid/name/url/status）
   async fn list_ant_by_ids(Self, @core.Ctx, Array[Int64]) -> Array[Json] raise @core.MldongError
+  /// 分片上传初始化（boot2 initiateMultipartUpload 同位）：先落台账行，返回 (fileInfoId, uploadId)。
+  /// url 在初始化时就写入记录（契约 UC-0604）；实现体见 fileinfo_multipart.mbt
+  async fn initiate_multipart(
+    Self,
+    @core.Ctx,
+    size : Int64,
+    original_filename : String,
+    content_type : String,
+    object_type : String,
+  ) -> (Int64, String) raise @core.MldongError
+  /// 单枚分片落盘（boot2 uploadPart 同位：作用域只这一枚序号，不碰同会话其它分片）
+  async fn upload_part(
+    Self,
+    @core.Ctx,
+    file_info_id : Int64,
+    part_number : Int,
+    content : Bytes,
+  ) -> Unit raise @core.MldongError
+  /// 合并（boot2 completeMultipartUpload 同位）：按序号排序拼接 → 回写真实 size/size_info → 清扫暂存
+  async fn complete_multipart(Self, @core.Ctx, Int64) -> @entity.FileInfo raise @core.MldongError
+  /// 取消（boot2 abortMultipartUpload 同位）：清暂存 + 删台账行（契约"取消后删除记录与平台侧残留"）
+  async fn abort_multipart(Self, @core.Ctx, Int64) -> Unit raise @core.MldongError
 }
 
 ///|
@@ -32,12 +54,14 @@ pub fn upload_base_path() -> String {
 }
 
 ///|
-pub(all) struct FileInfoServiceImpl[R] {
+pub(all) struct FileInfoServiceImpl[R, S] {
   dao : R
+  /// 存储后端（FileStorage 端口）：本文件只管台账与业务规则，对象怎么放交给它
+  storage : S
 }
 
 ///|
-pub impl[R : @dao.FileInfoDao] FileInfoService for FileInfoServiceImpl[R] with fn save(self, ctx, req) {
+pub impl[R : @dao.FileInfoDao, S : FileStorage] FileInfoService for FileInfoServiceImpl[R, S] with fn save(self, ctx, req) {
   let d : @entity.FileInfo = {
     id: @core.next_id(),
     url: req.url,
@@ -67,7 +91,7 @@ pub impl[R : @dao.FileInfoDao] FileInfoService for FileInfoServiceImpl[R] with f
 }
 
 ///|
-pub impl[R : @dao.FileInfoDao] FileInfoService for FileInfoServiceImpl[R] with fn update(self, ctx, req) {
+pub impl[R : @dao.FileInfoDao, S : FileStorage] FileInfoService for FileInfoServiceImpl[R, S] with fn update(self, ctx, req) {
   match self.dao.find_by_id(req.id) {
     None => raise @core.MldongError::NotFound("数据不存在: " + req.id.to_string())
     Some(_) => ()
@@ -102,7 +126,7 @@ pub impl[R : @dao.FileInfoDao] FileInfoService for FileInfoServiceImpl[R] with f
 }
 
 ///|
-pub impl[R : @dao.FileInfoDao] FileInfoService for FileInfoServiceImpl[R] with fn remove_by_ids(self, _ctx, ids) {
+pub impl[R : @dao.FileInfoDao, S : FileStorage] FileInfoService for FileInfoServiceImpl[R, S] with fn remove_by_ids(self, _ctx, ids) {
   if ids.is_empty() {
     raise @core.MldongError::InvalidInput("ids 不能为空")
   }
@@ -110,7 +134,7 @@ pub impl[R : @dao.FileInfoDao] FileInfoService for FileInfoServiceImpl[R] with f
 }
 
 ///|
-pub impl[R : @dao.FileInfoDao] FileInfoService for FileInfoServiceImpl[R] with fn find_by_id(
+pub impl[R : @dao.FileInfoDao, S : FileStorage] FileInfoService for FileInfoServiceImpl[R, S] with fn find_by_id(
   self,
   _ctx,
   id,
@@ -122,7 +146,7 @@ pub impl[R : @dao.FileInfoDao] FileInfoService for FileInfoServiceImpl[R] with f
 }
 
 ///|
-pub impl[R : @dao.FileInfoDao] FileInfoService for FileInfoServiceImpl[R] with fn page(self, _ctx, req) {
+pub impl[R : @dao.FileInfoDao, S : FileStorage] FileInfoService for FileInfoServiceImpl[R, S] with fn page(self, _ctx, req) {
   let w = @core.where_()
   let _ = w.append(req.m)
   self.dao.page(w, req.page_num, req.page_size)
@@ -138,7 +162,7 @@ pub extend FileInfoServiceImpl with FileInfoService::{
 }
 
 ///|
-pub impl[R : @dao.FileInfoDao] FileInfoService for FileInfoServiceImpl[R] with fn upload_file(
+pub impl[R : @dao.FileInfoDao, S : FileStorage] FileInfoService for FileInfoServiceImpl[R, S] with fn upload_file(
   self,
   ctx,
   filename,
@@ -146,21 +170,15 @@ pub impl[R : @dao.FileInfoDao] FileInfoService for FileInfoServiceImpl[R] with f
   content_type,
   object_type,
 ) {
-  // 文件名：objectId.ext（boot2 IdWorker objectId 同位）；ext 取原文件名尾段
-  let ext = filename_ext(filename)
-  let object_id = @core.next_id().to_string()
-  let stored = object_id + (if ext.is_empty() { "" } else { "." + ext })
+  // 落盘交给存储端口（失败即回，不产半态台账）；命名/路径/url 口径见 LocalStorage
   let now = @core.now_str()
   let ym = now[0:4].to_owned() + now[5:7].to_owned()
-  let dir = upload_base_path() + "/" + ym
-  // 落盘（async/fs：mkdir -p + 原子写；失败即回，不产半行台账）
-  @fs.mkdir(dir, recursive=true, allow_exist=true) catch {
-    e => raise @core.MldongError::Internal("upload mkdir: \{e}")
-  }
-  @fs.write_file(dir + "/" + stored, content) catch {
-    e => raise @core.MldongError::Internal("upload write: \{e}")
-  }
-  let url = "/uploadfiles/\{ym}/\{stored}"
+  let object = self.storage.plan_object(filename, ym)
+  self.storage.put_object(object, content)
+  let ext = object.ext
+  let stored = object.filename
+  let dir = object.base_path
+  let url = object.url
   let d : @entity.FileInfo = {
     id: @core.next_id(),
     url,
@@ -169,7 +187,7 @@ pub impl[R : @dao.FileInfoDao] FileInfoService for FileInfoServiceImpl[R] with f
     filename: Some(stored),
     original_filename: Some(filename),
     base_path: Some(dir),
-    path: Some("/" + ym + "/" + stored),
+    path: Some(object.path),
     ext: if ext.is_empty() { None } else { Some(ext) },
     content_type: if content_type.is_empty() { None } else { Some(content_type) },
     platform: Some("local"),
@@ -178,7 +196,7 @@ pub impl[R : @dao.FileInfoDao] FileInfoService for FileInfoServiceImpl[R] with f
     th_size: None,
     th_size_info: None,
     th_content_type: None,
-    object_id: Some(object_id),
+    object_id: Some(object.object_id),
     object_type: if object_type.is_empty() { None } else { Some(object_type) },
     attr: None,
     create_time: Some(now),
@@ -191,7 +209,7 @@ pub impl[R : @dao.FileInfoDao] FileInfoService for FileInfoServiceImpl[R] with f
 }
 
 ///|
-pub impl[R : @dao.FileInfoDao] FileInfoService for FileInfoServiceImpl[R] with fn list_ant_by_ids(
+pub impl[R : @dao.FileInfoDao, S : FileStorage] FileInfoService for FileInfoServiceImpl[R, S] with fn list_ant_by_ids(
   self,
   _ctx,
   ids,
@@ -215,6 +233,10 @@ pub impl[R : @dao.FileInfoDao] FileInfoService for FileInfoServiceImpl[R] with f
 pub extend FileInfoServiceImpl with FileInfoService::{
   upload_file,
   list_ant_by_ids,
+  initiate_multipart,
+  upload_part,
+  complete_multipart,
+  abort_multipart,
 }
 
 ///|
