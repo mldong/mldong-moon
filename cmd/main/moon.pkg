@@ -13,7 +13,7 @@ import {
   "mldong/moon-token-store/port" @port,
   "mldong/moon-token-moonback/guard" @mbguard,
   "mldong/moon-sys" @sys,
-  "mldong/moon-sys/repository" @sysrepo,
+  "mldong/moon-sys/api" @sysapi,
   "mldong/moon-app" @appmod,
   "mldong/moon-dev" @dev,
   "moonbitlang/core/env" @env,

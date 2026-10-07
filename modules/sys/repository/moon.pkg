@@ -2,7 +2,6 @@ supported_targets = "+native+wasm"
 
 import {
   "mldong/moon-core" @core,
-  "mldong/moon-plugin-api" @api,
   "mldong/moon-sys/entity" @entity,
   "mldong/moon-sys/dao" @dao,
   "moonbitstack/moondb" @moondb,

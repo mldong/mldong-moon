@@ -35,4 +35,6 @@ pub(open) trait RbacDao {
   ) -> (Int, Array[@entity.User]) raise @core.MldongError
   /// 数据范围授权（sys_role_dept 全量替换 + sys_role.data_scope 直更）
   async fn grant_data_scope(Self, role_id : Int64, data_scope : Int?, dept_ids : Array[Int64]) -> Unit raise @core.MldongError
+  /// 全量角色-用户对（role.code + user_id；插件查询面 SysQueryApi 供数用，双逻辑删过滤）
+  async fn role_user_pairs(Self) -> Array[(String, Int64)] raise @core.MldongError
 }

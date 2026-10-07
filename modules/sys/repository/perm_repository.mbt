@@ -220,7 +220,8 @@ pub extend RbacRepository with @dao.RbacDao::{
   grant_data_scope,
   find_menu_ids_by_role,
   page_users_by_role,
-  grant_user_role_pairs
+  grant_user_role_pairs,
+  role_user_pairs
 }
 
 // ── RBAC 授权面（boot2 RbacController/RoleController#grantDataScope 同位）──
@@ -353,4 +354,22 @@ pub impl @dao.RbacDao for RbacRepository with fn grant_data_scope(self, role_id,
   }
   tx_commit(conn)
   conn.close()
+}
+
+///|
+pub impl @dao.RbacDao for RbacRepository with fn role_user_pairs(
+  self,
+) -> Array[(String, Int64)] raise @core.MldongError {
+  let conn = open_conn(self.config)
+  defer close_conn(conn)
+  let rows = q(
+    conn,
+    "SELECT r.code AS role_code, ur.user_id FROM sys_user_role ur JOIN sys_role r ON ur.role_id = r.id JOIN sys_user u ON u.id = ur.user_id WHERE r.is_deleted = 0 AND u.is_deleted = 0 ORDER BY r.code, ur.user_id",
+    [],
+  )
+  let out : Array[(String, Int64)] = []
+  for r in rows {
+    out.push((row_text(r, "role_code", ""), row_i64(r, "user_id")))
+  }
+  out
 }

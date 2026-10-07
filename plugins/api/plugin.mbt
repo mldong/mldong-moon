@@ -116,65 +116,99 @@ pub(open) trait PluginRoutes {
 }
 
 ///|
-/// sys 查询面返回的用户行（含部门/岗位名——引擎 UserInfo 与人员选择所需全字段）
-pub(all) struct SysUserRow {
+/// sys 查询面 · 契约 DTO —— 面向完整业务投影（不按单个消费方裁字段；后来者同样要用户信息）。
+/// 字段面 = sys_user/sys_dept/sys_post 实体全量 + 关联名（dept/post 名称编码）。
+pub(all) struct SysUserDetail {
   id : Int64
   user_name : String
   real_name : String
+  nick_name : String?
+  mobile_phone : String?
+  email : String?
+  sex : Int?
+  admin_type : Int?
+  is_locked : Int?
   dept_id : Int64?
   dept_name : String?
+  dept_code : String?
   post_id : Int64?
   post_name : String?
+  post_code : String?
+  remark : String?
 }
 
 ///|
-/// sys 查询面返回的部门行（leader_ids=部门负责人 id 集，库内逗号串已拆好）
-pub(all) struct SysDeptRow {
+pub(all) struct SysDeptDetail {
   id : Int64
   name : String
-  leader_ids : Array[String]
+  code : String
+  parent_id : Int64?
+  leader_ids : Array[String] // 库内逗号串已拆
   main_leader_id : Int64?
+  sort : Int64?
+}
+
+///|
+pub(all) struct SysPostDetail {
+  id : Int64
+  name : String
+  code : String
+  sort : Int64?
 }
 
 ///|
 pub(all) struct SysUserPage {
-  rows : Array[SysUserRow]
+  rows : Array[SysUserDetail]
   record_count : Int
 }
 
 ///|
-/// 角色-用户对（引擎按角色找人节点的预载数据）
+/// 用户页查询条件（keywords = user_name/real_name 模糊；结构化字段随需增量，先不搬全量 m_ 操作符）
+pub(all) struct SysUserQuery {
+  page : Int
+  size : Int
+  keywords : String
+}
+
+///|
+/// 角色-用户对（角色编码 → 在册用户 id 集；引擎按角色找人节点的预载数据）
 pub(all) struct SysRoleUser {
   role_code : String
   user_id : String
 }
 
 ///|
-/// sys 查询面 —— 插件可调用的框架查询能力（依赖倒置：契约在此，框架层 modules/sys
-/// 实现，cmd/main 注册插件时注入 PluginContext；插件禁止依赖框架实现模块）。
-/// v1 方法集 = jeeflow 引擎供数所需（boot4 JeeflowUserProvider/OrgUserProvider/
-/// UserSearchProvider 的数据流反推）：查询为主，写面按真实调用点另立。
-/// 方法全 async/live——引擎同步 SPI 的新鲜度妥协由消费插件预载承担（v2 引擎 SPI
-/// 异步化后消亡）。
+/// sys 查询面 —— 插件可调用的框架查询能力（依赖倒置：契约在此，实现归框架层
+/// modules/sys 的 api 层——委托 service，等同 boot4 的 mldong-sys-api UserApi/DeptApi 层；
+/// cmd/main 注册插件时注入 PluginContext；插件禁止依赖框架实现模块）。
+/// 方法面 = 用户/部门/岗位/角色完整查询业务面（不按单个消费方裁剪）；写面按真实调用点另立。
+/// 方法全 async/live——引擎同步 SPI 的新鲜度妥协由消费插件预载承担（v2 引擎 SPI 异步化后消亡）。
 pub(open) trait SysQueryApi {
-  /// 按 id 取用户（含部门/岗位名）；不存在返回 None
+  /// 用户：按 id 取完整投影（含部门/岗位关联名）；不存在返回 None
   async fn user_by_id(
     self : Self,
     id : Int64,
-  ) -> Option[SysUserRow] raise @core.MldongError
+  ) -> Option[SysUserDetail] raise @core.MldongError
 
-  /// 用户分页（keyword 对 user_name/real_name 模糊；空串 = 全量分页）
-  async fn user_page(
+  /// 用户：分页（keywords 对 user_name/real_name 模糊）
+  async fn user_page(self : Self, q : SysUserQuery) -> SysUserPage raise @core.MldongError
+
+  /// 用户：全量轻量（未删除；部门用户树/快照预载用）
+  async fn user_list(self : Self) -> Array[SysUserDetail] raise @core.MldongError
+
+  /// 部门：按 id；不存在返回 None
+  async fn dept_by_id(
     self : Self,
-    page : Int,
-    size : Int,
-    keyword : String,
-  ) -> SysUserPage raise @core.MldongError
+    id : Int64,
+  ) -> Option[SysDeptDetail] raise @core.MldongError
 
-  /// 全量在册部门（小表；引擎同步 SPI 需可同步读取，故提供批量面）
-  async fn dept_list(self : Self) -> Array[SysDeptRow] raise @core.MldongError
+  /// 部门：全量在册（小表；快照预载用）
+  async fn dept_list(self : Self) -> Array[SysDeptDetail] raise @core.MldongError
 
-  /// 全量角色-用户对（角色找人节点的预载数据）
+  /// 岗位：全量在册（小表）
+  async fn post_list(self : Self) -> Array[SysPostDetail] raise @core.MldongError
+
+  /// 角色：全量角色-用户对（角色找人节点的预载数据）
   async fn role_user_pairs(self : Self) -> Array[SysRoleUser] raise @core.MldongError
 }
 

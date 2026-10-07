@@ -63,11 +63,12 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
   ctx : @api.PluginContext,
 ) -> Unit raise {
   // ① 供数预载：用户分页拉全量（keyword 空 = 全量，含部门/岗位名）
-  let user_map : Map[String, @api.SysUserRow] = Map([])
+  let user_map : Map[String, @api.SysUserDetail] = Map([])
   let mut loaded = 0
   let mut page = 1
   while true {
-    let p = ctx.sys_query.user_page(page, 200, "")
+    // user_page 分页拉全量（含部门/岗位关联名）；快照供数见文件头
+    let p = ctx.sys_query.user_page({ page, size: 200, keywords: "" })
     loaded += p.rows.length()
     for r in p.rows {
       user_map[r.id.to_string()] = r
@@ -79,7 +80,7 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
   }
   println("[jeeflow] 供数预载：用户 \{loaded} 人")
   // ② 部门（领导/分管字段随行）
-  let dept_map : Map[String, @api.SysDeptRow] = Map([])
+  let dept_map : Map[String, @api.SysDeptDetail] = Map([])
   for d in ctx.sys_query.dept_list() {
     dept_map[d.id.to_string()] = d
   }
@@ -148,7 +149,7 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
   let _ = ectx4.with_user_search_provider({
     page: fn(query) {
       let kw = s_or(query.operator(), "")
-      let matched : Array[@api.SysUserRow] = []
+      let matched : Array[@api.SysUserDetail] = []
       for u in user_map.values() {
         if kw.is_empty() || u.real_name.contains(kw) || u.user_name.contains(kw) {
           matched.push(u)

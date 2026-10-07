@@ -103,7 +103,7 @@ async fn main raise {
     //   路由经 guard 注册（鉴权/权限码与框架自有端点零差别），policy 片段已在 Guard 前合入
     for p in plugins {
       let d = p.descriptor()
-      let sys_query : &@api.SysQueryApi = @sysrepo.SysQueryApiImpl::make(config)
+      let sys_query : &@api.SysQueryApi = @sysapi.SysQueryApiImpl::make(config)
       let pctx = @host.plugin_context(config, d, PluginRouteSink::{ g, mctx: ctx }, sys_query) catch {
         e => abort("插件 \{d.name} 装载失败: \{@core.MldongError::message(e)}")
       }
