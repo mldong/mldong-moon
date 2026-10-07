@@ -526,14 +526,15 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
   let kickout_by_token_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
     for token in kick_str_ids(@web.json_body(request)) {
       // 作用域＝**这一枚 token**（boot2 StpUtil.kickoutByTokenValue 同位；UC-0212 四条断言按此判）。
-      // 不能走 `auth.kickout(login_id, device=…)`：moon-token 的 kickout 按「账号+设备」整族打墓碑，
-      // 而登录端点把 device 恒写成 "pc" ⇒ 踢一枚会连坐同账号其它会话。
-      // base-verify L3 B02 实测到该连坐：脚本收尾清自己的第二个会话，把仍在用的第一个会话一起踢成
-      // KickedOut，后续 onlineDevice/permCode 全变 99990403。
-      // 代价：按枚注销的事件是 LoggedOut 而非 Kicked，被踢方拿不到「KickedOut」精确原因——
-      // 要两者兼得需 moon-token 提供按枚 kick 口（已登记待办，不在这里伸进它的 store）。
-      auth.logout(token) catch {
-        _ => ()
+      // 走 moon-token 0.1.11 的按枚口 `kickout_token`：墓碑态是 Kicked（被踢方拿得到精确原因，
+      // 不塌成注销那种 UnknownToken），同时联动删绑定的 refresh——按枚撤就撤干净，
+      // 别让被踢方拿旧 refresh 轮转出一枚新会话。
+      // 不用 `auth.kickout(login_id, device=…)`：那是「账号+设备」粒度，而登录端点把 device 恒写成
+      // "pc" ⇒ 踢一枚会连坐同账号其它会话（base-verify L3 B02 实测到：脚本收尾清第二个会话，
+      // 把仍在用的第一个会话一起踢成 KickedOut，后续 onlineDevice/permCode 全变 99990403）。
+      // 查无此枚与二次踢＝幂等返 0（不抛错、不重发事件），故这里不需 catch 之外的分支。
+      let _ = auth.kickout_token(token) catch {
+        _ => 0
       }
     }
     @core.ok_empty()

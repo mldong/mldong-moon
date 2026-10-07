@@ -34,12 +34,20 @@ def login():
 s1=login()
 check('A2 新用户可登', s1 and s1.get('token'), str(s1)[:60])
 r=post('/sys/user/logoutByTokenValue',{'ids':[s1['token']]},t)
-r2=post('/sys/user/info',{},s1['token'])
-check('A3 logoutByTokenValue 注销生效', r['code']==0 and r2['code']==99990403, str(r2))
+rl=post('/sys/user/info',{},s1['token'])
+check('A3 logoutByTokenValue 注销生效', r['code']==0 and rl['code']==99990403, str(rl))
 s2=login()
+# 同账号第二枚会话：登录端点 device 恒写 "pc"，这正是 issue #1 里被 kickout(login_id,device) 连坐的形状
+s2b=login()
 r=post('/sys/user/kickoutByTokenValue',{'ids':[s2['token']]},t)
 r2=post('/sys/user/info',{},s2['token'])
 check('A4 kickoutByTokenValue 踢下线', r['code']==0 and r2['code']==99990403, str(r2))
+# moon-token 0.1.11 按枚口 kickout_token：墓碑态＝Kicked ⇒ 被踢方拿精确原因，
+# 与自愿注销（UnknownToken）两档并存，不塌成笼统未登录
+check('A4b 被踢方原因精确到 KickedOut', r2.get('msg')=='not login: KickedOut', str(r2)[:90])
+check('A4c 注销方原因仍是 UnknownToken（两粒度并存）', rl.get('msg')=='not login: UnknownToken', str(rl)[:90])
+check('A4d 兄弟会话不被连坐', post('/sys/user/info',{},s2b['token'])['code']==0, '')
+check('A4e 被踢方 refreshToken 联动失效', post('/sys/refreshToken',{'refreshToken':s2['refreshToken']})['code']==99990410, '')
 s3=login()
 r=post('/sys/user/logoutByLoginId',{'ids':[uid]},t)
 r2=post('/sys/user/info',{},s3['token'])
