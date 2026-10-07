@@ -221,6 +221,20 @@ pub(all) struct PluginContext {
   db : &PluginDb
   routes : &PluginRoutes
   sys_query : &SysQueryApi // 框架查询面（v1：jeeflow 供数；新能力以增量方法/新接口扩展）
+  dicts : &PluginDictApi // 自定义字典贡献面（UC-0432 注册中心契约；spec 2→3 那轮随 sys_query 同族加）
+}
+
+///|
+/// 自定义字典贡献面（issues/146 集成轮；契约权威＝base-verify 跨语言 runner 的 UC-0432）。
+/// 两档语义按注册中心四原则分家：
+/// - `expose`＝声明即曝光：进 `/sys/dict/customDictList`，同时 `getByDictType` 可应答（引擎 7 支枚举字典走这档）；
+/// - `answer`＝只应答不曝光：运行时调度键（`wf_assignment_handler` 等 4 类，value=类全名），
+///   `getByDictType` 照常返回数组、清单里看不到（owner 2026-09-26 拍板，UC-0432 断言③）。
+/// 两档都是**请求时派生**：装载器保存插件在 initialize 灌进来的活集合，清单每次现聚合，禁启动快照。
+/// 幂等：同 `dict_key` 重复 expose 覆盖原项（on_enable 每次启动都跑，见 Plugin trait 头注）。
+pub(open) trait PluginDictApi {
+  fn expose(self : Self, model : @core.DictModel) -> Unit
+  fn answer(self : Self, model : @core.DictModel) -> Unit
 }
 
 ///|

@@ -13,6 +13,8 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] install(
   holder : @core.ConfigHolder,
   /// 框架级枚举字典注册中心（core 件，main 建实例传入）：各模块装配期灌自己的声明
   enum_registry : @core.EnumDictRegistry,
+  /// 自定义字典供数方（装载器侧注入：插件经 PluginDictApi.expose 灌进来的活集合）
+  custom_providers : Array[() -> Array[@core.DictModel]]
 ) -> @mb.Module {
   @mb.Module(ctx => {
     let rbac_dao = @repo.RbacRepository::make(config)
@@ -64,7 +66,7 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] install(
       dao: dict_dao,
       items_of: async fn(dict_id) raise @core.MldongError { dict_item_dao.list_enabled_by_dict(dict_id) },
       enums: enum_registry,
-      custom_providers: [],
+      custom_providers,
     }
     @ctrl.register_dict(ctx, dict_svc, g) catch {
       e => abort("sys 模块 dict 路由注册失败: \{e}")

@@ -232,6 +232,39 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
     @itl.task_role_assignee_handler(Some(org_fns)),
   )
   println("[jeeflow] 内置取人 handler 注册：7 支（operator/申请部门领导×2/当前部门领导×2/formField/taskRole）")
+  // ⑥ wf 字典供数（boot4 WfProcessDictService / CustomDictService 的 moon 同位；契约＝UC-0432）
+  //    条目逐字取自引擎注册表（零硬码）。两档分家：
+  //      expose → 引擎 7 支枚举字典：进 customDictList（声明即曝光）且 getByDictType 应答；
+  //      answer → 4 类运行时调度键（value=类全名）：只应答不曝光（owner 2026-09-26 拍板，断言③）。
+  let jenums = @jmeta.EnumDictRegistry::new()
+  let exposed = jenums.list_dict_keys()
+  for key in exposed {
+    let items = match jenums.get_dict(key) {
+      Some(v) => v
+      None => []
+    }
+    let pairs : Array[(String, String)] = []
+    for it in items {
+      pairs.push((it.value(), it.label()))
+    }
+    ctx.dicts.expose(wf_build_dict(wf_dict_label(key), key, pairs))
+  }
+  let jhandlers = @jmeta.HandlerRegistry::new()
+  let spec : Array[(String, String, String)] = [
+    ("wf_assignment_handler", "AssignmentHandler", "流程办理人处理器"),
+    ("wf_candidate_handler", "CandidateHandler", "候选人处理器"),
+    ("wf_flow_interceptor_pre_process", "FlowInterceptorPreProcess", "流程前置拦截器"),
+    ("wf_flow_interceptor_post_process", "FlowInterceptorPostProcess", "流程后置拦截器"),
+  ]
+  for s in spec {
+    let ms = jhandlers.list_handlers(s.1)
+    let pairs : Array[(String, String)] = []
+    for m in ms {
+      pairs.push((m.class_name(), m.display_name()))
+    }
+    ctx.dicts.answer(wf_str_dict(s.2, s.0, pairs))
+  }
+  println("[jeeflow] wf 字典供数：引擎枚举 \{exposed.length()} 支曝光 + 4 类调度键只应答")
   let facade = @facade.Facade::make(ectx5)
   // ⑤ 注册 /wf/{action} 路由（guard 链鉴权，权限码已在 policy 片段合入）
   for a in jeeflow_actions {
@@ -256,6 +289,57 @@ pub impl @api.Plugin for JeeflowPlugin with fn on_disable(
 ) -> Unit raise {
   let _ = self
   let _ = ctx
+}
+
+///|
+/// 引擎枚举字典的中文名（只影响 customDictList 的 name 列；key 与条目一律取自引擎注册表）
+fn wf_dict_label(key : String) -> String {
+  match key {
+    "wf_process_define_state" => "流程定义状态"
+    "wf_process_instance_state" => "流程实例状态"
+    "wf_process_submit_type" => "流程提交类型"
+    "wf_process_task_state" => "流程任务状态"
+    "wf_process_task_type" => "流程任务类型"
+    "wf_process_task_perform_type" => "流程任务办理类型"
+    "wf_countersign_type" => "会签类型"
+    _ => key
+  }
+}
+
+///|
+/// 引擎字典 → 框架 DictModel：码值全为整数就按数值码（data_type=2，boot2 int_dict 同位），
+/// 否则退回字符串码档（data_type=1）。判定用现读的码表本身，不额外维护枚举清单。
+fn wf_build_dict(name : String, key : String, pairs : Array[(String, String)]) -> @core.DictModel {
+  let vals : Array[@core.IntVal] = []
+  let mut numeric = pairs.length() > 0
+  for kv in pairs {
+    match @core.parse_i64_lenient(kv.0) {
+      Some(n) => vals.push({ code: n.to_int(), label: kv.1 })
+      None => numeric = false
+    }
+  }
+  if numeric {
+    @core.int_dict(name, key, vals)
+  } else {
+    wf_str_dict(name, key, pairs)
+  }
+}
+
+///|
+/// 字符串码档：dict_item_value 出字符串（UC-0426/框架 ext 同语义，None 不出键）
+fn wf_str_dict(name : String, key : String, pairs : Array[(String, String)]) -> @core.DictModel {
+  let items : Array[@core.DictItemModel] = []
+  for kv in pairs {
+    let it : @core.DictItemModel = {
+      name: kv.1,
+      dict_item_value: @jf.string_of(kv.0),
+      dict_item_key: kv.0,
+      ext: None,
+    }
+    items.push(it)
+  }
+  let m : @core.DictModel = { name, dict_key: key, data_type: Some(1), items }
+  m
 }
 
 ///|

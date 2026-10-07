@@ -95,7 +95,7 @@ pub fn jeeflow_descriptor() -> @api.PluginDescriptor {
   {
     name: "jeeflow",
     plugin_version: "0.1.27", // 引擎代次（mooncakes mldong/jeeflow-*，随版更新）
-    spec_version: 2, // 对齐 plugin-host 的 SPEC_VERSION（PluginContext 加 sys_query 字段那轮 bump）
+    spec_version: 3, // 对齐 plugin-host 的 SPEC_VERSION（2→3：PluginContext 加 dicts 字典贡献面）
     requires: [],
     tables: [],
     migrations: [],

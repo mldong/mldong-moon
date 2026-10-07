@@ -87,8 +87,10 @@ async fn main raise {
   let holder = @core.ConfigHolder::new()
   // 框架级枚举字典注册中心：全进程一个实例，各模块装配期灌自己的声明（ConfigHolder 同链）
   let enum_registry = @core.EnumDictRegistry::new()
+  // 插件字典贡献面的落点（UC-0432）：declare 走活数组、answer_only 走枚举注册中心
+  let dict_sink = @host.FrameworkDictSink::new(enum_registry)
   let root = @mb.Module(ctx => {
-    ctx.use_(@sys.install(config, g, auth, holder, enum_registry)) catch {
+    ctx.use_(@sys.install(config, g, auth, holder, enum_registry, [fn() { dict_sink.list_declared() }])) catch {
       _ => abort("sys 模块挂载失败")
     }
     // dev 模块（元数据只读面）
@@ -104,7 +106,13 @@ async fn main raise {
     for p in plugins {
       let d = p.descriptor()
       let sys_query : &@api.SysQueryApi = @sysapi.SysQueryApiImpl::make(config)
-      let pctx = @host.plugin_context(config, d, PluginRouteSink::{ g, mctx: ctx }, sys_query) catch {
+      let pctx = @host.plugin_context(
+        config,
+        d,
+        PluginRouteSink::{ g, mctx: ctx },
+        sys_query,
+        dict_sink,
+      ) catch {
         e => abort("插件 \{d.name} 装载失败: \{@core.MldongError::message(e)}")
       }
       p.initialize(pctx) catch {
