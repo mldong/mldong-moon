@@ -24,5 +24,6 @@ import {
   "moonbitstack/moondb@0.2.0",
   "moonbitstack/moonmysql@0.7.3",
   "moonbitlang/moonback@0.8.6",
+  "mldong/moon-plugin-api@0.1.0",
   "moonbitlang/async@0.22.4",
 }

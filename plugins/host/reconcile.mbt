@@ -38,8 +38,15 @@ pub async fn load_check(
       framework_tables.push(k)
     }
   }
-  // ④ 归属闸（含两两冲突校验 + migration 目标表扫描）
+  // ④ 契约号比对（卡 0：spec_version 装载期比对，不匹配拒绝启动）+ 归属闸
   let descriptors : Array[@api.PluginDescriptor] = plugins.map(fn(p) { p.descriptor() })
+  for d in descriptors {
+    if d.spec_version != SPEC_VERSION {
+      raise @core.MldongError::Business(
+        "契约号不匹配: 插件 \{d.name} spec_version=\{d.spec_version}，装载器要求 \{SPEC_VERSION}——插件与装载器版本错配，先对齐再启动",
+      )
+    }
+  }
   let gate : OwnershipGate = { framework_tables, plugins: descriptors, contract_prefixes }
   gate.validate()
   // 记录方现读：sys_plugin 全集 + 逐插件 migration 计数

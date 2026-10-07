@@ -116,6 +116,69 @@ pub(open) trait PluginRoutes {
 }
 
 ///|
+/// sys 查询面返回的用户行（含部门/岗位名——引擎 UserInfo 与人员选择所需全字段）
+pub(all) struct SysUserRow {
+  id : Int64
+  user_name : String
+  real_name : String
+  dept_id : Int64?
+  dept_name : String?
+  post_id : Int64?
+  post_name : String?
+}
+
+///|
+/// sys 查询面返回的部门行（leader_ids=部门负责人 id 集，库内逗号串已拆好）
+pub(all) struct SysDeptRow {
+  id : Int64
+  name : String
+  leader_ids : Array[String]
+  main_leader_id : Int64?
+}
+
+///|
+pub(all) struct SysUserPage {
+  rows : Array[SysUserRow]
+  record_count : Int
+}
+
+///|
+/// 角色-用户对（引擎按角色找人节点的预载数据）
+pub(all) struct SysRoleUser {
+  role_code : String
+  user_id : String
+}
+
+///|
+/// sys 查询面 —— 插件可调用的框架查询能力（依赖倒置：契约在此，框架层 modules/sys
+/// 实现，cmd/main 注册插件时注入 PluginContext；插件禁止依赖框架实现模块）。
+/// v1 方法集 = jeeflow 引擎供数所需（boot4 JeeflowUserProvider/OrgUserProvider/
+/// UserSearchProvider 的数据流反推）：查询为主，写面按真实调用点另立。
+/// 方法全 async/live——引擎同步 SPI 的新鲜度妥协由消费插件预载承担（v2 引擎 SPI
+/// 异步化后消亡）。
+pub(open) trait SysQueryApi {
+  /// 按 id 取用户（含部门/岗位名）；不存在返回 None
+  async fn user_by_id(
+    self : Self,
+    id : Int64,
+  ) -> Option[SysUserRow] raise @core.MldongError
+
+  /// 用户分页（keyword 对 user_name/real_name 模糊；空串 = 全量分页）
+  async fn user_page(
+    self : Self,
+    page : Int,
+    size : Int,
+    keyword : String,
+  ) -> SysUserPage raise @core.MldongError
+
+  /// 全量在册部门（小表；引擎同步 SPI 需可同步读取，故提供批量面）
+  async fn dept_list(self : Self) -> Array[SysDeptRow] raise @core.MldongError
+
+  /// 全量角色-用户对（角色找人节点的预载数据）
+  async fn role_user_pairs(self : Self) -> Array[SysRoleUser] raise @core.MldongError
+}
+
+///|
 /// 装载器发给插件的运行面 —— 只放装载器要用的最小面，能力端口留给官方插件轮次。
 /// ctx：装载期恒为 @core.Ctx::system()（与模块装配期取数同惯例）；请求期主体由插件
 /// handler 里自取（ctx_of 依赖 core-web，插件自理——契约不背 web 依赖）。
@@ -123,6 +186,7 @@ pub(all) struct PluginContext {
   ctx : @core.Ctx
   db : &PluginDb
   routes : &PluginRoutes
+  sys_query : &SysQueryApi // 框架查询面（v1：jeeflow 供数；新能力以增量方法/新接口扩展）
 }
 
 ///|

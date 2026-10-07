@@ -7,7 +7,7 @@
 
 ///|
 /// 契约号：descriptor.spec_version 装载期比对，不匹配拒绝启动；破坏性契约变更时 +1
-pub const SPEC_VERSION : Int = 1
+pub const SPEC_VERSION : Int = 2 // 1→2：PluginContext 增 sys_query 框架查询面字段（10-07）
 
 ///|
 /// mysql-schema-all.sql 已固化的最高 framework migration 版本。

@@ -7,7 +7,6 @@ import {
   "mldong/jeeflow-core/json" @jf,
   "mldong/jeeflow-core/model" @model,
   "mldong/jeeflow-core/spi" @spi,
-  "mldong/jeeflow-core/error" @error,
   "mldong/jeeflow-core/id_gen" @id_gen,
   "mldong/jeeflow-facade" @facade,
   "mldong/jeeflow-repository-mysql/repo" @jrepo,

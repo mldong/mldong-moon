@@ -8,8 +8,9 @@ pub async fn plugin_context(
   config : @core.MysqlConfig,
   d : @api.PluginDescriptor,
   routes : &@api.PluginRoutes,
+  sys_query : &@api.SysQueryApi,
 ) -> @api.PluginContext raise @core.MldongError {
   let conn = @repo.open_conn(config)
   let db : &@api.PluginDb = plugin_db_of(conn, d.name, d.tables)
-  { ctx: @core.Ctx::system(), db, routes }
+  { ctx: @core.Ctx::system(), db, routes, sys_query }
 }
