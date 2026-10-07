@@ -115,7 +115,8 @@ fn generic_row_to_json(r : @moondb.Row, cols : Map[String, String]) -> Json {
       Bool(b) => Json::boolean(b)
       Blob(_) => Json::null()
     }
-    let _ = obj.set(name, j)
+    // UC-0318/0319：动态表行出口一律 camelCase（后端负责转，前端不做 snake_case 兼容）
+    let _ = obj.set(@core.to_camel_case(name), j)
   }
   Json::object(obj)
 }

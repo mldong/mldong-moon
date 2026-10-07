@@ -46,11 +46,13 @@ pub impl @dao.RbacDao for RbacRepository with fn find_user_auth_by_id(self, id) 
 
 ///|
 pub impl @dao.RbacDao for RbacRepository with fn find_role_codes(self, user_id, app_code) {
+  // appCode 不参与角色码过滤（boot2 getInCache 只按 menu.app_code）；端口签名保留入参
+  let _ = app_code
   let conn = open_conn(self.config)
   let rows = q(
     conn,
-    "SELECT r.code FROM sys_role r JOIN sys_user_role ur ON ur.role_id = r.id WHERE ur.user_id = ? AND r.app_code = ? AND r.is_deleted = 0",
-    [@moondb.Int64(user_id), @moondb.Text(app_code)],
+    "SELECT r.code FROM sys_role r JOIN sys_user_role ur ON ur.role_id = r.id WHERE ur.user_id = ? AND r.is_deleted = 0",
+    [@moondb.Int64(user_id)],
   )
   conn.close()
   let out : Array[String] = []
@@ -65,8 +67,8 @@ pub impl @dao.RbacDao for RbacRepository with fn find_perms_by_user(self, user_i
   let conn = open_conn(self.config)
   let rows = q(
     conn,
-    "SELECT DISTINCT m.code FROM sys_menu m JOIN sys_role_menu rm ON rm.menu_id = m.id JOIN sys_user_role ur ON ur.role_id = rm.role_id JOIN sys_role r ON r.id = ur.role_id WHERE ur.user_id = ? AND r.app_code = ? AND m.app_code = ? AND m.is_deleted = 0",
-    [@moondb.Int64(user_id), @moondb.Text(app_code), @moondb.Text(app_code)],
+    "SELECT DISTINCT m.code FROM sys_menu m JOIN sys_role_menu rm ON rm.menu_id = m.id JOIN sys_user_role ur ON ur.role_id = rm.role_id JOIN sys_role r ON r.id = ur.role_id WHERE ur.user_id = ? AND m.app_code = ? AND m.is_deleted = 0",
+    [@moondb.Int64(user_id), @moondb.Text(app_code)],
   )
   conn.close()
   let out : Array[String] = []
@@ -173,8 +175,8 @@ pub impl @dao.RbacDao for RbacRepository with fn find_menu_ids_by_user(self, use
   let conn = open_conn(self.config)
   let rows = q(
     conn,
-    "SELECT DISTINCT m.id FROM sys_menu m JOIN sys_role_menu rm ON rm.menu_id = m.id JOIN sys_user_role ur ON ur.role_id = rm.role_id JOIN sys_role r ON r.id = ur.role_id WHERE ur.user_id = ? AND r.app_code = ? AND m.app_code = ? AND m.is_deleted = 0",
-    [@moondb.Int64(user_id), @moondb.Text(app_code), @moondb.Text(app_code)],
+    "SELECT DISTINCT m.id FROM sys_menu m JOIN sys_role_menu rm ON rm.menu_id = m.id JOIN sys_user_role ur ON ur.role_id = rm.role_id JOIN sys_role r ON r.id = ur.role_id WHERE ur.user_id = ? AND m.app_code = ? AND m.is_deleted = 0",
+    [@moondb.Int64(user_id), @moondb.Text(app_code)],
   )
   conn.close()
   let out : Array[Int64] = []

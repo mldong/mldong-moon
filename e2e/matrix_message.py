@@ -43,9 +43,9 @@ r=post('/sys/message/update',{'id':mid,'title':'A1改','content':'x','msgType':2
 check('A4 update', r['code']==0)
 r=post('/sys/message/detail',{'id':mid},t)
 check('A5 update 回读', r['data']['title']=='A1改')
-# save 缺 msgType → 契约必填（boot2 @NotNull 同位）；moon 校验失败码 99990001（差异记账）
+# save 缺 msgType → 契约必填（boot2 @NotNull 同位）；参数校验失败按契约 00-全局约定 §1 出 99999999
 r=post('/sys/message/save',{'title':'A6缺类型','bizType':BT+'_d','receiverUserId':MYID},t)
-check('A6 缺 msgType 拒绝 99990001', r['code']==99990001, str(r)[:80])
+check('A6 缺 msgType 拒绝 99999999', r['code']==99999999, str(r)[:80])
 
 # ── B. page + 接收人隔离 ──
 r=mkmsg('B1隔离','x_biz',ruid=FAKE_RUID)  # 发给不存在的人

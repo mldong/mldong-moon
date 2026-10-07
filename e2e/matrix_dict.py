@@ -36,7 +36,7 @@ r=post('/sys/dict/save',{'name':'契约字典'+RID,'code':RID+'_d1','groupCode':
 check('DC1 dict save', r['code']==0 and r['data'], str(r))
 d1=r['data']
 r2=post('/sys/dict/save',{'name':'重复code','code':RID+'_d1','groupCode':'default'},t)
-check('DC2 dict code 全局唯一', r2['code']==99990003, 'code=%s'%r2['code'])
+check('DC2 dict code 全局唯一', r2['code']==99999999, 'code=%s'%r2['code'])
 r=post('/sys/dict/detail',{'id':d1},t)
 check('DC3 detail 回读', r['code']==0 and r['data']['code']==RID+'_d1' and r['data']['dataType']==1, str(r.get('data',{}).get('code')))
 r=post('/sys/dict/update',{'id':d1,'name':'契约字典改'+RID,'code':RID+'_d1','groupCode':'default','dataType':1,'enabled':1,'sort':9},t)
@@ -115,7 +115,7 @@ check('E6 update ext={} 不出键', 'ext' not in r['data'], str('ext' in r['data
 
 # ---- dictItem 唯一性 / 负向 ----
 r=post('/sys/dictItem/save',{'dictId':int(d1),'name':'重码','code':RID+'_a','sort':5,'enabled':1},t)
-check('N1 dict 内 code 唯一', r['code']==99990003, 'code=%s'%r['code'])
+check('N1 dict 内 code 唯一', r['code']==99999999, 'code=%s'%r['code'])
 r=post('/sys/dictItem/save',{'dictId':'999999999999999999','name':'孤儿','code':RID+'_x','sort':1,'enabled':1},t)
 check('N2 dictId 不存在拒', r['code']!=0, str(r))
 

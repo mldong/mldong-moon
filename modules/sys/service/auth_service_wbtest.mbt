@@ -36,6 +36,14 @@ impl RbacService for StubRbac with fn grant_role_menus(
 }
 
 ///|
+impl RbacService for StubRbac with fn perm_codes(self, user_id, app_code) {
+  let _ = self
+  let _ = user_id
+  let _ = app_code
+  []
+}
+
+///|
 struct FixedPerms {}
 
 ///|

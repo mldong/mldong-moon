@@ -22,7 +22,7 @@ mldong-moon/
 ├── AGENTS.md            # 本文件
 ├── README.md            # 面向人的总览（快速开始/文档导航/路线图；接口细节在 doc/api.md）
 ├── core/                # mldong/moon-core —— 框架无关底座，零 web/ORM 依赖
-│   ├── error.mbt        #   MldongError（99990000~99990004 码表）
+│   ├── error.mbt        #   MldongError（99990000~99990004 业务档 + 99990406 权限档 + 99999999 参数校验档）
 │   ├── result.mbt       #   响应信封 ok_empty/ok_data/fail/ok_page
 │   ├── sqlbuilder.mbt   #   Wrapper 条件 + build_select/insert/update/delete（中性 SQL 构建）
 │   ├── query.mbt        #   m_ 通用动态查询（13 操作符 + keywords）与防注入白名单
@@ -113,7 +113,7 @@ curl -s -X POST http://127.0.0.1:18680/sys/user/page \
 - **moonback handler 没有 raise 通道**（`Handler = async (Request, Responder) -> Unit`），
   统一异常处理落 `@web.wrap`：业务闭包只许抛 `MldongError`，wrap 负责转 9999xxxx 信封。
   **中间件做不了这事**（moonback 中间件是 App 全局作用域且先于路由匹配执行）。
-- **信封 HTTP 恒 200**（含鉴权失败）：业务码进 body（99990403=token 失效、99990401 只归登录
+- **信封 HTTP 恒 200**（含鉴权失败）：业务码进 body（99990403=token 失效、99990406=无权限码、99999999=参数校验失败与唯一键冲突、99990401 只归登录
   「用户名或密码错误」）——boot2 GlobalExceptionHandler / goframe WriteJson 同约定，vben5 按 code
   分支不吃 HTTP 状态；新端点别再直出 4xx（契约 runner UC-0101/0113 都按此断，详见 doc/base-contract.md §3）。
 - **moon_zod 是 strip 模式**：schema 里没声明的字段会被**丢弃**。id/deptId 这类"不校验但要存活"

@@ -26,3 +26,20 @@ pub fn Ctx::make(user_id : Int64?, login_id : String) -> Ctx {
 pub fn Ctx::system() -> Ctx {
   { user_id: None, login_id: "", app_code: None }
 }
+///|
+/// 落库用的应用编码（boot2 MenuServiceImpl/RoleServiceImpl 的
+/// `if (StrUtil.isEmpty(param.getAppCode())) entity.setAppCode(LoginUserHolder.getAppCode())`
+/// 同位）：入参优先 → 请求域 appCode → platform。入参缺省**不写 NULL**，
+/// 否则新建的角色/菜单落不进任何 appCode 域，授权链与菜单树都查不到它。
+pub fn Ctx::resolve_app_code(self : Ctx, from_body : String?) -> String {
+  let mut out = "platform"
+  match self.app_code {
+    Some(v) if !v.is_empty() => { out = v }
+    _ => ()
+  }
+  match from_body {
+    Some(v) if !v.is_empty() => { out = v }
+    _ => ()
+  }
+  out
+}

@@ -39,7 +39,10 @@ r=post('/sys/login',{'userName':'u0010','password':'123456'})  # u0010 当前只
 # 不改库：直接验证 platform 侧——u0010 有 manage@platform，page 无 sys:user:page → rotate 后仍 403 才对（extra 存活的反证）
 t1=post('/sys/refreshToken',{'refreshToken':r['data']['refreshToken']})['data']
 c=post('/sys/user/page',{'pageNum':1,'pageSize':2},t1['token'])['code']
-check('RR6a rotate 后 extra(appCode=platform) 存活（仍滤空 403）', c==99990403, 'code=%s'%c)
+# 10-07 改判（契约 00-全局约定：99990403 只表示 token 无效/未登录，无权限码是 99990406
+# = boot2 NO_RESOURCE_AUTH；旧钉值 99990403 是 moon guard 那条已记台账的偏差，由 base-verify
+# L3 量出后收口）。用例语义不变：有效 token + 缺 sys:user:page 仍旧拒，只是码值归位。
+check('RR6a rotate 后 extra(appCode=platform) 存活（仍拒，无权限码 99990406）', c==99990406, 'code=%s'%c)
 # RR6b 正证：超管 rotate 后仍超管（跨码 200）
 r2=post('/sys/login',{'userName':'superAdmin','password':'123456'})
 t2=post('/sys/refreshToken',{'refreshToken':r2['data']['refreshToken']})['data']

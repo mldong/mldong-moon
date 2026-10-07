@@ -11,6 +11,10 @@ pub(open) trait RbacService {
   async fn grant_user_roles(Self, user_id : Int64, role_ids : Array[Int64]) -> Unit raise @core.MldongError
   /// 角色授权菜单（role_menu 全量替换）
   async fn grant_role_menus(Self, role_id : Int64, menu_ids : Array[Int64]) -> Unit raise @core.MldongError
+  /// 当前权限码（boot2 AuthServiceImpl.getPermissionList 同位）：超管**只出** `["admin"]`
+  /// （CommonConstant.SUPER_ADMIN_PERM_FLAG，前端按它放行全部路由），其余按
+  /// user_role→role_menu→menu.code 现取，appCode 取请求域。
+  async fn perm_codes(Self, user_id : Int64, app_code : String) -> Array[String] raise @core.MldongError
 }
 
 ///|
@@ -78,6 +82,18 @@ pub impl[D : @dao.RbacDao] @port.PermissionProvider for RbacServiceImpl[D] with 
 }
 
 ///|
+pub impl[D : @dao.RbacDao] RbacService for RbacServiceImpl[D] with fn perm_codes(
+  self,
+  user_id,
+  app_code,
+) {
+  match self.dao.find_user_auth_by_id(user_id) {
+    Some(u) if u.admin_type == Some(1) => ["admin"]
+    _ => self.dao.find_perms_by_user(user_id, app_code)
+  }
+}
+
+///|
 pub impl[D : @dao.RbacDao] @port.PermissionProvider for RbacServiceImpl[D] with fn get_roles(
   self,
   login_id,
@@ -119,6 +135,7 @@ pub impl[D : @dao.RbacDao] @port.PermissionProvider for RbacServiceImpl[D] with 
 ///|
 pub extend RbacServiceImpl with RbacService::{
   find_user_auth_by_name,
+  perm_codes,
   find_user_auth_by_id,
   grant_user_roles,
   grant_role_menus,

@@ -151,7 +151,9 @@ pub async fn[T] BaseDao::find_by_ids(self : BaseDao[T], vals : Array[@core.SqlVa
 }
 
 ///|
-/// 唯一编码校验（boot2 LowCodeServiceUtil.checkUnique 同位）：存在（排除自身）即 Conflict。
+/// 唯一编码校验（boot2 LowCodeServiceUtil.checkUnique 同位）：存在（排除自身）即业务失败，
+/// 码取 99999999——boot2 那句就是 `ServiceException.throwBiz(99999999, error)`，
+/// base-verify L3 B03/B06 实测断此码（旧映射 Conflict 99990003 是 moon 自创，契约码表里没有）。
 /// col/value 由调用方给（code 唯一是常态），msg 直出给前端。
 pub async fn[T] BaseDao::check_unique(
   self : BaseDao[T],
@@ -165,7 +167,7 @@ pub async fn[T] BaseDao::check_unique(
     let _ = w.ne("id", L(exclude_id.unwrap()))
   }
   if (self.count(w)) > 0 {
-    raise @core.MldongError::Conflict(msg)
+    raise @core.MldongError::InvalidParam(msg)
   }
 }
 

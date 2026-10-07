@@ -84,9 +84,10 @@ check('LC20 user/select keywords 缺省按 labelKey(real_name)', r['code']==0 an
 r=post('/lowCode/sys_user/select',{'pageSize':2,'labelKey':'realName'},t)
 check('LC21 lowCode select（sys_user 无 name 列，显式 labelKey——与 goframe 同判）', r['code']==0 and len(r['data'])>=1)
 r=post('/lowCode/sys_user/page',{'pageNum':1,'pageSize':2},t)
-check('LC22 lowCode page 形状', r['code']==0 and r['data']['recordCount']>=1 and isinstance(r['data']['rows'][0].get('user_name'),str), str(r['data'])[:150])
+# UC-0318：动态表行出口一律 camelCase（旧断 user_name 是 moon 自创的 snake 透出面）
+check('LC22 lowCode page 形状(camelCase)', r['code']==0 and r['data']['recordCount']>=1 and isinstance(r['data']['rows'][0].get('userName'),str) and 'user_name' not in r['data']['rows'][0], str(r['data'])[:150])
 r=post('/lowCode/sys_dept/detail',{'id':first_id},t)
-check('LC23 lowCode detail snake 键', r['code']==0 and r['data']['id']==first_id and 'parent_id' in r['data'], str(r)[:120])
+check('LC23 lowCode detail camelCase 键(UC-0319)', r['code']==0 and r['data']['id']==first_id and 'parentId' in r['data'] and 'parent_id' not in r['data'], str(r)[:120])
 r=post('/lowCode/no_such_table/select',{},t)
 check('LC24 未知表 9999', r['code']!=0, str(r))
 r=post('/lowCode/sys_user;drop/detail',{'id':'1'},t)

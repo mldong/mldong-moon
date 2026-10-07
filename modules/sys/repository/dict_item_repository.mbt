@@ -81,7 +81,7 @@ pub impl @dao.DictItemDao for DictItemRepository with fn check_unique_in_dict(
     None => ()
   }
   if (self.base.count(w)) > 0 {
-    raise @core.MldongError::Conflict(msg)
+    raise @core.MldongError::InvalidParam(msg)
   }
 }
 

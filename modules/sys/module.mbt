@@ -106,7 +106,7 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] install(
     }
     // lowcode —— 通用下拉 /{module}/{table}/select + /lowCode 动态表网关
     // （仅登录无权限码；controller 直用 GenericDao——纯基础设施无业务语义）
-    @ctrl.register_lowcode(ctx, @repo.GenericDao::make(config), g)
+    @ctrl.register_lowcode(ctx, @repo.GenericDao::make(config), rbac_svc, g)
     // rbac —— 授权关系面（角色-菜单/用户-角色/数据范围，boot2 RbacController 同位）
     @ctrl.register_rbac(ctx, rbac_dao, g) catch {
       e => abort("sys 模块 rbac 路由注册失败: \{e}")

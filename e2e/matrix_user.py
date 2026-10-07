@@ -51,14 +51,14 @@ check('U10 updateInfo', r['code']==0)
 r=post('/sys/user/info',{},t)
 check('U11 info 回读新名', r['data']['realName']=='超管改名')
 r=post('/sys/user/updateInfo',{'realName':'superAdmin'},t)  # 还原
-r=post('/sys/user/updatePwd',{'oldPassword':'123456','newPassword':'abc12345'},t)
+r=post('/sys/user/updatePwd',{'password':'123456','newPassword':'abc12345'},t)
 check('U12 updatePwd', r['code']==0)
 r2=post('/sys/login',{'userName':'superAdmin','password':'abc12345'})
 check('U13 新密可登', r2['code']==0)
-r=post('/sys/user/updatePwd',{'oldPassword':'wrong','newPassword':'xyz98765'},t2 if False else r2['data']['token'])
+r=post('/sys/user/updatePwd',{'password':'wrong','newPassword':'xyz98765'},t2 if False else r2['data']['token'])
 check('U14 旧密错拒', r['code']==99990004, str(r))
 t=post('/sys/login',{'userName':'superAdmin','password':'abc12345'})['data']['token']
-r=post('/sys/user/updatePwd',{'oldPassword':'abc12345','newPassword':'123456'},t)  # 还原默认密码
+r=post('/sys/user/updatePwd',{'password':'abc12345','newPassword':'123456'},t)  # 还原默认密码
 check('U15 还原默认密码', r['code']==0)
 r=post('/sys/user/updateAvatar',{'avatar':'https://cdn.example.com/a.png'},t)
 check('U16 updateAvatar', r['code']==0)

@@ -64,7 +64,7 @@ fn schema_req_of(data : Json) -> SchemaSaveReq {
 pub fn schema_parse_save(body : Json) -> SchemaSaveReq raise @core.MldongError {
   match schema_save_schema.parse(body) {
     Ok(data) => schema_req_of(data)
-    Err(errors) => raise @core.MldongError::InvalidInput(errors[0].to_string())
+    Err(errors) => raise @core.MldongError::InvalidParam(errors[0].to_string())
   }
 }
 
@@ -91,7 +91,7 @@ pub(all) struct SchemaPageReq {
 pub fn schema_parse_page(body : Json) -> SchemaPageReq raise @core.MldongError {
   let page_num = @core.get_int(body, "pageNum").unwrap_or(1)
   let page_size = @core.get_int(body, "pageSize").unwrap_or(10)
-  if page_num <= 0 || page_size <= 0 || page_size > 200 {
+  if page_num <= 0 || page_size <= 0 {
     raise @core.MldongError::InvalidInput("分页参数非法")
   }
   {
@@ -130,11 +130,14 @@ pub fn schema_json(d : @entity.Schema) -> Json {
     Object(map) => map
     _ => abort("schema_json 恒为 Object")
   }
-  // ext 空不出键（UC-0426：'{}' 恒重写与 NULL 两态同判）
-  match @core.ext_json_opt(d.variable) {
-    Some(e) => { let _ = base.set("ext", e) }
-    None => ()
+  // dev 家族 ext 恒出键（空为 {}）：UC-0303 响应字段列了 ext、UC-0306 明写
+  // 「无 ext 的模型返回 ext: {} 不是 null」——与 sys/dict 家族「空不出键」（UC-0426）是两面，
+  // 别互相套用（boot2 SchemaVO 同样默认空 JSONObject）。
+  let ext_val = match @core.ext_json_opt(d.variable) {
+    Some(e) => e
+    None => Json::object(Map([], capacity=0))
   }
+  let _ = base.set("ext", ext_val)
   Json::object(base)
 }
 
@@ -225,10 +228,11 @@ pub fn schema_group_vo_json(g : @entity.SchemaGroup, schemas : Array[@entity.Sch
     Object(map) => map
     _ => abort("schema_group_vo_json 恒为 Object")
   }
-  match @core.ext_json_opt(g.variable) {
-    Some(e) => { let _ = base.set("ext", e) }
-    None => ()
+  let grp_ext = match @core.ext_json_opt(g.variable) {
+    Some(e) => e
+    None => Json::object(Map([], capacity=0))
   }
+  let _ = base.set("ext", grp_ext)
   let arr : Array[Json] = []
   for d in schemas {
     arr.push(Json::object(schema_item_with_null_columns(d)))

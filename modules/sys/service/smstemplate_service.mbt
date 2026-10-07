@@ -17,7 +17,7 @@ pub(all) struct SmsTemplateServiceImpl[R] {
 
 ///|
 pub impl[R : @dao.SmsTemplateDao] SmsTemplateService for SmsTemplateServiceImpl[R] with fn save(self, ctx, req) {
-  // uk_biz_type_provider 唯一前置（DB 兜底 + 友好 99990003）
+  // uk_biz_type_provider 唯一前置（DB 兜底 + 友好 99999999）
   self.dao.check_unique(req.biz_type, req.provider, None, "该业务类型下已存在同通道模板: " + req.biz_type.to_string())
   let d : @entity.SmsTemplate = {
     id: @core.next_id(),

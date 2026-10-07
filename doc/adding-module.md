@@ -64,7 +64,7 @@
 - `trait PostService` + `pub(all) struct PostServiceImpl[R] { dao : R }` +
   `pub impl[R : @dao.PostDao] PostService for PostServiceImpl[R] with ...`；
 - 纯校验规则抽 `fn validate(req) -> String?` 纯函数（不连库，可 `moon test`）；
-- 查重冲突抛 `Conflict`、不存在抛 `NotFound`；NOT NULL 列给业务默认值。
+- 查重冲突抛 `InvalidParam`（99999999，boot2 checkUnique throwBiz 同码）、不存在抛 `NotFound`；NOT NULL 列给业务默认值。
 
 ### ⑦ controller（`controller/post_controller.mbt`）
 

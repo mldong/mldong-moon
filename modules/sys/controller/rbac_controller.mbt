@@ -136,7 +136,7 @@ pub fn[
     }
     let page_num = @core.get_int(body, "pageNum").unwrap_or(1)
     let page_size = @core.get_int(body, "pageSize").unwrap_or(10)
-    if page_num <= 0 || page_size <= 0 || page_size > 200 {
+    if page_num <= 0 || page_size <= 0 {
       raise @core.MldongError::InvalidInput("分页参数非法")
     }
     let keywords = @core.text_or(body, "keywords", "")

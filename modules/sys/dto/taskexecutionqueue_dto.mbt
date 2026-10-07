@@ -55,7 +55,7 @@ fn taskexecutionqueue_req_of(data : Json) -> TaskExecutionQueueSaveReq {
 pub fn taskexecutionqueue_parse_save(body : Json) -> TaskExecutionQueueSaveReq raise @core.MldongError {
   match taskexecutionqueue_save_schema.parse(body) {
     Ok(data) => taskexecutionqueue_req_of(data)
-    Err(errors) => raise @core.MldongError::InvalidInput(errors[0].to_string())
+    Err(errors) => raise @core.MldongError::InvalidParam(errors[0].to_string())
   }
 }
 
@@ -82,7 +82,7 @@ pub(all) struct TaskExecutionQueuePageReq {
 pub fn taskexecutionqueue_parse_page(body : Json) -> TaskExecutionQueuePageReq raise @core.MldongError {
   let page_num = @core.get_int(body, "pageNum").unwrap_or(1)
   let page_size = @core.get_int(body, "pageSize").unwrap_or(10)
-  if page_num <= 0 || page_size <= 0 || page_size > 200 {
+  if page_num <= 0 || page_size <= 0 {
     raise @core.MldongError::InvalidInput("分页参数非法")
   }
   {

@@ -46,7 +46,7 @@ fn config_req_of(data : Json) -> ConfigSaveReq {
 pub fn config_parse_save(body : Json) -> ConfigSaveReq raise @core.MldongError {
   match config_save_schema.parse(body) {
     Ok(data) => config_req_of(data)
-    Err(errors) => raise @core.MldongError::InvalidInput(errors[0].to_string())
+    Err(errors) => raise @core.MldongError::InvalidParam(errors[0].to_string())
   }
 }
 
@@ -73,7 +73,7 @@ pub(all) struct ConfigPageReq {
 pub fn config_parse_page(body : Json) -> ConfigPageReq raise @core.MldongError {
   let page_num = @core.get_int(body, "pageNum").unwrap_or(1)
   let page_size = @core.get_int(body, "pageSize").unwrap_or(10)
-  if page_num <= 0 || page_size <= 0 || page_size > 200 {
+  if page_num <= 0 || page_size <= 0 {
     raise @core.MldongError::InvalidInput("分页参数非法")
   }
   {

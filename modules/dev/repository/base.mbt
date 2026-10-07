@@ -154,7 +154,7 @@ pub async fn[T] BaseDao::check_unique(
     let _ = w.ne("id", L(exclude_id.unwrap()))
   }
   if (self.count(w)) > 0 {
-    raise @core.MldongError::Conflict(msg)
+    raise @core.MldongError::InvalidParam(msg)
   }
 }
 

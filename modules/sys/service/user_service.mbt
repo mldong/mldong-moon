@@ -54,7 +54,7 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn save(self,
   }
   // 业务规则：用户名查重（未删除范围内）
   match self.dao.find_by_user_name(req.user_name) {
-    Some(_) => raise @core.MldongError::Conflict("用户名已存在: \{req.user_name}")
+    Some(_) => raise @core.MldongError::InvalidParam("用户名已存在: \{req.user_name}")
     None => ()
   }
   // 密码机制对齐 boot2 save：不收用户自报密码，发默认密码（holder 可配）+ 8 位随机盐
@@ -101,7 +101,7 @@ pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn update(sel
   // 用户名查重（排除自身）
   match self.dao.find_by_user_name(req.user_name) {
     Some(other) => if other.id != req.id {
-      raise @core.MldongError::Conflict("用户名已存在: \{req.user_name}")
+      raise @core.MldongError::InvalidParam("用户名已存在: \{req.user_name}")
     }
     None => ()
   }

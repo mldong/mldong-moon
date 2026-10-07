@@ -20,13 +20,13 @@ pub impl[R : @dao.RoleDao] RoleService for RoleServiceImpl[R] with fn save(self,
   // 业务规则：code 查重（未删除范围内；code 有唯一索引语义，空 code 不查）
   if !req.code.is_empty() {
     match self.dao.find_by_code(req.code) {
-      Some(_) => raise @core.MldongError::Conflict("角色编码已存在: \{req.code}")
+      Some(_) => raise @core.MldongError::InvalidParam("角色编码已存在: \{req.code}")
       None => ()
     }
   }
   let r : @entity.Role = {
     id: @core.next_id(),
-    app_code: req.app_code,
+    app_code: Some(ctx.resolve_app_code(req.app_code)),
     name: req.name,
     code: req.code,
     sort: req.sort,
@@ -53,7 +53,7 @@ pub impl[R : @dao.RoleDao] RoleService for RoleServiceImpl[R] with fn update(sel
   if !req.code.is_empty() {
     match self.dao.find_by_code(req.code) {
       Some(other) => if other.id != req.id {
-        raise @core.MldongError::Conflict("角色编码已存在: \{req.code}")
+        raise @core.MldongError::InvalidParam("角色编码已存在: \{req.code}")
       }
       None => ()
     }

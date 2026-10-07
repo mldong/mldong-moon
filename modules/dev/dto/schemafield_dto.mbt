@@ -61,7 +61,7 @@ pub fn schemafield_req_of(data : Json) -> SchemaFieldSaveReq {
 pub fn schemafield_parse_save(body : Json) -> SchemaFieldSaveReq raise @core.MldongError {
   match schemafield_save_schema.parse(body) {
     Ok(data) => schemafield_req_of(data)
-    Err(errors) => raise @core.MldongError::InvalidInput(errors[0].to_string())
+    Err(errors) => raise @core.MldongError::InvalidParam(errors[0].to_string())
   }
 }
 
@@ -88,7 +88,7 @@ pub(all) struct SchemaFieldPageReq {
 pub fn schemafield_parse_page(body : Json) -> SchemaFieldPageReq raise @core.MldongError {
   let page_num = @core.get_int(body, "pageNum").unwrap_or(1)
   let page_size = @core.get_int(body, "pageSize").unwrap_or(10)
-  if page_num <= 0 || page_size <= 0 || page_size > 200 {
+  if page_num <= 0 || page_size <= 0 {
     raise @core.MldongError::InvalidInput("分页参数非法")
   }
   {

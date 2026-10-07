@@ -116,7 +116,7 @@ pub impl[R : @dao.MenuDao] MenuService for MenuServiceImpl[R] with fn save(self,
   self.dao.check_unique(req.code, None, "唯一编码已存在: " + req.code)
   let d : @entity.Menu = {
     id: @core.next_id(),
-    app_code: req.app_code,
+    app_code: Some(ctx.resolve_app_code(req.app_code)),
     parent_id: req.parent_id,
     name: req.name,
     code: req.code,

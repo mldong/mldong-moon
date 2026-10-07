@@ -81,7 +81,9 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
     if user_id <= 0L {
       raise @core.MldongError::InvalidInput("用户ID不能为空")
     }
-    rbac.grant_user_roles(user_id, @core.get_i64_array(body, "roleIds"))
+    // 字段名是 roleIdList（契约 UC-0208「userId + roleIdList(string[])」/boot2 UserParam.roleIdList）；
+    // 旧写 roleIds 时读不到键 ⇒ grant_roles 走"全量替换成空集"，接口回 code=0 却一行不写（静默失效）。
+    rbac.grant_user_roles(user_id, @core.get_i64_array(body, "roleIdList"))
     @core.ok_empty()
   })
   // ---- 管理-用户状态族（boot2 locked/unLocked/resetPassword/select 同位）----
@@ -117,12 +119,19 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
 
   // ---- 个人中心族（principal_of 取登录主体；main 已关推导，这些端点只验登录）----
 
-  // 当前权限标识（boot2 permCode 口径）
-  let perm_code_handler : @mb.Handler = @web.wrap(fn(request) -> Json raise @core.MldongError {
-    let codes = match @mbguard.principal_of(request) {
-      Some(p) => p.permissions
+  // 当前权限标识（boot2 permCode 口径）：码现取而不是读会话快照——
+  // moon-token 的 Principal.permissions 是登录时的快照，授权变更后重登才刷新，
+  // 而 boot2 getPermissionList 每次现算（超管固定 ["admin"]），L3 B03-UI/B04 量过快照口径拿不到码。
+  let perm_code_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    let ctx = @web.ctx_of(request)
+    let uid = match @mbguard.principal_of(request) {
+      Some(p) => match @svc.parse_user_id(p.login_id) {
+        Some(id) => id
+        None => raise @core.MldongError::NotFound("登录主体非法: \{p.login_id}")
+      }
       None => raise @core.MldongError::NotFound("会话无主体")
     }
+    let codes = rbac.perm_codes(uid, ctx.resolve_app_code(None))
     let arr : Array[Json] = []
     for c in codes {
       arr.push(Json::string(c))
@@ -137,7 +146,16 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
     while guard_count < 100 {
       let page = auth.list_online(@port.SessionFilter::all(), cursor, 100)
       for row in auth.load_online(page) {
-        rows.push(row)
+        // 只报活会话：索引是派生缓存，权威在 T:。载荷取不到（注销/过期）
+        // 或处于墓碑态（Kicked/Superseded，宽限窗内仍留在索引里）都必须剔掉，
+        // 否则 kickout 之后在线列表照旧显示该账号（base-verify L3 B12 实测）。
+        let alive = match row.session {
+          Some(ss) => ss.status is @port.Active
+          None => false
+        }
+        if alive {
+          rows.push(row)
+        }
       }
       if page.next_cursor.is_empty() {
         break
@@ -231,7 +249,9 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
       None => raise @core.MldongError::NotFound("登录主体非法: \{p.login_id}")
     }
     let body = @web.json_body(request)
-    svc.update_password(ctx, uid, @core.text_or(body, "oldPassword", ""), @core.text_or(body, "newPassword", ""))
+    // 旧密字段是 `password`（boot2 UserParam.UpdatePwd 分组 @NotBlank 的就是 password+newPassword），
+    // 不是 oldPassword——base-verify L3 B02 据此实测量出。
+    svc.update_password(ctx, uid, @core.text_or(body, "password", ""), @core.text_or(body, "newPassword", ""))
     @core.ok_empty()
   })
   // 修改个人头像（avatar 存 URL 串）
@@ -505,15 +525,15 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider, T : @svc.UserService,
   })
   let kickout_by_token_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
     for token in kick_str_ids(@web.json_body(request)) {
-      // moon-token kickout 按 login_id+device 标记：先反查会话再踢（token 无效跳过）
-      let session = auth.read_session(token) catch {
-        _ => None
-      }
-      match session {
-        Some(ss) => {
-          let _ = auth.kickout(ss.login_id(), device=ss.device().id) catch { _ => 0 }
-        }
-        None => ()
+      // 作用域＝**这一枚 token**（boot2 StpUtil.kickoutByTokenValue 同位；UC-0212 四条断言按此判）。
+      // 不能走 `auth.kickout(login_id, device=…)`：moon-token 的 kickout 按「账号+设备」整族打墓碑，
+      // 而登录端点把 device 恒写成 "pc" ⇒ 踢一枚会连坐同账号其它会话。
+      // base-verify L3 B02 实测到该连坐：脚本收尾清自己的第二个会话，把仍在用的第一个会话一起踢成
+      // KickedOut，后续 onlineDevice/permCode 全变 99990403。
+      // 代价：按枚注销的事件是 LoggedOut 而非 Kicked，被踢方拿不到「KickedOut」精确原因——
+      // 要两者兼得需 moon-token 提供按枚 kick 口（已登记待办，不在这里伸进它的 store）。
+      auth.logout(token) catch {
+        _ => ()
       }
     }
     @core.ok_empty()

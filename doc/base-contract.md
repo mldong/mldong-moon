@@ -1,6 +1,6 @@
 # base-verify 契约跑测 · 差异清单（2026-10-03 首轮）
 
-> 跑批报告：**`base-verify/reports/2026-10-05-moon-batch12-l2.json`（sys/dev 按需增补轮 16/16 全绿保持）**；历史：`base-verify/reports/2026-10-04-moon-dict-l2.{json,txt}`（字典轮 10/16）、`base-verify/reports/2026-10-04-moon-menu-l2.{json,txt}`（菜单轮 11/16）、`base-verify/reports/2026-10-04-moon-menu2-l2.json`（菜单缺口补齐轮 11/16 无回归）、`base-verify/reports/2026-10-05-moon-dev-l2.json`（dev 台账轮 **12/16**，UC-0303/0306/0310 收口）、`base-verify/reports/2026-10-05-moon-final-l2.json`（**收口轮 16/16 全绿**：message/fileInfo/appversion/sse 四模块落地——base 首批契约全部收口）。boot2 全量 12 端点已对齐（syncRoute 无 base 契约，仓内 e2e 隔离域覆盖）；dev 模块 boot2 22 端点已对齐（无 base 契约的进仓内 e2e matrix_dev 55 例）。
+> 跑批报告：**`base-verify/reports/2026-10-07-moon-l3-first-run.md`（10-07 首轮 L3＝vben5 前端 Playwright 全 40 格，39 过 1 红；红项归因见该文件 §4）**；L2 同日全量复跑 `base-verify/reports/` 侧读数 16/16（带 `--with-writes --with-file-upload --no-redis`——moon 用 moon-token 内存仓，Redis 腿不适用）；上一代 L2：**`base-verify/reports/2026-10-05-moon-batch12-l2.json`（sys/dev 按需增补轮 16/16 全绿保持）**；历史：`base-verify/reports/2026-10-04-moon-dict-l2.{json,txt}`（字典轮 10/16）、`base-verify/reports/2026-10-04-moon-menu-l2.{json,txt}`（菜单轮 11/16）、`base-verify/reports/2026-10-04-moon-menu2-l2.json`（菜单缺口补齐轮 11/16 无回归）、`base-verify/reports/2026-10-05-moon-dev-l2.json`（dev 台账轮 **12/16**，UC-0303/0306/0310 收口）、`base-verify/reports/2026-10-05-moon-final-l2.json`（**收口轮 16/16 全绿**：message/fileInfo/appversion/sse 四模块落地——base 首批契约全部收口）。boot2 全量 12 端点已对齐（syncRoute 无 base 契约，仓内 e2e 隔离域覆盖）；dev 模块 boot2 22 端点已对齐（无 base 契约的进仓内 e2e matrix_dev 55 例）。
 >
 > 用途：对照家族 base 契约 runner（协调仓 `scripts/contract-tests/contract_runner.py`，语言无关纯 HTTP）
 > 逐组给出 mldong-moon 的现状——**已存在端点的契约比对结论 + 未存在端点的按模块清单**。
@@ -61,7 +61,7 @@ python scripts/contract-tests/contract_runner.py \
 | 模块（表） | runner 消费的端点 | 备注 |
 |---|---|---|
 | ~~sys_message~~ **已补（10-05）** | `/sys/message/page` | UC-0501；分页五字段 + 行按前端消费口径 |
-| ~~sys_file_info~~ **已补（10-05）** | `/sys/fileInfo/{upload,getFileInfoByIds,remove}` | UC-0601/0602/0606：upload 返 `{url,fileInfoId}`（id 字符串）、回查 `{id,uid,name,url,status}` |
+| ~~sys_file_info~~ **runner 消费的三端点已补（10-05）**；**分片四件套仍未存在**（见 §5） | `/sys/fileInfo/{upload,getFileInfoByIds,remove}` | UC-0601/0602/0606：upload 返 `{url,fileInfoId}`（id 字符串）、回查 `{id,uid,name,url,status}` |
 | ~~app 模块~~ **已补（10-05，moon 档蒲公英外呼降级见 §2 UC-0610 行）** | `/app/appVersion/check` | UC-0610：免登录、不查库、转调蒲公英自比较 `buildVersionNo`、任何失败降级 `data:null`（家族 13 栈 2026-09-20 已全量对齐，goframe `fd88b94` 为基准） |
 | ~~dev_schema 模型~~ **已补（10-05）** | boot2 dev 22 端点全量 | 见下节"dev 模块"行 |
 | ~~SSE~~ **已补（10-05）** | `/sse/events` | UC-0608 |
@@ -69,9 +69,17 @@ python scripts/contract-tests/contract_runner.py \
 
 ## 5. 已记录的语义差异（不拦 runner，记账待议）
 
-- **无权限码**：boot2 NotPermissionException → 99990406 NO_RESOURCE_AUTH；moon 暂同 99990403
-  （menu 模块 10-04 已上线、runner 全绿，vben5 只按 code≠0 分支——**决策：维持 99990403 不对齐**，
-  boot2 语义差异记账即可；若将来 vben5 出现"区分 401/403 跳转"需求再启）。
+- **无权限码**：**10-07 已对齐 99990406**（`core-web/guard.mbt` 403 档）。旧决策"维持 99990403 不对齐"
+  的前提是"runner 全绿＋vben5 只看 code≠0"，两条都被首轮 L3 推翻：契约 00-全局约定 §1 把 99990403 只留给
+  token 无效/未登录，而 L3 的 B03/B05/B06/B07/B08/B09/B11/B12/B14 九组负向**精确断 99990406**——
+  记账差异升级为实测红。msg 仍取 moon-token 精确原因（只改码值，不改文案）。
+- **分片上传四件套未实现（10-07 首轮 L3 的唯一红）**：`/sys/fileInfo/{initiateMultipartUpload,uploadPart,
+  completeMultipartUpload,abortMultipartUpload}` 在 moon 全 404（实测读数见
+  `base-verify/reports/2026-10-07-moon-l3-first-run.md` §4），契约 UC-0604/0605 与 L3 B11 要它。
+  boot2 那四个端点是 x-file-storage→MinIO 的透传（`fileInfo.getUploadId()` 由存储客户端持有），
+  而 moon 的 upload 是**本地盘直写**、`sys_file_info` 也没有 `upload_id` 列 ⇒ 补齐要先定一件事：
+  分片暂存位与合并语义放哪（本地盘 staging 目录＋attr 记态，或引入 MinIO 依赖）。
+  属"新功能＋存储选型"，不与本轮契约偏差修复合并做，待点名。
 - **登录失败码**：家族各栈本就不一（boot2 10000001 / goframe gerror 默认 50 / moon 99990401）——
   vben5 只看 code≠0 + msg，不构成契约破坏；保持 99990401。
 - **时间格式**：moon 统一 UTC（`format_unix_utc`），boot2 用服务器时区；runner 只断键存在不断时区。

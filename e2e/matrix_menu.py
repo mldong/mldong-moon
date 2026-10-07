@@ -49,7 +49,7 @@ r=post('/sys/menu/save',{'name':'测试目录'+RID,'code':RID+'_dir','parentId':
 check('C1 save', r['code']==0 and r['data'], str(r))
 mid=r['data']
 r2=post('/sys/menu/save',{'name':'重复code','code':RID+'_dir','parentId':0,'type':1},t)
-check('C2 code 全局唯一', r2['code']==99990003, 'code=%s'%r2['code'])
+check('C2 code 全局唯一', r2['code']==99999999, 'code=%s'%r2['code'])
 r=post('/sys/menu/save',{'name':'ext菜单'+RID,'code':RID+'_ext','parentId':int(mid),'type':2,'sort':1,'appCode':'platform','ext':{'i18n':{'zh-CN':'菜单'}}},t)
 mid2=r['data']
 r=post('/sys/menu/detail',{'id':mid2},t)

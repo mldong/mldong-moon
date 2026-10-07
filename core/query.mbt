@@ -22,6 +22,26 @@ pub fn to_underscore(camel : String) -> String {
 }
 
 ///|
+/// snake_case → camelCase（to_underscore 的反向；boot2 VO 出口一律 camel，
+/// lowCode 动态表把物理列名直接透出会被 UC-0318/0319 判红）
+pub fn to_camel_case(snake : String) -> String {
+  let b = StringBuilder()
+  let mut upper_next = false
+  for ch in snake {
+    if ch == '_' {
+      upper_next = true
+    } else if upper_next {
+      let code = ch.to_int()
+      b.write_char(if code >= 97 && code <= 122 { (code - 32).unsafe_to_char() } else { ch })
+      upper_next = false
+    } else {
+      b.write_char(ch)
+    }
+  }
+  b.to_string()
+}
+
+///|
 /// 列名安全校验：仅允许 `[alias.]col_name` 形状（字母开头，字母/数字/下划线/点），
 /// 防止 m_ 列名夹带 SQL（白名单语义）
 pub fn is_field_safe(col : String) -> Bool {

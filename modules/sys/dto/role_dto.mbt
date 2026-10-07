@@ -46,7 +46,7 @@ fn role_req_of(data : Json) -> RoleSaveReq {
 pub fn parse_role_save(body : Json) -> RoleSaveReq raise @core.MldongError {
   match role_save_schema.parse(body) {
     Ok(data) => role_req_of(data)
-    Err(errors) => raise @core.MldongError::InvalidInput(errors[0].to_string())
+    Err(errors) => raise @core.MldongError::InvalidParam(errors[0].to_string())
   }
 }
 
@@ -73,7 +73,7 @@ pub(all) struct RolePageReq {
 pub fn parse_role_page(body : Json) -> RolePageReq raise @core.MldongError {
   let page_num = @core.get_int(body, "pageNum").unwrap_or(1)
   let page_size = @core.get_int(body, "pageSize").unwrap_or(10)
-  if page_num <= 0 || page_size <= 0 || page_size > 200 {
+  if page_num <= 0 || page_size <= 0 {
     raise @core.MldongError::InvalidInput("分页参数非法")
   }
   {

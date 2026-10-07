@@ -2,7 +2,9 @@
 //   POST /{module}/{table}/select   通用下拉（module+table 拼表名，table 支持小驼峰）
 //   POST /sys/user/select           用户下拉专属（labelKey 缺省 real_name，keywords 缺省按它模糊）
 //   POST /lowCode/{table}/{page,detail,select}  动态表网关（tableName 为完整 snake 表名）
-// 全部仅登录无权限码（goframe `*/*/select` 免权限白名单 / boot2 无注解同口径）。
+// 面：`select` 族仅登录无权限码（goframe `*/*/select` 免权限白名单 / boot2 无注解同口径）；
+// `lowCode/{table}/page|detail` **带表名权限码**（`lowCode:{table}:page`，detail 与 page 为 OR），
+// 码在处理器里按路径参数自查——见 require_lowcode_perm。
 // 出参：select 裸数组 [{label, value(str), ext?}]；page 五键分页全字段行；detail 全字段。
 // 防注入：表名字符白名单 + 真列清单校验 + 值参数绑定（GenericDao 内核）。
 
@@ -55,9 +57,45 @@ fn path_param_of(request : @mb.Request, name : String) -> StringView {
 }
 
 ///|
-pub fn[S : @port.TokenStore, P : @port.PermissionProvider] register_lowcode(
+/// lowCode 权限码自查（boot2 LowCodeController 的
+/// `if (!LoginUserHolder.me().isSuperAdmin()) StpUtil.checkPermissionOr(\{codes})` 同位）：
+/// 权限码里带**表名**，Guard 的静态策略（按 URL 推导/显式 rule）表达不了，只能在处理器里
+/// 按路径参数拼码再判——base-verify L3 B10 实测：不判就是任何登录用户可读任意动态表。
+async fn[R : @svc.RbacService] require_lowcode_perm(
+  rbac : R,
+  request : @mb.Request,
+  codes : Array[String],
+) -> Unit raise @core.MldongError {
+  let ctx = @web.ctx_of(request)
+  let p = match @mbguard.principal_of(request) {
+    Some(p) => p
+    None => raise @core.MldongError::NotFound("会话无主体")
+  }
+  let uid = match @svc.parse_user_id(p.login_id) {
+    Some(id) => id
+    None => raise @core.MldongError::NotFound("登录主体非法: \{p.login_id}")
+  }
+  let held = rbac.perm_codes(uid, ctx.resolve_app_code(None))
+  let mut hit = false
+  for c in codes {
+    for h in held {
+      if h == c {
+        hit = true
+      }
+    }
+  }
+  // 超管豁免走的是 moon-token Guard 侧（boot2 是控制器里 `if(!isSuperAdmin())` 同位；
+  // 本端点在 Guard 的豁免面里，所以这里必须自己判掉超管）
+  if !hit && !p.super_admin {
+    raise @core.MldongError::NoPermission("no permission: \{codes[0]}")
+  }
+}
+
+///|
+pub fn[S : @port.TokenStore, P : @port.PermissionProvider, R : @svc.RbacService] register_lowcode(
   ctx : @mb.ModuleContext,
   dao : @repo.GenericDao,
+  rbac : R,
   g : @mbguard.Guard[S, P],
 ) -> Unit {
   // 通用下拉 handler：module/table 取自路由段（table 支持小驼峰 → snake 拼表名）
@@ -82,12 +120,15 @@ pub fn[S : @port.TokenStore, P : @port.PermissionProvider] register_lowcode(
   })
   let lc_page_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
     let table = path_param_of(request, "tableName").to_owned()
+    require_lowcode_perm(rbac, request, ["lowCode:\{table}:page"])
     let req = parse_lowcode_page_req(@web.json_body(request))
     let (total, rows) = dao.page(table, req)
     @core.ok_page(req.page_num, req.page_size, total, rows)
   })
   let lc_detail_handler : @mb.Handler = @web.wrap(async fn(request) -> Json raise @core.MldongError {
     let table = path_param_of(request, "tableName").to_owned()
+    // boot2 同款 OR 双码（page 或 detail 任一即放行）
+    require_lowcode_perm(rbac, request, ["lowCode:\{table}:page", "lowCode:\{table}:detail"])
     let id = match @core.get_i64(@web.json_body(request), "id") {
       Some(n) => n
       None => raise @core.MldongError::InvalidInput("id 不能为空")

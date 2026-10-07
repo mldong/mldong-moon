@@ -51,7 +51,7 @@ pub impl @dao.SmsTemplateDao for SmsTemplateRepository with fn page(self, w, pag
 }
 
 ///|
-/// biz_type+provider 唯一前置校验（DB uk_biz_type_provider 同语义，友好报 99990003）
+/// biz_type+provider 唯一前置校验（DB uk_biz_type_provider 同语义，友好报 99999999）
 pub impl @dao.SmsTemplateDao for SmsTemplateRepository with fn check_unique(
   self,
   biz_type,
@@ -74,7 +74,7 @@ pub impl @dao.SmsTemplateDao for SmsTemplateRepository with fn check_unique(
   }
   conn.close()
   if !rows.is_empty() && row_int_d(rows[0], "c", 0) > 0 {
-    raise @core.MldongError::Conflict(msg)
+    raise @core.MldongError::InvalidParam(msg)
   }
 }
 

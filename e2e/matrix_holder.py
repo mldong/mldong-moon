@@ -38,15 +38,15 @@ check('H6 旧默认密码不可登', r['code']==99990401)
 
 # H3 查重抽查（三表 check_unique 行为不变）
 r=post('/sys/config/save',{'name':'x','code':'M_DEFAULT_PASSWORD','groupCode':'SYS'},t)
-check('H7 config 查重 99990003', r['code']==99990003)
+check('H7 config 查重 99999999', r['code']==99999999)
 r=post('/sys/dept/save',{'name':'hx','code':'holderdept','parentId':'0'},t)
 did=r['data']
 r=post('/sys/dept/save',{'name':'hx2','code':'holderdept','parentId':'0'},t)
-check('H8 dept 查重 99990003', r['code']==99990003)
+check('H8 dept 查重 99999999', r['code']==99999999)
 r=post('/sys/post/save',{'name':'hx','code':'holderpost'},t)
 pid=r['data']
 r=post('/sys/post/save',{'name':'hx2','code':'holderpost'},t)
-check('H9 post 查重 99990003', r['code']==99990003)
+check('H9 post 查重 99999999', r['code']==99999999)
 r=post('/sys/post/update',{'id':pid,'name':'hx','code':'holderpost'},t)
 check('H10 查重排除自身（update 自身过）', r['code']==0)
 

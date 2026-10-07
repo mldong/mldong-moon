@@ -65,7 +65,7 @@ r=post('/sys/smsTemplate/update',{'id':tid,'bizType':BIZ,'templateCode':TAG,'pro
 c3=r['code']==0
 r2=post('/sys/smsTemplate/save',{'bizType':BIZ,'templateCode':TAG+'x','provider':'mock','content':'dup'},t)
 check('B3 smsTemplate CRUD5', c1 and c2 and c3, str(r2)[:80])
-# 唯一编码冲突语义（boot2 抛 99999999，moon 对齐 Conflict 99990003 差异记文档）
+# 唯一编码冲突语义（boot2 checkUnique 抛 99999999，moon 同码）
 check('B4 templateCode 重复非 0', r2['code']!=0, str(r2))
 
 # ---- sms 发送四端点 ----

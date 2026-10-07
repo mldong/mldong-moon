@@ -19,10 +19,10 @@
 | `/sys/user/{locked,unLocked}` | `sys:user:locked` **OR** `sys:user:unLocked` | 批量锁/解锁（双端点共用双码 OR，boot2 SaMode.OR 同构） |
 | `/sys/user/resetPassword` | `sys:user:resetPassword` | 批量重置为默认密码（超管跳过） |
 | `/sys/user/select` | `sys:user:select` | 下拉选项 `[{label,value}]` |
-| `/sys/user/permCode` | 仅登录 | 当前用户权限码数组（守卫快照投影） |
+| `/sys/user/permCode` | 仅登录 | 当前用户权限码数组：**每请求现取**（`user_role→role_menu→menu.code`，appCode 取请求域）；超管恒 `["admin"]`（boot2 getPermissionList 同位，前端按它放行全部路由） |
 | `/sys/user/info` / `updateInfo` / `updatePwd` / `updateAvatar` | 仅登录 | 个人中心（id 取自登录主体；info 含 `deptName`/`lastLoginTime` 契约键） |
 | `/sys/user/onlineUserList` / `onlineDevice` | `sys:user:onlineUserList` / 仅登录 | 在线用户（按人分组带 tokenList/ip/ua/剩余时长，moon-token 会话枚举） |
-| `/sys/user/{logoutByTokenValue,kickoutByTokenValue}` | 各自码 | 按 token 强制注销/踢下线（注销=漏斗全清；踢下线=标记 Kicked 拒重入；boot2 同语义） |
+| `/sys/user/{logoutByTokenValue,kickoutByTokenValue}` | 各自码 | 按 token 强制注销/踢下线：**作用域＝请求里那几枚 token，绝不连坐同账号其它会话**（boot2 `StpUtil.kickoutByTokenValue` 同位）。moon 现按枚走 `logout(token)`——moon-token 的 `kickout(login_id, device=)` 是**账号+设备整族**打墓碑，而登录端点 device 恒 "pc"，用它踢一枚会误伤其它会话（L3 B02 实测）；代价＝被踢方拿到的是笼统未登录而非 `KickedOut` 精确原因，要兼得需 moon-token 补一个按枚 kick 口 |
 | `/sys/user/{logoutByLoginId,kickoutByLoginId}` | 各自码 | 按登录 ID 批量注销/踢下线；无效 token 幂等 0 |
 | `/sys/playUser` | `sys:playUser` | 扮演用户，body `{userId}`（boot2 AuthServiceImpl 同构双会话）：目标存在 + 超管守卫（非超管不能扮演超管）→ 给目标签真会话（extra 盖 isPlayer/playerToken/playerUserId/playUserAccount + 操作者 ip/ua 继承）→ 返 `{userId,token,refreshToken}` 前端就地换 token；Coexist 策略不踢目标既有登录，权限快照 per-token 天然按目标解析；操作者会话原封不动 |
 | `/sys/unPlayUser` | 仅登录 | 退出扮演：读当前会话 extra 回跳操作者 token 并登出 played 会话；原 access 已过期（2h 滑动）走存储的 refreshToken rotate 兜底换全新对——moon-token 原语全公开 API，零源码改动 |
@@ -51,7 +51,7 @@
 | `GET /dev/schema/getByTableName` | 豁免面（handler 三段自校验） | 按 id/表名取模型 VO：token → appId/appSecret（sys_config SCHEMA_APP_ID/SECRET，默认 admin/123456）→ 99990403；凭证链 + DEFAULT_SCHEMA_AUTO_IMPORT=true 时自愈落库；VO 含派生（moduleName/tableCamelName/className/columns 带 fieldCamelName/listSort/searchSort/ext/schemaGroup 聚合，缺分组伪造 id=schema.id+1） |
 | `/dev/schema/updateDesigner` | `dev:schema:updateDesigner` | 表单设计保存：update 主表 + 字段全删重插（sort=index+100，事务），返回最新 VO |
 | `/dev/schema/{updateListKeys,updateSearchFormKeys}` | 各自权限码；detail 三码 OR 可见 | 列表/搜索键直更（列名白名单） |
-| `/dev/schemaGroup/{save,remove,update,detail,page}` | `dev:schemaGroup:*` | 模型分组 CRUD（code 唯一 99990003） |
+| `/dev/schemaGroup/{save,remove,update,detail,page}` | `dev:schemaGroup:*` | 模型分组 CRUD（code 唯一 99999999） |
 | `/dev/schemaField/{save,remove,update,detail,page,updateSort}` | `dev:schemaField:*` | 模型字段 CRUD（page 默认 sort,id 升序；remove 物理删——boot2 @TableLogic 注释同语义）+ updateSort 拖拽换位（boot2 算法逐行 port） |
 | `/dev/schema/column/list` | `dev:schema:columnList` | 列清单裸切面（信息模式 + gen 字段类型映射；与台账面并存，gen 代码生成器专用） |
 | `/sys/message/{save,remove,update,detail,page,setRead,getUnreadCount,getUnreadCountGroupByBizType}` | save/update 挂码，其余仅登录 | 站内信（boot2 8 端点同位）：**接收人隔离**（读写全强制 receiver=当前用户）+ **appCode 端隔离**（biz_type 前缀自动补 + LIKE 过滤，BS/APP 互不可见）；setRead ids 空=本域全部已读；分页 bizTypes 过滤自动补前缀 |
@@ -63,11 +63,11 @@
 | `/sys/rbac/{saveUserRole,removeUserRole}` | `sys:rbac:*` | 用户-角色授权对，body `[{userId, roleId}]` 逐对增删（兼容 `{list:[..]}` 包裹形状） |
 | `/sys/rbac/{userListByRoleId,userListExcludeRoleId}` | `sys:rbac:*` | 角色下用户分页/排除分页（body `{roleId, pageNum, pageSize, keywords?, m_*?}`；keywords user_name/real_name OR-LIKE + m_ 叠加） |
 | `POST /{module}/{table}/select` | 仅登录 | **通用下拉**（goframe 协议同构）：module+table 拼表名（table 小驼峰→snake）、labelKey/valueKey 缺省 name/id、extFieldNames→ext 嵌套、keywords+searchKeys 多列 OR-LIKE、orderBy 安全解析、includeType 1/2 回显、pageSize 缺省 1000、information_schema 真列白名单 |
-| `POST /lowCode/{tableName}/{select,page,detail}` | 仅登录 | lowCode 动态表网关（tableName 完整 snake 表名；page 全字段 snake 键；detail 单行） |
+| `POST /lowCode/{tableName}/{select,page,detail}` | select 仅登录；**page/detail 带表名权限码** | lowCode 动态表网关（tableName 完整 snake 表名）。行出口**一律 camelCase**（UC-0318/0319，列名由后端转，前端不兼容 snake）；权限码 `lowCode:{tableName}:page`（detail 与 page 为 OR），因码里带路径参数、Guard 静态策略表达不了，在处理器内按 `require_lowcode_perm` 自查（超管豁免） |
 | `/sys/opLog/{save,remove,update,detail,page}` / `/sys/visLog/{...}` | `sys:opLog:*` / `sys:visLog:*` | 操作/访问日志 CRUD5（表无 is_deleted 物理删；写入口=切面族语义，moon 本轮仅管理面，登录写日志行差异记 [base-contract.md](base-contract.md) §5） |
 | `/sys/sms/{sendCode,verifyCode}` | 豁免 | 短信验证码：`{phone,bizType}` → `{taskId}`；6 位码内存态（phone:bizType 键 TTL 5 分钟一次性消费）；verify 幂等布尔；落 sys_sms_log provider=mock |
 | `/sys/sms/{sendNotification,batchSendNotification}` | `sys:sms:*` | 通知短信：按 biz_type 取启用模板渲染 `{k}` 占位（未配置降级通用文案）落日志；batch 逐 phone 数组回执 `{phone,success,taskId,messageId}`；真通道接入后续轮 |
-| `/sys/smsTemplate/{save,remove,update,detail,page}` | `sys:smsTemplate:*` | 模板 CRUD5 + biz_type+provider 唯一前置（uk_biz_type_provider，友好 99990003） |
+| `/sys/smsTemplate/{save,remove,update,detail,page}` | `sys:smsTemplate:*` | 模板 CRUD5 + biz_type+provider 唯一前置（uk_biz_type_provider，友好 99999999） |
 | `/sys/smsLog/{save,remove,update,detail,page}` | `sys:smsLog:*` | 短信日志 CRUD5（表无 is_deleted/审计列物理删） |
 | `/sys/timer/{save,remove,detail,page,stop,start,update,reset,executeImmediate}` | 各自码（stop/start 共用 `sys:timer:stop` boot2 注解同款） | 定时任务内存态（boot2 TimerCache 同物，无表重启即失）：state 1 运行/2 停止；reset redisCron 回落 cron；executeImmediate 幂等（无 runner 可执行，差异记 [base-contract.md](base-contract.md) §5）；save/remove 为 moon 补面（前端 timer.ts 有调 boot2 未暴露） |
 | `/sys/taskExecutionQueue/{save,remove,update,detail,page,cancelTask}` | `sys:taskExecutionQueue:*` | 任务队列 CRUD5 + 取消（boot2 TaskExecutionProvider 同语义：队列行转历史 task_state=3 同 id + finishedTime + cancelReason 后删队列行） |
@@ -82,7 +82,7 @@
   3 段式 `m_EQ_userName` / 4 段式（带表别名）`m_t_LIKE_userName`；列名 camelCase 自动转
   snake_case，空值跳过、非法操作符跳过、列名形状白名单防注入；
 - 错误码（骨架子集，码表对齐 mldong 框架约定）：`99990000` 内部 / `99990001` 参数校验失败 /
-  `99990002` 数据不存在 / `99990003` 业务冲突 / `99990004` 业务失败 / `99999999` @Validated
+  `99990002` 数据不存在 / `99990004` 业务失败 / `99990406` 权限码不足 / `99999999` 参数校验失败与唯一键冲突（@Validated / checkUnique 同码）
   参数校验档（UC-0610 在用）；
 - `appCode`：登录头（缺省 `platform`）定会话应用上下文，role/menu 按 `app_code` 双过滤，
   同用户不同 app 会话共存。

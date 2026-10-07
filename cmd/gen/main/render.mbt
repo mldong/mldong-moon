@@ -204,7 +204,7 @@ pub fn render_dto(plan : TablePlan) -> String {
   o.line("pub fn " + plan.lc + "_parse_save(body : Json) -> " + plan.class_name + "SaveReq raise @core.MldongError {")
   o.line("  match " + plan.lc + "_save_schema.parse(body) {")
   o.line("    Ok(data) => " + plan.lc + "_req_of(data)")
-  o.line("    Err(errors) => raise @core.MldongError::InvalidInput(errors[0].to_string())")
+  o.line("    Err(errors) => raise @core.MldongError::InvalidParam(errors[0].to_string())")
   o.line("  }")
   o.line("}")
   o.line("")
@@ -231,7 +231,7 @@ pub fn render_dto(plan : TablePlan) -> String {
   o.line("pub fn " + plan.lc + "_parse_page(body : Json) -> " + plan.class_name + "PageReq raise @core.MldongError {")
   o.line("  let page_num = @core.get_int(body, \"pageNum\").unwrap_or(1)")
   o.line("  let page_size = @core.get_int(body, \"pageSize\").unwrap_or(10)")
-  o.line("  if page_num <= 0 || page_size <= 0 || page_size > 200 {")
+  o.line("  if page_num <= 0 || page_size <= 0 {")
   o.line("    raise @core.MldongError::InvalidInput(\"分页参数非法\")")
   o.line("  }")
   o.line("  {")
@@ -341,7 +341,7 @@ pub fn render_dao(plan : TablePlan) -> String {
   o.line("  /// 批量按 id 查（remove 前收标识刷缓存等场景）")
   o.line("  async fn find_by_ids(Self, Array[Int64]) -> Array[@entity." + plan.class_name + "] raise @core.MldongError")
   if plan.has_code {
-    o.line("  /// 唯一编码校验（boot2 checkUnique 同位一行调：存在且排除自身即 Conflict）")
+    o.line("  /// 唯一编码校验（boot2 checkUnique 同位一行调：存在且排除自身即业务失败 99999999）")
     o.line("  async fn check_unique(Self, String, Int64?, String) -> Unit raise @core.MldongError")
   }
   o.line("  /// 分页：Wrapper 由 service 组装（业务说了算），返回 (总数, 当页行)")

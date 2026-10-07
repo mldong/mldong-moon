@@ -95,24 +95,37 @@ vben5 只按 code≠0 分支）；400→99990001 / 其余→99990000。
 
 ## 5. appCode 多应用机制
 
-对齐 boot2：登录头 `appCode`（缺省 `platform`）→ 会话级定死 → role/menu 按 `app_code` 双过滤。
+对齐 boot2：登录头 `appCode`（缺省 `platform`）→ 会话级定死 → **菜单按 `app_code` 过滤**
+（10-07 更正：旧写"role/menu 双过滤"是 moon 自创的第二道闸——boot2 `getInCache` 只按
+`role_menu.roleId` + `menu.app_code` 取码，从不看 `sys_role.app_code`。那道多出来的过滤会让
+**所有 API 建的角色（app_code 落 NULL）授了权也拿不到码**，base-verify L3 B04 实测：新账号
+permCode 恒空、已授权端点照样 99990406。角色/菜单的域归属改由建号默认值保证，见下）。
 **落法 = moon-token 0.1.10 `extra` 会话属性通道**（首版曾复合进 login_id，owner 否了，见 §2）：
 
 - 登录端点塞 extra 三键：`appCode`（登录头）、`ip`（客户端 IP）、`ua`（原样 User-Agent；
   boot2 `loginBrowser` 存的就是原样 UA，"os" 是日志层解析的，骨架同口径存原样）；
 - 供数方 `RbacServiceImpl` 三方法从 `extra` 里读 appCode 传给 DAO（缺省 platform），
-  SQL 里 `role.app_code`/`menu.app_code` 双过滤；
+  SQL 里**只有 `menu.app_code` 参与过滤**（`find_role_codes` 的 appCode 入参保留但不进 WHERE，
+  端口签名不变）；
 - 超管判定（`admin_type=1`）只看用户属性，**与 appCode 无关**（boot2 同）；
 - 会话语义：moon-token 默认 `Coexist` + max_sessions=12——**同用户不同 appCode 的会话共存**
   （各自独立 token，互不顶），与 boot2 is-concurrent 同语义；
 - extra 随 rotate 存活（moon-token 单测覆盖）；新增会话级属性照三键模式塞 extra，别走 login_id。
+
+## 5b. 建角色/建菜单的域默认值（10-07 补）
+
+`/sys/role/save`、`/sys/menu/save` 在**入参不带 appCode** 时落 `Ctx.resolve_app_code()`：
+入参 → 请求头 appCode → `platform`（boot2 `RoleServiceImpl`/`MenuServiceImpl` 那句
+`if (StrUtil.isEmpty(param.getAppCode())) entity.setAppCode(LoginUserHolder.getAppCode())` 同位）。
+update 路径**不回填**（boot2 同：MyBatis-Plus 对 null 字段跳过 SET），否则会把手工划到别域的行拽回来。
+不这么做的后果实测过：新建角色 app_code=NULL ⇒ 菜单树反查不到新建节点、授权链取不到码。
 
 ## 6. RBAC 真码链
 
 **权限码的真实来源 = `sys_menu.code`**（boot2 RbacService 同源），链路：
 
 ```
-sys_user_role ──▶ sys_role (app_code 过滤) ──▶ sys_role_menu ──▶ sys_menu (type=按钮, app_code 过滤) ──▶ code 去重
+sys_user_role ──▶ sys_role (不过滤域) ──▶ sys_role_menu ──▶ sys_menu (app_code 过滤 + is_deleted=0) ──▶ code 去重
 ```
 
 组织定稿（mldong 框架同构）：

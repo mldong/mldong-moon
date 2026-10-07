@@ -132,7 +132,7 @@ pub(all) struct UserServiceImpl[R] { dao : R }
 pub impl[R : @dao.UserDao] UserService for UserServiceImpl[R] with fn save(self, ctx, req) { ... }
 ```
 
-- 错误码语义：参数错 `InvalidInput`、不存在 `NotFound`、查重冲突 `Conflict`、业务失败 `Business`；
+- 错误码语义：参数错 `InvalidInput`、不存在 `NotFound`、查重冲突与必填校验 `InvalidParam`、权限码不足 `NoPermission`、业务失败 `Business`；
 - **NOT NULL 列必须给业务默认值**（save 时 `admin_type: Some(2)`、`is_locked: Some(0)`）——
   分页过滤 `admin_type <> 1` 会因 NULL 三值逻辑漏行，落 NULL 是事故；
 - **密码机制**（对齐 boot2）：save 不收用户自报密码，发默认密码 + 8 位随机盐
@@ -218,7 +218,7 @@ let (sql, params) = @core.build_select("sys_user", cols, w, orders=[("create_tim
 
 - 信封：HTTP 恒 200 + `{"code":0,"msg":"ok","data":..}`；分页 data 形状 `recordCount/totalPage/pageSize/pageNum/rows`；
 - 业务错误 `MldongError`（`core/error.mbt`）：`Internal 99990000` / `InvalidInput 99990001` /
-  `NotFound 99990002` / `Conflict 99990003` / `Business 99990004` / `InvalidParam 99999999`
+  `NotFound 99990002` / `Business 99990004` / `InvalidParam 99999999` / `NoPermission 99990406`
   （@Validated 参数校验档，UC-0610 在用）——raise 上抛，wrap 统一转信封；
 - 鉴权错误走 moon-token：**HTTP 恒 200**，`99990403`（未登录/token 失效/无权限共用）由
   `core-web/guard.mbt` 的 `on_error` 产出；`99990401` 只归登录端点「用户名或密码错误」——

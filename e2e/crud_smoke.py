@@ -27,7 +27,7 @@ check('S2 page find',r['code']==0 and any(str(x.get('id'))==str(uid) for x in ro
 r=post('/sys/user/update',{'id':uid,'userName':'mtest01','realName':'矩阵冒烟改'},t)
 check('S3 update',r['code']==0)
 rid=post('/sys/role/page',{'pageNum':1,'pageSize':10},t)['data']['rows'][0]['id']
-r=post('/sys/user/grantRole',{'userId':uid,'roleIds':[str(rid)]},t)
+r=post('/sys/user/grantRole',{'userId':uid,'roleIdList':[str(rid)]},t)
 check('S4 grantRole',r['code']==0,'role=%s'%rid)
 r=post('/sys/user/remove',{'ids':[str(uid)]},t)
 check('S5 remove',r['code']==0)
