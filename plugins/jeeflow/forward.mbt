@@ -78,7 +78,9 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
   let gen = @id_gen.DefaultIdGenerator::new(2L)
   let ectx2 = ectx.with_id_generator(fn() { gen.next_id() })
   // IUserProvider：引擎给的 uid 就是 sys_user.id 的字符串形态（v1 快照的键同一口径）
-  let ectx3 = ectx2.with_user_provider(async fn(uid : String) raise @jerr.JeeflowError {
+  let live_user : (async (String) -> @model.UserInfo? raise @jerr.JeeflowError) = async fn(
+    uid : String
+  ) raise @jerr.JeeflowError {
     match @core.parse_i64_lenient(uid) {
       None => None
       Some(id) =>
@@ -103,10 +105,11 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
           _ => raise @jerr.Internal("sys_query.user_by_id 供数失败")
         }
     }
-  })
+  }
+  let ectx3 = ectx2.with_user_provider(live_user)
   // IOrgUserProvider：部门领导 / 主职领导 / 角色找人，逐次现查（dept_list 是小表，
   // 角色面 role_user_pairs 全量在册对——两者都按调用点过滤，不再常驻内存）
-  let ectx4 = ectx3.with_org_user_provider({
+  let org_fns : @spi.OrgUserProviderFns = {
     find_dept_leaders: async fn(dept_id : String) raise @jerr.JeeflowError {
       match @core.parse_i64_lenient(dept_id) {
         None => []
@@ -152,7 +155,8 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
         _ => raise @jerr.Internal("sys_query.role_user_pairs 供数失败")
       }
     },
-  })
+  }
+  let ectx4 = ectx3.with_org_user_provider(org_fns)
   // IUserSearchProvider：候选人搜索走 user_page 真分页（关键字模糊 + 服务端分页），
   // 不再是内存全表过滤
   let ectx5 = ectx4.with_user_search_provider({
@@ -194,6 +198,40 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
     },
   })
   println("[jeeflow] 供数＝live 调框架查询端口（v1 启动期快照已删，运行期数据变更免重启生效）")
+  // ④ 内置取人 handler 注册（boot4 WfHandlerRegistryConfig 同位；键＝spec/07 的 FQCN 原样串）
+  //    没有这一步，流程 JSON 里的 "assignmentHandler" 在 moon 上无人解析（引擎按"未注册⇒记日志
+  //    并照常落历史行续流"处理，静默不炸但零参与者）。注册后部门领导/分管/角色三族都经 org 闭包，
+  //    而 org 闭包是 live 的 ⇒ 运行期改部门领导、改角色成员，下一张单即时生效（免重启）。
+  let base : @itl.OrgAssignBase = { user: Some(live_user), org: Some(org_fns) }
+  ectx5.register_assignment_handler(
+    "com.mldong.jeeflow.interceptor.impl.OperatorAssignmentHandler",
+    @itl.operator_assignment_handler(),
+  )
+  ectx5.register_assignment_handler(
+    "com.mldong.jeeflow.interceptor.impl.OrgUserAssignmentHandlers$ApplicantDeptLeaderAssignmentHandler",
+    @itl.applicant_dept_leader_handler(base, main=false),
+  )
+  ectx5.register_assignment_handler(
+    "com.mldong.jeeflow.interceptor.impl.OrgUserAssignmentHandlers$ApplicantDeptMainLeaderAssignmentHandler",
+    @itl.applicant_dept_leader_handler(base, main=true),
+  )
+  ectx5.register_assignment_handler(
+    "com.mldong.jeeflow.interceptor.impl.OrgUserAssignmentHandlers$DeptLeaderAssignmentHandler",
+    @itl.dept_leader_handler(base, main=false),
+  )
+  ectx5.register_assignment_handler(
+    "com.mldong.jeeflow.interceptor.impl.OrgUserAssignmentHandlers$DeptMainLeaderAssignmentHandler",
+    @itl.dept_leader_handler(base, main=true),
+  )
+  ectx5.register_assignment_handler(
+    "com.mldong.jeeflow.interceptor.impl.FormFieldAssigneeHandler",
+    @itl.form_field_assignee_handler(),
+  )
+  ectx5.register_assignment_handler(
+    "com.mldong.jeeflow.interceptor.impl.OrgUserAssignmentHandlers$TaskRoleAssigneeHandler",
+    @itl.task_role_assignee_handler(Some(org_fns)),
+  )
+  println("[jeeflow] 内置取人 handler 注册：7 支（operator/申请部门领导×2/当前部门领导×2/formField/taskRole）")
   let facade = @facade.Facade::make(ectx5)
   // ⑤ 注册 /wf/{action} 路由（guard 链鉴权，权限码已在 policy 片段合入）
   for a in jeeflow_actions {
