@@ -131,8 +131,22 @@ async fn main raise {
     Some(v) => if v.is_empty() { "127.0.0.1" } else { v }
     None => "127.0.0.1"
   }
-  let server = @mb.listen(host=listen_host, port=18680)
-  println("mldong-moon listening on http://127.0.0.1:18680")
+  // 监听端口可配：一键部署包复用的共享前端镜像把 nginx 上游写死成
+  //   proxy_pass http://backend:8080（13 栈同此约束），容器内不给 8080 则前端腿整片 502；
+  //   本机 dev 缺省仍是 18680。
+  let listen_port : UInt16 = match @env.get_env_var("MLDONG_LISTEN_PORT") {
+    Some(s) => {
+      let v = try {
+        @string.parse_int(s)
+      } catch {
+        _ => 18680
+      }
+      if v >= 1 && v <= 65535 { v.to_uint16() } else { 18680 }
+    }
+    None => 18680
+  }
+  let server = @mb.listen(host=listen_host, port=listen_port)
+  println("mldong-moon listening on http://\{listen_host}:\{listen_port}")
   println("端点：POST /sys/login /sys/logout /sys/refreshToken /sys/getCaptchaOpenFlag + /sys/user/*（含 grantRole） /sys/role|dept|post|config|dict|dictItem/*（带鉴权） /dev/schema/*")
   app.serve(server)
 }

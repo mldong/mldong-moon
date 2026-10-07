@@ -1,0 +1,16 @@
+# 镜像构建上下文瘦身：运行期只需要 moon.work + 五个源目录 + doc/sql/migrations。
+# 下列目录既不进镜像也不该上传（_build 是产物缓存、.mooncakes 由镜像内 moon update 重取、
+# uploadfiles 是 gitignored 的运行期上传盘、e2e/ 是黑盒工装）。
+.git
+_build
+.mooncakes
+uploadfiles
+gen-out
+e2e
+doc/api.md
+doc/*.md
+.dockerignore
+Dockerfile
+.gitignore
+AGENTS.md
+README.md

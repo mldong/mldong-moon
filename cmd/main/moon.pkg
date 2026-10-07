@@ -17,6 +17,7 @@ import {
   "mldong/moon-app" @appmod,
   "mldong/moon-dev" @dev,
   "moonbitlang/core/env" @env,
+  "moonbitlang/core/string" @string,
   "moonbitlang/moonback" @mb,
   "moonbitlang/async",
 }
