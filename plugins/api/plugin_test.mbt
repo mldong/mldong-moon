@@ -72,7 +72,7 @@ impl @moon-plugin-api.Plugin for BetaPlugin with fn descriptor(
         ddl: "CREATE TABLE `p_beta_registration` (`id` bigint NOT NULL, PRIMARY KEY (`id`))",
       },
     ],
-    routes: [{ http_method: "POST", path: "/plugin/beta/ping", perms: [], public: true }],
+    routes: [{ http_method: "POST", path: "/plugin/beta/ping", perms: [], perm_or: false, public: true }],
     menus: [],
     dicts: [],
   }
@@ -129,6 +129,7 @@ test "契约类型验收：MigrationDecl/RouteDecl/MenuDecl/DictDecl 字段齐�
     http_method: "GET",
     path: "/plugin/beta/list",
     perms: ["plugin:beta:list"],
+    perm_or: false,
     public: false,
   }
   assert_eq(r.perms.length(), 1)

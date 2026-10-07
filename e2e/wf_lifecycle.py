@@ -128,21 +128,28 @@ if del_ids:
     left, _ = wf_msgs('wf_task')
     check('W11 探针消息自清', d.get('code') == 0 and not left, left)
 
-# ---- 非超管授权档（10-07 前端走查抓出的集成遗漏回归闸）----
-# 超管走 is_super_admin 豁免，权限码前缀写错它照样绿；种子账号 u0010 挂 role「manage」。
-# 负向码**从该账号现读的 permCode 里挑**（种子 sys_menu 有多行同码 wf:processTask:todoList，
-# 按 sys_role_menu 反查"未授"会挑到其实已授的那条——现读 34 码里就含 todoList）：
-# wf:processInstance:stats:overview 现读不在授权集内，且是只读端点，拿它当负向最稳。
+# ---- 非超管授权档（10-07/10-08 两轮前端走查各抓一条，回归闸）----
+# 超管走 is_super_admin 豁免会把整段权限码链短路——前缀写错、放行清单漏一条，
+# 全用 superAdmin 跑的 16 格照样绿。这几格换成两个普通账号：
+#   u0010（role「manage」，现读 34 条 wf: 码）＝"授过的必须放行"；
+#   wuhao（种子账号、零角色）＝"登录≠万能"，同时是分析页那两条统计 action 的正面证据。
+# 期望值按引擎 DefaultActionPermissionProvider 同位映射算（放行 11 / OR 5 / 默认 31），不靠猜。
 try:
     tu = post('/sys/login', {'userName': 'u0010', 'password': '123456'})['data']['token']
-    granted = post('/wf/processInstance/page', {'pageNum': 1, 'pageSize': 5}, tu)
-    check('W12 授权账号调已授 wf 端点放行', granted.get('code') == 0, granted)
-    denied = post('/wf/processInstance/stats/overview', {}, tu)
-    check('W13 未授 wf 端点 99990406 且码带 wf: 前缀',
-          denied.get('code') == 99990406
-          and 'wf:processInstance:stats:overview' in (denied.get('msg') or ''), denied)
+    r = post('/wf/processInstance/page', {'pageNum': 1, 'pageSize': 5}, tu)
+    check('W12 已授默认族端点放行（wf:processInstance:page）', r.get('code') == 0, r)
+    # jumpAbleTaskNameList 的码种子里根本不存在，只有 OR 族的 wf:processTask:execute 命中才放行
+    r = post('/wf/processTask/jumpAbleTaskNameList', {'taskId': '1'}, tu)
+    check('W13 OR 族任一命中即放行（不是 AND）', r.get('code') != 99990406, r)
+    tw = post('/sys/login', {'userName': 'wuhao', 'password': '123456'})['data']['token']
+    for act, tag in (('stats/overview', 'W14'), ('stats/group', 'W15')):
+        r = post('/wf/processInstance/' + act, {}, tw)
+        check(tag + ' 零角色账号也拿得到分析页统计（登录即放行）', r.get('code') == 0, r)
+    r = post('/wf/processInstance/page', {'pageNum': 1, 'pageSize': 5}, tw)
+    check('W16 零角色账号调默认族端点仍拒（登录≠万能）',
+          r.get('code') == 99990406 and 'wf:processInstance:page' in (r.get('msg') or ''), r)
 except Exception as e:  # 种子账号不在了也要报出来，别静默跳过
-    check('W12/W13 非超管档可跑', False, e)
+    check('W12~W16 非超管档可跑', False, e)
 
 print('== wf_lifecycle: OK %d FAIL %d' % (ok, bad))
 raise SystemExit(0 if bad == 0 else 1)

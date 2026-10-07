@@ -67,7 +67,7 @@ test "归属闸正向：合规插件过闸不被误伤（正向对照）" {
     plugin_of(
       "portal",
       ["registration"],
-      [{ http_method: "POST", path: "/plugin/portal/register", perms: [], public: false }],
+      [{ http_method: "POST", path: "/plugin/portal/register", perms: [], perm_or: false, public: false }],
       [
         {
           version: 1,
@@ -139,7 +139,7 @@ test "归属闸：路由不以 /plugin/<name>/ 开头 ⇒ 拒" {
     plugin_of(
       "portal",
       ["registration"],
-      [{ http_method: "POST", path: "/sys/user/page", perms: [], public: false }],
+      [{ http_method: "POST", path: "/sys/user/page", perms: [], perm_or: false, public: false }],
       [],
     ),
   ])
@@ -221,7 +221,7 @@ test "归属闸：契约前缀白名单放行官方契约路由（jeeflow /wf/ �
       plugin_of(
         "jeeflow",
         [],
-        [{ http_method: "POST", path: "/wf/processTask/todoList", perms: ["wf:processTask:todoList"], public: false }],
+        [{ http_method: "POST", path: "/wf/processTask/todoList", perms: ["wf:processTask:todoList"], perm_or: false, public: false }],
         [],
       ),
     ],
@@ -239,8 +239,8 @@ test "归属闸：契约前缀两两不撞（两插件同用 /wf/ 即拒）" {
   let g : @moon-plugin-host.OwnershipGate = {
     framework_tables: [],
     plugins: [
-      plugin_of("jeeflow", [], [{ http_method: "POST", path: "/wf/a", perms: [], public: false }], []),
-      plugin_of("other", [], [{ http_method: "POST", path: "/wf/b", perms: [], public: false }], []),
+      plugin_of("jeeflow", [], [{ http_method: "POST", path: "/wf/a", perms: [], perm_or: false, public: false }], []),
+      plugin_of("other", [], [{ http_method: "POST", path: "/wf/b", perms: [], perm_or: false, public: false }], []),
     ],
     contract_prefixes: ["/wf/"],
   }

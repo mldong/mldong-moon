@@ -11,7 +11,9 @@ pub fn registry() -> Array[&@api.Plugin] {
 
 ///|
 /// 插件 policy 片段：public → exempt、带 perms → 显式 rule（主仓全显式语义不动；
-/// 空 perms 路由 = 仅登录，与框架未列端点同语义）
+/// 空 perms 路由 = 仅登录，与框架未列端点同语义）。
+/// 多码语义由声明方带（`perm_or`）——工作流族 13 栈用的是 boot3 `checkPermissionOr`，
+/// 而 guard 的 `RouteRule::make` 默认 And，不带上就会把"任一即可"做成"全都要"。
 pub fn plugin_policy(plugins : Array[&@api.Plugin]) -> @guard.RoutePolicy {
   let mut p = @guard.RoutePolicy::new()
   for pl in plugins {
@@ -20,7 +22,10 @@ pub fn plugin_policy(plugins : Array[&@api.Plugin]) -> @guard.RoutePolicy {
       if r.public {
         p = p.exempt(r.path)
       } else if !r.perms.is_empty() {
-        p = p.rule(@guard.RouteRule::make(r.path, r.perms))
+        let rule = @guard.RouteRule::make(r.path, r.perms)
+        p = p.rule(
+          if r.perm_or { rule.with_perm_mode(@port.Or) } else { rule },
+        )
       }
     }
   }

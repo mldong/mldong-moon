@@ -14,8 +14,9 @@ pub(all) struct MigrationDecl {
 ///|
 pub(all) struct RouteDecl {
   http_method : String // "POST" / "GET"（MoonBit 保留字 method 不能作字段名，10-06 编译现读）
-  path : String // 必须以 "/plugin/<name>/" 开头（装载器校验）
-  perms : Array[String] // 空 = 装载期用 derive_perm 现场算成显式 rule（主仓 by_convention=false）
+  path : String // 必须以 "/plugin/<name>/" 开头，或命中装配级契约前缀白名单（如 "/wf/"）
+  perms : Array[String] // 空 = 不挂权限码，只验登录（主仓 by_convention=false 下与未列端点同语义）
+  perm_or : Bool // true = 多码取「任一命中即可」（boot3 `@SaCheckPermission(mode=OR)` 同语义）；false = 全都要
   public : Bool // true = 进 exempt 面（免登录）
 }
 

@@ -83,22 +83,83 @@ pub fn perm_code(action : String) -> String {
 }
 
 ///|
+/// 登录即放行（不配权限码）的 action —— 引擎 `DefaultActionPermissionProvider.NO_PERM_ACTIONS`
+/// 的 moon 同位（issues/29 归纳自 boot3「无 `@SaCheckPermission` 注解＝登录即可」）。
+/// 统计那三条是 issues/103 的收口成果：分析页（概览→分析页）是人人可看的仪表盘，
+/// 早先按默认规则拼出 `wf:processInstance:stats:*` 把普通用户整页拦死、toast 刷屏，
+/// 六语言同款＝goframe `694d5b9` / fastapi `1aa5471` / salvo `58231b2` / nestjs `06e06c2` /
+/// laravel `d39ebfc`；moon 这轮补齐（10-08 owner 前端走查抓出的正是同一条）。
+let no_perm_actions : Array[String] = [
+  "processInstance/detail",
+  "processInstance/highLight",
+  "processInstance/approvalRecord",
+  "processInstance/getAssigneeTextData",
+  "processInstance/bizData",
+  "processTask/detail",
+  "processTask/addCandidate",
+  "processTask/latest",
+  "processInstance/stats/overview",
+  "processInstance/stats/trend",
+  "processInstance/stats/group",
+]
+
+///|
+/// 多码 OR（boot3 `@SaCheckPermission(value={...}, mode=OR)` 语义）：任一命中即有权。
+/// 与引擎 `OR_RULES` 逐字对齐——漏一条就把"任一即可"做成"全都要"。
+let or_rules : Array[(String, Array[String])] = [
+  ("processDefine/detail", ["wf:processDefine:detail", "wf:processDesign:listByType"]),
+  (
+    "processDefine/startAndExecute",
+    ["wf:processDefine:startAndExecute", "wf:processDesign:listByType"],
+  ),
+  (
+    "processDefine/getLastByName",
+    [
+      "wf:processDefine:detail",
+      "wf:processDesign:listByType",
+      "wf:processDefine:getLastByName",
+    ],
+  ),
+  ("processTask/candidatePage", ["wf:processTask:execute", "wf:processTask:candidatePage"]),
+  ("processTask/jumpAbleTaskNameList", ["wf:processTask:execute"]),
+]
+
+///|
+/// action → (权限码集合, 是否 OR)。空集合＝只验登录：`plugin_policy` 不给它挂 rule，
+/// 主仓 `by_convention=false` 下未列端点即"仅登录"语义（与 boot3 无注解端点同形）。
+pub fn perm_codes_of(action : String) -> (Array[String], Bool) {
+  for a in no_perm_actions {
+    if a == action {
+      return ([], false)
+    }
+  }
+  for (a, codes) in or_rules {
+    if a == action {
+      return (codes, true)
+    }
+  }
+  ([perm_code(action)], false)
+}
+
+///|
 /// descriptor —— 47 条 POST /wf/{action} 路由逐条显式权限码（主仓全显式语义不动）；
 /// tables/migrations/menus 皆空集（见文件头）
 pub fn jeeflow_descriptor() -> @api.PluginDescriptor {
   let routes : Array[@api.RouteDecl] = []
   for a in jeeflow_actions {
+    let (codes, is_or) = perm_codes_of(a)
     routes.push({
       http_method: "POST",
       path: "/wf/\{a}",
-      perms: [perm_code(a)],
+      perms: codes,
+      perm_or: is_or,
       public: false,
     })
   }
   {
     name: "jeeflow",
     plugin_version: "0.1.27", // 引擎代次（mooncakes mldong/jeeflow-*，随版更新）
-    spec_version: 4, // 对齐 plugin-host 的 SPEC_VERSION（3→4：PluginContext 加 messages 站内信投递面）
+    spec_version: 5, // 4→5：RouteDecl 增 perm_or——工作流族的 OR 语义要由声明方带
     requires: [],
     tables: [],
     migrations: [],
