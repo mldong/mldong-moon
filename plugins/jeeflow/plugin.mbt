@@ -5,7 +5,7 @@
 // 引擎 schema 变更走 __framework__ 基线增量通道。
 // 引擎装配：进程级一个 Facade，自带连接管理不经 ScopedDb（与 13 栈引擎自带连接池同构）；
 // 装配动作在 initialize（供数预载需异步查库），make 只读定配置。
-// 供数：引擎三个 SPI 是同步闭包（引擎既有形状），v1 在 initialize 经 SysQueryApi 预载
+// 供数：引擎供数族 SPI 自 jeeflow-moon 0.1.28 起是 async 闭包（hub issues/146）⇒ initialize 里
 // user/dept/role 快照，闭包读本地映射——新鲜度妥协的根因是引擎同步 SPI，v2 引擎 SPI
 // 异步化后插件删快照直接 live 调端口。
 

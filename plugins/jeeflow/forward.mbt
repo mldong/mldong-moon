@@ -62,39 +62,10 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
   self : JeeflowPlugin,
   ctx : @api.PluginContext,
 ) -> Unit raise {
-  // ① 供数预载：用户分页拉全量（keyword 空 = 全量，含部门/岗位名）
-  let user_map : Map[String, @api.SysUserDetail] = Map([])
-  let mut loaded = 0
-  let mut page = 1
-  while true {
-    // user_page 分页拉全量（含部门/岗位关联名）；快照供数见文件头
-    let p = ctx.sys_query.user_page({ page, size: 200, keywords: "" })
-    loaded += p.rows.length()
-    for r in p.rows {
-      user_map[r.id.to_string()] = r
-    }
-    if p.rows.is_empty() || loaded >= p.record_count {
-      break
-    }
-    page += 1
-  }
-  println("[jeeflow] 供数预载：用户 \{loaded} 人")
-  // ② 部门（领导/分管字段随行）
-  let dept_map : Map[String, @api.SysDeptDetail] = Map([])
-  for d in ctx.sys_query.dept_list() {
-    dept_map[d.id.to_string()] = d
-  }
-  println("[jeeflow] 供数预载：部门 \{dept_map.length()} 个")
-  // ③ 角色-用户对（按角色找人节点用）
-  let role_map : Map[String, Array[String]] = Map([])
-  for pair in ctx.sys_query.role_user_pairs() {
-    match role_map.get(pair.role_code) {
-      Some(arr) => arr.push(pair.user_id)
-      None => role_map[pair.role_code] = [pair.user_id]
-    }
-  }
-  println("[jeeflow] 供数预载：角色编码 \{role_map.length()} 个")
-  // ④ 引擎装配：三个同步 SPI 闭包读快照（v1 妥协，见文件头）
+  // ① 引擎装配：三个供数 SPI 闭包 = **live 调框架查询端口**（issues/146 引擎轮之后才成立——
+  //    供数 SPI 是 async 形状 ⇒ 闭包里可以 await 查库；v1 的启动期全量快照已整段删除，
+  //    运行期新增用户/调岗/换领导免重启即被解析，规模上限也随之消亡）。
+  let sys = ctx.sys_query
   let repo = @jrepo.MysqlRepository::make(@jrepo.MysqlConfig::{
     host: self.config.host,
     port: self.config.port,
@@ -106,87 +77,124 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
   let ectx = @spi.Ctx::new(repo, repo)
   let gen = @id_gen.DefaultIdGenerator::new(2L)
   let ectx2 = ectx.with_id_generator(fn() { gen.next_id() })
-  let ectx3 = ectx2.with_user_provider(fn(uid : String) -> @model.UserInfo? {
-    match user_map.get(uid) {
-      Some(r) =>
-        Some(
-          @model.UserInfo::make(
-            user_id=uid,
-            real_name=r.real_name,
-            dept_id=i64s(r.dept_id),
-            dept_name=s_or(r.dept_name, ""),
-            post_id=i64s(r.post_id),
-            post_name=s_or(r.post_name, ""),
-          ),
-        )
+  // IUserProvider：引擎给的 uid 就是 sys_user.id 的字符串形态（v1 快照的键同一口径）
+  let ectx3 = ectx2.with_user_provider(async fn(uid : String) raise @jerr.JeeflowError {
+    match @core.parse_i64_lenient(uid) {
       None => None
+      Some(id) =>
+        try {
+          match sys.user_by_id(id) {
+            Some(r) =>
+              Some(
+                @model.UserInfo::make(
+                  user_id=uid,
+                  real_name=r.real_name,
+                  dept_id=i64s(r.dept_id),
+                  dept_name=s_or(r.dept_name, ""),
+                  post_id=i64s(r.post_id),
+                  post_name=s_or(r.post_name, ""),
+                ),
+              )
+            None => None
+          }
+        } catch {
+          // 框架查询端口报错不外泄成"发起炸掉"，也不静默当"没这个人"——
+          // 引擎侧 add_user_info/dept_id_of 各自吞异常成空值，这里保留一次显式失败点
+          _ => raise @jerr.Internal("sys_query.user_by_id 供数失败")
+        }
     }
   })
+  // IOrgUserProvider：部门领导 / 主职领导 / 角色找人，逐次现查（dept_list 是小表，
+  // 角色面 role_user_pairs 全量在册对——两者都按调用点过滤，不再常驻内存）
   let ectx4 = ectx3.with_org_user_provider({
-    find_dept_leaders: fn(dept_id) {
-      match dept_map.get(dept_id) {
-        Some(d) => d.leader_ids
+    find_dept_leaders: async fn(dept_id : String) raise @jerr.JeeflowError {
+      match @core.parse_i64_lenient(dept_id) {
         None => []
-      }
-    },
-    find_dept_main_leaders: fn(dept_id) {
-      match dept_map.get(dept_id) {
-        Some(d) =>
-          match d.main_leader_id {
-            Some(id) => [id.to_string()]
-            None => []
+        Some(id) =>
+          try {
+            match sys.dept_by_id(id) {
+              Some(d) => d.leader_ids
+              None => []
+            }
+          } catch {
+            _ => raise @jerr.Internal("sys_query.dept_by_id 供数失败")
           }
-        None => []
       }
     },
-    find_by_role: fn(role_code) {
-      match role_map.get(role_code) {
-        Some(arr) => arr
+    find_dept_main_leaders: async fn(dept_id : String) raise @jerr.JeeflowError {
+      match @core.parse_i64_lenient(dept_id) {
         None => []
+        Some(id) =>
+          try {
+            match sys.dept_by_id(id) {
+              Some(d) =>
+                match d.main_leader_id {
+                  Some(ml) => [ml.to_string()]
+                  None => []
+                }
+              None => []
+            }
+          } catch {
+            _ => raise @jerr.Internal("sys_query.dept_by_id 供数失败")
+          }
+      }
+    },
+    find_by_role: async fn(role_code : String) raise @jerr.JeeflowError {
+      try {
+        let out : Array[String] = []
+        for p in sys.role_user_pairs() {
+          if p.role_code == role_code {
+            out.push(p.user_id)
+          }
+        }
+        out
+      } catch {
+        _ => raise @jerr.Internal("sys_query.role_user_pairs 供数失败")
       }
     },
   })
-  let _ = ectx4.with_user_search_provider({
-    page: fn(query) {
+  // IUserSearchProvider：候选人搜索走 user_page 真分页（关键字模糊 + 服务端分页），
+  // 不再是内存全表过滤
+  let ectx5 = ectx4.with_user_search_provider({
+    page: async fn(query : @model.PageQuery) raise @jerr.JeeflowError {
       let kw = s_or(query.operator(), "")
-      let matched : Array[@api.SysUserDetail] = []
-      for u in user_map.values() {
-        if kw.is_empty() || u.real_name.contains(kw) || u.user_name.contains(kw) {
-          matched.push(u)
+      try {
+        let p = sys.user_page({
+          page: query.page_num().to_int(),
+          size: query.page_size().to_int(),
+          keywords: kw,
+        })
+        let rows : Array[Map[String, Json]] = []
+        for u in p.rows {
+          rows.push(user_row(u))
         }
+        @model.PageResult::new(
+          query.page_num(),
+          query.page_size(),
+          p.record_count.to_int64(),
+          rows,
+        )
+      } catch {
+        _ => raise @jerr.Internal("sys_query.user_page 供数失败")
       }
-      matched.sort_by(fn(a, b) { a.id.compare(b.id) })
-      let total = matched.length()
-      let start = ((query.page_num() - 1L) * query.page_size()).to_int()
-      let rows : Array[Map[String, Json]] = []
-      let mut i = start
-      while i < total && i < start + query.page_size().to_int() {
-        let u = matched[i]
-        let row : Map[String, Json] = Map([])
-        row["id"] = @jf.string_of(u.id.to_string())
-        row["userId"] = @jf.string_of(u.user_name)
-        row["realName"] = @jf.string_of(u.real_name)
-        row["deptName"] = @jf.string_of(s_or(u.dept_name, ""))
-        rows.push(row)
-        i += 1
-      }
-      @model.PageResult::new(query.page_num(), query.page_size(), total.to_int64(), rows)
     },
-    find_by_id: fn(uid) {
-      let row : Map[String, Json] = Map([])
-      match user_map.get(uid) {
-        Some(u) => {
-          row["id"] = @jf.string_of(u.id.to_string())
-          row["userId"] = @jf.string_of(u.user_name)
-          row["realName"] = @jf.string_of(u.real_name)
-          row["deptName"] = @jf.string_of(s_or(u.dept_name, ""))
-          Some(row)
-        }
+    find_by_id: async fn(uid : String) raise @jerr.JeeflowError {
+      match @core.parse_i64_lenient(uid) {
         None => None
+        Some(id) =>
+          try {
+            match sys.user_by_id(id) {
+              Some(u) => Some(user_row(u))
+              None => None
+            }
+          } catch {
+            _ => raise @jerr.Internal("sys_query.user_by_id 供数失败")
+          }
       }
     },
   })
-  let facade = @facade.Facade::make(ectx4)
+  println("[jeeflow] 供数＝live 调框架查询端口（v1 启动期快照已删，运行期数据变更免重启生效）")
+  let facade = @facade.Facade::make(ectx5)
   // ⑤ 注册 /wf/{action} 路由（guard 链鉴权，权限码已在 policy 片段合入）
   for a in jeeflow_actions {
     ctx.routes.route("POST", "/wf/\{a}", wf_handler(facade, a))
@@ -210,4 +218,15 @@ pub impl @api.Plugin for JeeflowPlugin with fn on_disable(
 ) -> Unit raise {
   let _ = self
   let _ = ctx
+}
+
+///|
+/// 候选人行投影（IUserSearchProvider 的两个方法共用；键名＝前端候选人表口径）
+fn user_row(u : @api.SysUserDetail) -> Map[String, Json] {
+  let row : Map[String, Json] = Map([])
+  row["id"] = @jf.string_of(u.id.to_string())
+  row["userId"] = @jf.string_of(u.user_name)
+  row["realName"] = @jf.string_of(u.real_name)
+  row["deptName"] = @jf.string_of(s_or(u.dept_name, ""))
+  row
 }
