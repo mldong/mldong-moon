@@ -352,7 +352,7 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
     ctx.dicts.answer(wf_str_dict(s.2, s.0, pairs))
   }
   println("[jeeflow] wf 字典供数：引擎枚举 \{exposed.length()} 支曝光 + 4 类调度键只应答")
-  // ⑦ persist 装配（写侧＝引擎 0.1.30 的 MysqlTableWriter，读侧＝框架 dev_query）：
+  // ⑦ persist 装配（写侧＝引擎 0.1.31 的 MysqlTableWriter，读侧＝框架 dev_query）：
   //   元数据来自框架 dev 查询面（information_schema 真列），表侧权限一律"可编辑"——字段权限
   //   落在**节点** properties.field 的 PERMISSION_* 上，引擎 intercept_sync 已按节点过滤，
   //   而本栈没有 dev_schema 台账可读（java 的 IDynamicMetaProvider 在那边读的就是台账）。
