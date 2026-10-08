@@ -401,3 +401,59 @@ pub async fn GenericDao::row_by_column(
     Some(generic_row_to_json(rows[0], cols))
   }
 }
+
+///|
+/// 按**任意真列**等值取多行（jeeflow `bizData` 的 ONE2MANY 子表回显：`WHERE <外键> = ?`）。
+/// 防注入链与 `row_by_column` 逐字同一条：列名先过 information_schema 真列白名单、值参数绑定；
+/// 无分页、无序（java `JdbcTableReader#queryList` 同形，子表行数天然小）。
+pub async fn GenericDao::rows_by_column(
+  self : GenericDao,
+  table : String,
+  column : String,
+  value : Int64
+) -> Array[Json] raise @core.MldongError {
+  let cols = self.table_columns(table)
+  if !(cols.get(column) is Some(_)) {
+    raise @core.MldongError::InvalidInput("列不存在: \{column}")
+  }
+  let where_sql = if cols.get("is_deleted") is Some(_) {
+    " WHERE \{column} = ? AND is_deleted = 0"
+  } else {
+    " WHERE \{column} = ?"
+  }
+  let conn = open_conn(self.config)
+  let rows = q(conn, "SELECT * FROM \{table}\{where_sql}", to_db_values([@core.L(value)]))
+  conn.close()
+  let out : Array[Json] = []
+  for r in rows {
+    out.push(generic_row_to_json(r, cols))
+  }
+  out
+}
+
+///|
+/// 低代码台账的**字段语义原料**：`dev_schema` ⨝ `dev_schema_field`，按 `sort, id` 定序出
+/// `(field_name, data_type, variable)` 三件原文。SQL 里的表名/列名全是**常量**，只有入参走
+/// 参数绑定 ⇒ 没有拼接面。`variable` 原样带出不解析（解释归引擎 `spec/10` §2.1，框架侧预解释
+/// 会和引擎侧长成两套）；台账没这张表 ⇒ 空数组。
+/// 为什么实现落 sys 而不是 dev：这条口的消费方是插件（只认 `plugins/api` 的端口），而 dev 模块
+/// 既不依赖 plugin-api、也不该反向依赖 sys；SQL 又必须收口在 repository 层 ⇒ 口的实现体留在
+/// sys/api＋sys/repository，跨模块仍只经端口，谁都没 import 谁。
+pub async fn GenericDao::schema_field_semantics(
+  self : GenericDao,
+  table : String
+) -> Array[(String, String, String)] raise @core.MldongError {
+  let sql = "SELECT f.field_name, f.data_type, f.variable FROM dev_schema_field f JOIN dev_schema s ON s.id = f.schema_id WHERE s.table_name = ? AND f.is_deleted = 0 AND s.is_deleted = 0 ORDER BY f.sort ASC, f.id ASC"
+  let conn = open_conn(self.config)
+  let rows = q(conn, sql, to_db_values([@core.S(table)]))
+  conn.close()
+  let out : Array[(String, String, String)] = []
+  for r in rows {
+    out.push((
+      row_text(r, "field_name", ""),
+      row_text(r, "data_type", ""),
+      row_text(r, "variable", ""),
+    ))
+  }
+  out
+}

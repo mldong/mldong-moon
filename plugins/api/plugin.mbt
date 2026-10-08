@@ -222,6 +222,20 @@ pub(all) struct DevColumnMeta {
 }
 
 ///|
+/// dev 低代码台账里一条字段的**语义原料**（`dev_schema_field` 三列原样出，框架不解释）。
+/// `variable` 就是 boot2 出口里那份 `ext` JSON（`modules/dev/dto/schemafield_dto.mbt` 把它整包
+/// 挂成 `ext` 键回给前端），`storageType`／`expandFields`／关联表配置全在里面。
+/// 为什么只供原料不做解释：键义随低代码前端演进，而**解释规则属于引擎 persist 规范**
+/// （`spec/10` §2.1）——框架侧一旦预解释就会和引擎侧长成两套，跨栈也对不上 java 的
+/// `IDynamicMetaProvider`。三件都取字符串：`data_type`/`variable` 库里可空，空出空串，
+/// 免得这条跨模块端口为了可空性把 Json 造出来再拆回去。
+pub(all) struct DevFieldSemantic {
+  field_name : String
+  data_type : String
+  variable : String
+}
+
+///|
 /// dev 查询面 —— 框架持有的**业务表**（低代码 / `dev_schema` 那一族动态表）的动态读能力。
 /// 为什么不给插件直接用 `PluginDb`：业务表的归属方是框架（`plugins/host/gate.mbt` 的命名空间闸
 /// 只放行 descriptor 里声明过的 `p_<name>_` 表），插件绕过闸去 SELECT 别人的表就破了
@@ -240,6 +254,19 @@ pub(open) trait DevQueryApi {
     column : String,
     value : Int64,
   ) -> Option[Map[String, Json]] raise @core.MldongError
+
+  /// 按等值列取多行（同一条防注入链，无分页无序）——引擎 `MetaTableReader` 的 ONE2MANY
+  /// 子表回显用（java `JdbcTableReader#queryList` 同位）
+  async fn rows_by_column(
+    self : Self,
+    table : String,
+    column : String,
+    value : Int64,
+  ) -> Array[Map[String, Json]] raise @core.MldongError
+
+  /// 表的低代码字段语义（`dev_schema` ⨝ `dev_schema_field`，按 `sort, id` 定序）。
+  /// 台账没建这张表 ⇒ 空数组 ⇒ 消费侧回落"全 NORMAL"，不是错误
+  async fn field_semantics(self : Self, table : String) -> Array[DevFieldSemantic] raise @core.MldongError
 }
 
 ///|

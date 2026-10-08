@@ -46,4 +46,35 @@ pub impl @api.DevQueryApi for DevQueryApiImpl with fn row_by_column(
 }
 
 ///|
-pub extend DevQueryApiImpl with @api.DevQueryApi::{row_by_column, table_columns}
+pub impl @api.DevQueryApi for DevQueryApiImpl with fn rows_by_column(
+  self,
+  table : String,
+  column : String,
+  value : Int64,
+) -> Array[Map[String, Json]] raise @core.MldongError {
+  let out : Array[Map[String, Json]] = []
+  for json in self.dao.rows_by_column(table, column, value) {
+    match json {
+      Json::Object(row) => out.push(row)
+      _ => ()
+    }
+  }
+  out
+}
+
+///|
+pub impl @api.DevQueryApi for DevQueryApiImpl with fn field_semantics(
+  self,
+  table : String,
+) -> Array[@api.DevFieldSemantic] raise @core.MldongError {
+  let out : Array[@api.DevFieldSemantic] = []
+  for (field_name, data_type, variable) in self.dao.schema_field_semantics(table) {
+    out.push({ field_name, data_type, variable })
+  }
+  out
+}
+
+///|
+pub extend DevQueryApiImpl with @api.DevQueryApi::{
+  field_semantics, row_by_column, rows_by_column, table_columns,
+}

@@ -352,10 +352,12 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
     ctx.dicts.answer(wf_str_dict(s.2, s.0, pairs))
   }
   println("[jeeflow] wf 字典供数：引擎枚举 \{exposed.length()} 支曝光 + 4 类调度键只应答")
-  // ⑦ persist 装配（写侧＝引擎 0.1.31 的 MysqlTableWriter，读侧＝框架 dev_query）：
-  //   元数据来自框架 dev 查询面（information_schema 真列），表侧权限一律"可编辑"——字段权限
-  //   落在**节点** properties.field 的 PERMISSION_* 上，引擎 intercept_sync 已按节点过滤，
-  //   而本栈没有 dev_schema 台账可读（java 的 IDynamicMetaProvider 在那边读的就是台账）。
+  // ⑦ persist 装配（issues/151 X10 收口）：元数据＝information_schema 真列 ∪ dev 台账字段语义，
+  //   写侧＝引擎 MetaTableWriter 包住 MysqlTableWriter（storageType 五档），读侧＝MetaTableReader
+  //   接框架 dev_query（JSON 回解／EXPAND 还原／子表组装）。台账没这张表 ⇒ 只剩真列一档，
+  //   形状与 0.1.31/0.1.32 逐字相同（全 NORMAL、字段名＝列名）⇒ 对既有流程零行为增量。
+  //   表侧权限一律"可编辑"——字段权限落在**节点** properties.field 的 PERMISSION_* 上，
+  //   引擎 intercept_sync 已按节点过滤。
   //   写侧握**同一个 repo 实例** ⇒ 与 wf_* 共用事务槽（issues/149 的能力面）。
   //   未配置 persistMode 的定义在 intercept 首行就 return ⇒ 这一步对既有流程零行为增量。
   let dev = ctx.dev_query
@@ -370,34 +372,51 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
         // 表不存在 ⇒ None（引擎按"表元数据不存在"报错），与 java provider 返回 null 同语义
         None
       } else {
-        let meta = @persist.TableMeta::make(table, table)
-        for c in cols {
-          meta.add_field(@persist.FieldMeta::make(c.name, c.data_type, c.name))
+        // 台账只是语义的**加料**，不是读写的前提：取不到就退回真列档（＝0.1.32 的形状），
+        // 业务数据的读写不因一次台账查询失败而中断
+        let sems = try {
+          dev.field_semantics(table)
+        } catch {
+          _ => []
         }
-        Some(meta)
+        Some(meta_from_ledger(table, cols, sems))
       }
     },
   }
-  let table_writer = @jrepo.MysqlTableWriter::from_repo(repo)
-  let persist_itc = @persist.PersistPostInterceptor::make_from_provider(
+  // 元数据驱动写侧包住基础 writer（spec/10 §4「演进而非推翻」）：`load_table_meta` 给 None
+  //（表不存在）之外的情况一律按元数据 storageType 组装；台账全 NORMAL 时逐字等价于基础档
+  let table_writer = @persist.MetaTableWriter::make(
+    @jrepo.MysqlTableWriter::from_repo(repo),
     meta_provider,
-    table_writer,
   )
+  let persist_itc = @persist.PersistPostInterceptor::make_from_provider(meta_provider, table_writer)
   let _ = ectx5.register_interceptor(persist_itc.as_interceptor())
   println("[jeeflow] persist 装配：后置拦截器 1 支（元数据＝dev_query 内省）+ bizData 读侧已注册")
-  // bizData 回显：java MetaTableReader#readByProcessInstance 同形——按 process_instance_id 取单行
-  //（引擎传进来的 tableName 请求参数不参与选路，表名取自流程定义 relTableName）
-  let ectx6 = ectx5.with_biz_data_reader(async fn(
-    table : String,
-    instance_id : Int64
-  ) raise @jerr.JeeflowError {
-    try {
-      dev.row_by_column(table, "process_instance_id", instance_id)
-    } catch {
-      // 不外泄框架原文（引擎侧统一收口成「业务数据读取失败」+ 日志），这里只留一次显式失败点
-      _ => raise @jerr.Internal("dev_query.row_by_column 业务数据读取失败")
-    }
-  })
+  // bizData 回显交给引擎 MetaTableReader（java `readByProcessInstance` 同形）：先按
+  // process_instance_id 取主表单行，再按元数据反序列化——JSON 档回解、EXPAND 还原成对象且
+  // 展开列不重复平铺、ONE2ONE 组装对象、ONE2MANY 按外键取多行组装数组（spec/10 §6）。
+  // 无台账 ⇒ 元数据＝真列一档 ⇒ 出口形状＝原样行（字段名＝列名），与 0.1.32 同形。
+  let biz_fns : @persist.DynamicTableReaderFns = {
+    row_by_key: async fn(k) raise @jerr.JeeflowError {
+      try {
+        dev.row_by_column(k.table, k.column, k.value)
+      } catch {
+        // 不外泄框架原文（引擎侧统一收口成「业务数据读取失败」+ 日志），这里只留一次显式失败点
+        _ => raise @jerr.Internal("dev_query.row_by_column 业务数据读取失败")
+      }
+    },
+    rows_by_key: async fn(k) raise @jerr.JeeflowError {
+      try {
+        dev.rows_by_column(k.table, k.column, k.value)
+      } catch {
+        _ => raise @jerr.Internal("dev_query.rows_by_column 子表数据读取失败")
+      }
+    },
+  }
+  let biz_reader = @persist.MetaTableReader::make(meta_provider, biz_fns)
+  // 引擎传进来的 tableName 请求参数不参与选路，表名取自流程定义 relTableName（签名与
+  // Ctx.biz_data_reader 逐字相同 ⇒ facade 的 bizData 出口与 issues/137 泄漏纪律都不动）
+  let ectx6 = ectx5.with_biz_data_reader(biz_reader.as_biz_data_reader())
   let facade = @facade.Facade::make(ectx6)
   // ⑤ 注册 /wf/{action} 路由（guard 链鉴权，权限码已在 policy 片段合入）
   for a in jeeflow_actions {
@@ -551,4 +570,143 @@ async fn notify_wf(
         }
       }
   }
+}
+
+///|
+/// 台账 `ext` 取字符串键；缺键／非字符串 ⇒ 空串（`targetTable`/`foreignKey` 缺省即空，
+/// 引擎按"外键回落主表主键"处理）
+fn ledger_str(ext : Map[String, Json], key : String) -> String {
+  match ext.get(key) {
+    Some(Json::String(s)) => s
+    _ => ""
+  }
+}
+
+///|
+/// `expandFields` 两种形状都收：spec/10 §2.1 是 `{子字段: 列名}` 对象，而 boot2
+/// `LowCodeServiceUtil:797` 读的是**字符串数组**（数组档列名＝子字段名，驼峰↔下划线由引擎 X3
+/// 那把尺子在实际读写时归一）。只认对象会把 boot2 形状的台账整批判成"没展开"。
+fn ledger_expand_fields(ext : Map[String, Json]) -> Map[String, String] {
+  let out : Map[String, String] = Map([])
+  match ext.get("expandFields") {
+    Some(Json::Object(obj)) =>
+      for sub_name, col in obj {
+        match col {
+          Json::String(c) => { let _ = out.set(sub_name, c) }
+          _ => ()
+        }
+      }
+    Some(Json::Array(items)) =>
+      for it in items {
+        match it {
+          Json::String(sub_name) => { let _ = out.set(sub_name, sub_name) }
+          _ => ()
+        }
+      }
+    _ => ()
+  }
+  out
+}
+
+///|
+/// 真列清单里找与 `want` 归一相等的**库中真列名**（引擎 X3 那把尺子，issues/151）；没有 ⇒ None
+fn real_column(cols : Array[@api.DevColumnMeta], want : String) -> String? {
+  for c in cols {
+    if @persist.column_names_equal(c.name, want) {
+      return Some(c.name)
+    }
+  }
+  None
+}
+
+///|
+/// 真列的库内类型（台账只给字段名，列类型仍以 information_schema 为准）；无 ⇒ 空串
+fn column_data_type(cols : Array[@api.DevColumnMeta], name : String) -> String {
+  for c in cols {
+    if c.name == name {
+      return c.data_type
+    }
+  }
+  ""
+}
+
+///|
+/// 「information_schema 真列 ∪ dev 台账语义」→ 引擎 `TableMeta`（spec/10 §2.1 的元数据形状）。
+/// 台账命中真列的把语义挂到那一列上（**绝不凭空加列**——写侧只认库里真列）；EXPAND 的展开列
+/// 从平铺档里摘掉（读侧不再重复带出）；不占主表单列的字段（EXPAND 本体／ONE2ONE／ONE2MANY，
+/// 以及台账写了但库里没有的列）作为独立字段追加。
+/// 主键固定 `id`：本栈业务表主键形状已定（BIGINT `id`＋雪花，issues/151 X9 的处置），
+/// 台账的 `is_primary` 不参与选路。
+/// 纯函数：台账原文已由调用点取好并交下来（`sems` 空 ⇒ 只剩真列一档）。
+fn meta_from_ledger(
+  table : String,
+  cols : Array[@api.DevColumnMeta],
+  sems : Array[@api.DevFieldSemantic]
+) -> @persist.TableMeta {
+  let meta = @persist.TableMeta::make(table, table)
+  let enriched : Map[String, @persist.FieldMeta] = Map([])   // 命中的真列 → 带语义字段
+  let expanded : Map[String, Bool] = Map([])                 // 被 EXPAND 消费掉的展开列
+  let extras : Array[@persist.FieldMeta] = []                // 不占主表单列的字段
+  for s in sems {
+    let ext : Map[String, Json] =
+      match @core.ext_json_opt(Some(s.variable)) {
+        Some(Json::Object(obj)) => obj
+        _ => Map([])
+      }
+    // 缺 storageType 键 ⇒ Normal（`Json::Null` 是只读类型，本栈不能拿来构造，故不塞哨兵值）
+    let st = match ext.get("storageType") {
+      Some(v) => @persist.storage_type_of(v)
+      None => @persist.Normal
+    }
+    let exp = ledger_expand_fields(ext)
+    let want = match ledger_str(ext, "columnName") {
+      "" => s.field_name
+      c => c
+    }
+    let real = match real_column(cols, want) {
+      Some(c) => c
+      // 库里没这列：原样带上，引擎写侧的列过滤会丢掉它（不凭空造列，也不炸整条链）
+      None => want
+    }
+    for _, col in exp {
+      match real_column(cols, col) {
+        Some(c) => { let _ = expanded.set(c, true) }
+        None => ()
+      }
+    }
+    let fm = @persist.FieldMeta::make(
+      real,
+      column_data_type(cols, real),
+      s.field_name,
+      name=s.field_name,
+      storage_type=st,
+      expand_fields=exp,
+      target_table=ledger_str(ext, "targetTable"),
+      foreign_key=ledger_str(ext, "foreignKey"),
+    )
+    // ⚠ boot2 的 `targetTable`/`foreignKey` 存的是**被关联 schema 的 id** 并二次 getSchema 解析
+    //（`LowCodeServiceUtil:818-830`）；本处按 spec/10 §2.1 直接取**表名/列名**，数字形式不解析——
+    // 台账今天没有 4/5 档真数据，等有真实配置形态时再定，不在这里猜一套第二语义。
+    // 不占主表单列的三类（EXPAND 本体／两张子表档）＋ 台账写了但库里没这列的 ⇒ 追加字段
+    let no_main_col = real_column(cols, real) is None
+    let standalone = st == @persist.Expand || st == @persist.One2One || st == @persist.One2Many || no_main_col
+    if standalone {
+      extras.push(fm)
+    } else {
+      let _ = enriched.set(real, fm)
+    }
+  }
+  for c in cols {
+    if expanded.get(c.name) is None {
+      let fm = match enriched.get(c.name) {
+        Some(f) => f
+        None => @persist.FieldMeta::make(c.name, c.data_type, c.name)
+      }
+      meta.add_field(fm)
+    }
+  }
+  for f in extras {
+    meta.add_field(f)
+  }
+  meta
 }
