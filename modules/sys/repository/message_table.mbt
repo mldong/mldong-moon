@@ -39,6 +39,12 @@ let message_table : TableCodec[@entity.Message] = TableCodec::{
     { name: "update_time", get: fn(d) { S(match d.update_time { Some(s) => s; None => @core.now_str() }) } },
     { name: "create_user", get: fn(d) { opt_l(d.create_user) } },
     { name: "update_user", get: fn(d) { opt_l(d.update_user) } },
+    // 软删列**必须显式写**：一键栈共用的 `mysql:mldong-plus-jeeflow` 种子里
+    // `sys_message.is_deleted` 是 `int DEFAULT NULL`（对照 sys_user/sys_role/sys_dict 那几张
+    // 都是 `tinyint(1) DEFAULT 0`，所以只有站内信这一张暴露），而所有读面都带
+    // `is_deleted = 0` 谓词 ⇒ 省掉这列就是"写得进、读不出"（page/未读/setRead 全空）。
+    // 取 `unwrap_or(0)` 与本文件 create_time/update_time 两列同一姿势：交得出具体值，不落 NULL。
+    { name: "is_deleted", get: fn(d) { I(d.is_deleted.unwrap_or(0)) } },
   ],
   update_cols: [
     { name: "title", get: fn(d) { S(d.title) } },
