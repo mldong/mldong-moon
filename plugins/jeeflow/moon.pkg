@@ -14,6 +14,7 @@ import {
   "mldong/jeeflow-core/id_gen" @id_gen,
   "mldong/jeeflow-facade" @facade,
   "mldong/jeeflow-repository-mysql/repo" @jrepo,
+  "mldong/jeeflow-persist" @persist,
   "moonbitlang/moonback" @mb,
   "moonbitstack/moondb" @moondb,
   "moonbitstack/moonmysql/client" @client,

@@ -78,7 +78,7 @@ fn join_str(parts : Array[String], sep : String) -> String {
 
 ///|
 /// 拉表真列清单（information_schema 一次查询；列名集合）
-async fn GenericDao::table_columns(self : GenericDao, table : String) -> Map[String, String] raise @core.MldongError {
+pub async fn GenericDao::table_columns(self : GenericDao, table : String) -> Map[String, String] raise @core.MldongError {
   if !table_name_safe(table) {
     raise @core.MldongError::InvalidInput("表名非法")
   }
@@ -347,6 +347,35 @@ pub async fn GenericDao::detail(self : GenericDao, table : String, id : Int64) -
   }
   let conn = open_conn(self.config)
   let rows = q(conn, "SELECT * FROM \{table}\{where_sql}", to_db_values([@core.L(id)]))
+  conn.close()
+  if rows.is_empty() {
+    None
+  } else {
+    Some(generic_row_to_json(rows[0], cols))
+  }
+}
+
+///|
+/// 按**任意真列**等值取单行（jeeflow `bizData` 那一族的读侧：`WHERE process_instance_id = ?`）。
+/// 列名进 SQL 前已过真列白名单（`table_columns` 拉的 information_schema 结果，表名本身先过
+/// `table_name_safe`），值一律参数绑定 ⇒ 与 `detail` 同一条防注入链，不是新口子。
+pub async fn GenericDao::row_by_column(
+  self : GenericDao,
+  table : String,
+  column : String,
+  value : Int64
+) -> Json? raise @core.MldongError {
+  let cols = self.table_columns(table)
+  if !(cols.get(column) is Some(_)) {
+    raise @core.MldongError::InvalidInput("列不存在: \{column}")
+  }
+  let where_sql = if cols.get("is_deleted") is Some(_) {
+    " WHERE \{column} = ? AND is_deleted = 0"
+  } else {
+    " WHERE \{column} = ?"
+  }
+  let conn = open_conn(self.config)
+  let rows = q(conn, "SELECT * FROM \{table}\{where_sql}", to_db_values([@core.L(value)]))
   conn.close()
   if rows.is_empty() {
     None

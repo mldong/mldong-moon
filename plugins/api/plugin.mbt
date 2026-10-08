@@ -214,6 +214,35 @@ pub(open) trait SysQueryApi {
 }
 
 ///|
+/// dev 通用业务表面的一条列元数据（`information_schema` 内省的最小投影）。
+/// 列名/类型都取库里的真值——低代码业务表是"用户后来建的"，编译期无从枚举，只能现读。
+pub(all) struct DevColumnMeta {
+  name : String
+  data_type : String
+}
+
+///|
+/// dev 查询面 —— 框架持有的**业务表**（低代码 / `dev_schema` 那一族动态表）的动态读能力。
+/// 为什么不给插件直接用 `PluginDb`：业务表的归属方是框架（`plugins/host/gate.mbt` 的命名空间闸
+/// 只放行 descriptor 里声明过的 `p_<name>_` 表），插件绕过闸去 SELECT 别人的表就破了
+/// "一张表只有一个所有者"这条不变式（卡 5 归属闸的设计前提）。
+/// 方法与 java `jeeflow-persist` 的读侧同位：`MetaTableReader#readByProcessInstance` 走的正是
+/// "按某个等值列取单行"，`IDynamicMetaProvider#loadTableMeta` 走的是"按表名取列"。
+/// 字段名沿用框架低代码那套口径：列名原样出（不做 camel 化），bigint 列字符串化（雪花防掉精度）。
+pub(open) trait DevQueryApi {
+  /// 表真列清单（表不存在返回空数组；列序＝库里的 ORDINAL_POSITION）
+  async fn table_columns(self : Self, table : String) -> Array[DevColumnMeta] raise @core.MldongError
+
+  /// 按等值列取单行（`WHERE <column> = ?`；有 `is_deleted` 列则附带 `= 0`）；无行返回 None
+  async fn row_by_column(
+    self : Self,
+    table : String,
+    column : String,
+    value : Int64,
+  ) -> Option[Map[String, Json]] raise @core.MldongError
+}
+
+///|
 /// 装载器发给插件的运行面 —— 只放装载器要用的最小面，能力端口留给官方插件轮次。
 /// ctx：装载期恒为 @core.Ctx::system()（与模块装配期取数同惯例）；请求期主体由插件
 /// handler 里自取（ctx_of 依赖 core-web，插件自理——契约不背 web 依赖）。
@@ -222,6 +251,7 @@ pub(all) struct PluginContext {
   db : &PluginDb
   routes : &PluginRoutes
   sys_query : &SysQueryApi // 框架查询面（v1：jeeflow 供数；新能力以增量方法/新接口扩展）
+  dev_query : &DevQueryApi // dev 业务表动态读面（jeeflow persist 的 bizData 回显与表元数据来源）
   dicts : &PluginDictApi // 自定义字典贡献面（UC-0432 注册中心契约；spec 2→3 那轮随 sys_query 同族加）
   messages : &PluginMessageApi // 站内信投递面（spec 3→4；引擎事件监听器在插件侧发通知的唯一出口）
 }

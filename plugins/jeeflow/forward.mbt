@@ -352,7 +352,53 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
     ctx.dicts.answer(wf_str_dict(s.2, s.0, pairs))
   }
   println("[jeeflow] wf 字典供数：引擎枚举 \{exposed.length()} 支曝光 + 4 类调度键只应答")
-  let facade = @facade.Facade::make(ectx5)
+  // ⑦ persist 装配（写侧＝引擎 0.1.30 的 MysqlTableWriter，读侧＝框架 dev_query）：
+  //   元数据来自框架 dev 查询面（information_schema 真列），表侧权限一律"可编辑"——字段权限
+  //   落在**节点** properties.field 的 PERMISSION_* 上，引擎 intercept_sync 已按节点过滤，
+  //   而本栈没有 dev_schema 台账可读（java 的 IDynamicMetaProvider 在那边读的就是台账）。
+  //   写侧握**同一个 repo 实例** ⇒ 与 wf_* 共用事务槽（issues/149 的能力面）。
+  //   未配置 persistMode 的定义在 intercept 首行就 return ⇒ 这一步对既有流程零行为增量。
+  let dev = ctx.dev_query
+  let meta_provider : @persist.DynamicMetaProviderFns = {
+    load_table_meta: async fn(table : String) raise @jerr.JeeflowError {
+      let cols = try {
+        dev.table_columns(table)
+      } catch {
+        _ => raise @jerr.Internal("dev_query.table_columns 取元数据失败: \{table}")
+      }
+      if cols.is_empty() {
+        // 表不存在 ⇒ None（引擎按"表元数据不存在"报错），与 java provider 返回 null 同语义
+        None
+      } else {
+        let meta = @persist.TableMeta::make(table, table)
+        for c in cols {
+          meta.add_field(@persist.FieldMeta::make(c.name, c.data_type, c.name))
+        }
+        Some(meta)
+      }
+    },
+  }
+  let table_writer = @jrepo.MysqlTableWriter::from_repo(repo)
+  let persist_itc = @persist.PersistPostInterceptor::make_from_provider(
+    meta_provider,
+    table_writer,
+  )
+  let _ = ectx5.register_interceptor(persist_itc.as_interceptor())
+  println("[jeeflow] persist 装配：后置拦截器 1 支（元数据＝dev_query 内省）+ bizData 读侧已注册")
+  // bizData 回显：java MetaTableReader#readByProcessInstance 同形——按 process_instance_id 取单行
+  //（引擎传进来的 tableName 请求参数不参与选路，表名取自流程定义 relTableName）
+  let ectx6 = ectx5.with_biz_data_reader(async fn(
+    table : String,
+    instance_id : Int64
+  ) raise @jerr.JeeflowError {
+    try {
+      dev.row_by_column(table, "process_instance_id", instance_id)
+    } catch {
+      // 不外泄框架原文（引擎侧统一收口成「业务数据读取失败」+ 日志），这里只留一次显式失败点
+      _ => raise @jerr.Internal("dev_query.row_by_column 业务数据读取失败")
+    }
+  })
+  let facade = @facade.Facade::make(ectx6)
   // ⑤ 注册 /wf/{action} 路由（guard 链鉴权，权限码已在 policy 片段合入）
   for a in jeeflow_actions {
     ctx.routes.route("POST", "/wf/\{a}", wf_handler(facade, repo, a))

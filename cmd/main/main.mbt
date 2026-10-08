@@ -106,12 +106,14 @@ async fn main raise {
     for p in plugins {
       let d = p.descriptor()
       let sys_query : &@api.SysQueryApi = @sysapi.SysQueryApiImpl::make(config)
+      let dev_query : &@api.DevQueryApi = @sysapi.DevQueryApiImpl::make(config)
       let msg_api : &@api.PluginMessageApi = @sysapi.SysMessageApiImpl::make(config)
       let pctx = @host.plugin_context(
         config,
         d,
         PluginRouteSink::{ g, mctx: ctx },
         sys_query,
+        dev_query,
         dict_sink,
         msg_api,
       ) catch {
