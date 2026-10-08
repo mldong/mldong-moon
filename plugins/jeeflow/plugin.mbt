@@ -169,7 +169,7 @@ pub fn jeeflow_descriptor() -> @api.PluginDescriptor {
   })
   {
     name: "jeeflow",
-    plugin_version: "0.1.28", // 引擎代次（mooncakes mldong/jeeflow-*，随版更新）
+    plugin_version: "0.1.29", // 引擎代次（mooncakes mldong/jeeflow-*，随版更新）
     spec_version: 5, // 4→5：RouteDecl 增 perm_or——工作流族的 OR 语义要由声明方带
     requires: [],
     tables: [],
