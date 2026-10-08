@@ -69,7 +69,8 @@ fn row_opt_text(r : @moondb.Row, col : String) -> String? {
 ///|
 pub impl @meta.MetadataDao for MetadataMysqlDao with fn list_tables(self, keywords) {
   let conn = open_conn(self.config)
-  let base = "SELECT table_name, table_comment FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'"
+  // 别名必写（同 generic_query.mbt：MySQL 8.0 的 I_S 列标签是大写，5.7 是小写）
+  let base = "SELECT table_name AS table_name, table_comment AS table_comment FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'"
   let (sql, params) = if keywords.is_empty() {
     ("\{base} ORDER BY table_name", ([] : Array[@moondb.Value]))
   } else {
@@ -96,7 +97,7 @@ pub impl @meta.MetadataDao for MetadataMysqlDao with fn list_columns(self, table
   let conn = open_conn(self.config)
   let rows = q(
     conn,
-    "SELECT column_name, data_type, column_type, is_nullable, column_default, column_comment, column_key, extra FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? ORDER BY ordinal_position",
+    "SELECT column_name AS column_name, data_type AS data_type, column_type AS column_type, is_nullable AS is_nullable, column_default AS column_default, column_comment AS column_comment, column_key AS column_key, extra AS extra FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? ORDER BY ordinal_position",
     [@moondb.Text(table)],
   )
   conn.close()

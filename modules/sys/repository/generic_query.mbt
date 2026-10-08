@@ -85,7 +85,10 @@ async fn GenericDao::table_columns(self : GenericDao, table : String) -> Map[Str
   let conn = open_conn(self.config)
   let rows = q(
     conn,
-    "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ?",
+    // 别名必写：MySQL 8.0 把 information_schema 的列标签返成大写（COLUMN_NAME），
+    // 5.7 返小写；row_text 大小写敏感 ⇒ 不钉别名则在 8.0 上列清单恒空（lowCode 报"表无 id 列"、
+    // m_ 过滤静默失效）。10-08 在一键栈（mysql:8.0.46）实测，本机 5.7 通道看不出问题。
+    "SELECT column_name AS column_name, data_type AS data_type FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ?",
     [@moondb.Text(table)],
   )
   conn.close()

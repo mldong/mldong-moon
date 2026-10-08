@@ -21,7 +21,9 @@ pub async fn load_check(
   // 库方一次现读：本库全表名
   let rows = @repo.q(
     conn,
-    "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()",
+    // 别名必写：MySQL 8.0 的 information_schema 列标签是大写（TABLE_NAME），5.7 是小写；
+    // 这里读空 ⇒ 库方全表集为空 ⇒ 归属闸与残留表判定整个失能（10-08 一键栈实测）。
+    "SELECT table_name AS table_name FROM information_schema.tables WHERE table_schema = DATABASE()",
     [],
   )
   let all_tables : Map[String, Bool] = Map([], capacity=64)
