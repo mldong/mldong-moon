@@ -33,7 +33,9 @@ check('M1 tree 直返数组', r['code']==0 and isinstance(r['data'],list) and le
 root=r['data'][0]
 check('M2 根节点 id(str)/name', isinstance(root.get('id'),str) and isinstance(root.get('name'),str), str(root.get('id')))
 check('M3 节点带 children', 'children' in root and isinstance(root['children'],list), str(type(root.get('children'))))
-check('M4 种子行 ext 空不出键', all('ext' not in node for node in r['data']), str([k for node in r['data'][:3] for k in node.keys() if k=='ext']))
+# （M4 已移到 C9：旧写法把"种子行 ext 为空"当前提，而 09-24/25 的 i18n 轮已把种子
+#  sys_menu.variable 填成 {"icon":..,"i18n":..} 真值 ⇒ 前提过期，不是产品缺陷。
+#  ext 的规则改由自建自清的行来钉：空不出键、非空必出键且等值。）
 check('M5 节点字段 camelCase 全', set(['appCode','parentId','code','type','sort','path'])<=set(root.keys()), str(sorted(root.keys()))[:100])
 r2=post('/sys/menu/tree',{'m_EQ_appCode':'no_such_app'},t)
 check('M6 m_EQ_appCode 显式过滤', r2['code']==0 and r2['data']==[], str(len(r2.get('data',[]))))
@@ -71,6 +73,11 @@ def find_node(nodes,code):
 r=post('/sys/menu/tree',{},t)
 node=find_node(r['data'],RID+'_dir')
 check('C8 全树父子嵌套（目录挂子菜单）', node is not None and node.get('children') and node['children'][0]['code']==RID+'_ext', str(node)[:120])
+# C9＝原 M4 的意图，改挂在本套自建的两行上（目录不带 ext、子菜单带 ext）：
+# 「ext 为空 ⇒ 不出键；ext 非空 ⇒ 出键且等值」，不再依赖库里的种子内容。
+ext_child = (node or {}).get('children',[{}])[0]
+check('C9 ext 空不出键 / 非空出键且等值', node is not None and 'ext' not in node and ext_child.get('ext')=={'i18n':{'zh-CN':'菜单'}},
+      str((node or {}).get('ext'))[:30]+str(ext_child.get('ext'))[:60])
 
 # ---- 清理 ----
 r=post('/sys/menu/remove',{'ids':[mid,mid2]},t)
@@ -121,9 +128,19 @@ def find_v2(nodes,code):
         hit=find_v2(n.get('children') or [],code)
         if hit: return hit
     return None
-n5=find_v2(r['data'],'sys:menu')   # 种子 sys:menu 行 is_show=0
-n2=find_v2(r2['data'],'sys:menu')
-check('R5 v5 hideInMenu / v2 hideMenu', n5 is not None and n2 is not None and n5['meta'].get('hideInMenu')==True and n2['meta'].get('hideMenu')==True, str((n5 or {}).get('meta',{}).get('hideInMenu'),))
+# R5 隐藏标记：自建自清（旧写法钉"种子 sys:menu 行 is_show=0"，现读该种子行 is_show=1、
+# 库里隐藏的另有两行 ⇒ 前提过期；hideInMenu/hideMenu 的产品行为改由下面这行自己钉）
+hid=post('/sys/menu/save',{'name':'隐藏菜单'+RID,'code':RID+'_hide','parentId':0,'type':2,'sort':9997,
+                          'path':'/hide','appCode':'platform','isShow':0,'enabled':1},t)['data']
+n5=find_route(get('/menu/all',t,'platform')['data'],RID+'_hide')
+n2=find_v2(get('/getMenuList',t,'platform')['data'],RID+'_hide')
+check('R5 v5 hideInMenu / v2 hideMenu', n5 is not None and n2 is not None and n5['meta'].get('hideInMenu')==True and n2['meta'].get('hideMenu')==True,
+      str(((n5 or {}).get('meta') or {}).get('hideInMenu'))+'/'+str(((n2 or {}).get('meta') or {}).get('hideMenu')))
+vis=post('/sys/menu/save',{'name':'显示菜单'+RID,'code':RID+'_vis','parentId':0,'type':2,'sort':9996,
+                          'path':'/vis','appCode':'platform','isShow':1,'enabled':1},t)['data']
+v5=find_route(get('/menu/all',t,'platform')['data'],RID+'_vis')
+check('R5b 显示行不带 hideInMenu', v5 is not None and 'hideInMenu' not in v5.get('meta',{}), str((v5 or {}).get('meta'))[:80])
+check('R5 清理', post('/sys/menu/remove',{'ids':[hid,vis]},t)['code']==0, '')
 r3=get('/getArtDesignMenu',t,'platform')
 n3=find_v2(r3['data'],'sys:user')
 check('R6 art 版菜单节点 authList 超管', n3 is not None and n3['meta'].get('authList')==[{'title':'超级管理员','authMark':'admin'}], str((n3 or {}).get('meta',{}).get('authList'))[:100])

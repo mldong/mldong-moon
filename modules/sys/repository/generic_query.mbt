@@ -100,23 +100,41 @@ pub async fn GenericDao::table_columns(self : GenericDao, table : String) -> Map
 }
 
 ///|
+/// 时间列判定（information_schema 的 data_type）：datetime/timestamp/date/time 四类
+fn is_temporal_type(dtype : String) -> Bool {
+  let t = dtype.to_lower()
+  t.has_prefix("datetime") || t.has_prefix("timestamp") || t == "date" || t == "time"
+}
+
+///|
 /// 行 → Json（family 口径：bigint 列雪花字符串化防精度；Int/Double 数值；Text 文本）
+///
+/// ⚠ 时间列不是 Text 回来的，是 **Blob(bytes)** 回来的（同包 `dialect.mbt` 里
+/// `value_to_text` 那句"DATETIME 走文本截 19 位"就是这件事的另一半）——旧写法把 Blob 一律丢成
+/// `Json::null()` ⇒ 低代码 `page|detail` 与引擎 `bizData` 两条出口的 create_time/update_time
+/// 全是 null（库里有时值、前端显示空）。现在按 dtype 认出时间列，Blob/Text 两路都 utf8 解串，
+/// 并截到 19 位与框架其它时间出口同形（`sys_user.createTime` 那一档）。
 fn generic_row_to_json(r : @moondb.Row, cols : Map[String, String]) -> Json {
   let obj : Map[String, Json] = Map([], capacity=0)
-  for name, _dtype in cols {
+  for name, dtype in cols {
     let v = match r.by_name(name) {
       Some(v) => v
       None => continue
     }
+    let temporal = is_temporal_type(dtype)
     let j : Json = match v {
       Null => Json::null()
-      Text(s) => Json::string(s)
       // bigint 一律字符串化（雪花 id 防 JS 精度丢失；sort 等非雪花 bigint 家族同样出串）
       Int64(n) => Json::string(n.to_string())
       Int(n) => Json::number(n.to_double())
       Double(d) => Json::number(d)
       Bool(b) => Json::boolean(b)
-      Blob(_) => Json::null()
+      Text(s) => Json::string(if temporal { norm_datetime(s) } else { s })
+      Blob(_) =>
+        match value_to_text(v) {
+          Some(s) => Json::string(if temporal { norm_datetime(s) } else { s })
+          None => Json::null()
+        }
     }
     // UC-0318/0319：动态表行出口一律 camelCase（后端负责转，前端不做 snake_case 兼容）
     let _ = obj.set(@core.to_camel_case(name), j)

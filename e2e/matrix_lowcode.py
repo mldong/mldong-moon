@@ -93,4 +93,13 @@ check('LC24 未知表 9999', r['code']!=0, str(r))
 r=post('/lowCode/sys_user;drop/detail',{'id':'1'},t)
 check('LC25 表名形状白名单拒绝', r['code']!=0, str(r))
 
+# E6 防回归：datetime 列驱动是以 Blob 回来的，旧 generic_row_to_json 把 Blob 一律丢成 null
+# ⇒ 低代码 page|detail 与引擎 bizData 两条出口的 create_time/update_time 全变 null。
+r=post('/lowCode/sys_user/page',{'pageNum':1,'pageSize':1},t)
+row=(r.get('data') or {}).get('rows') or [{}]
+ct,ut=row[0].get('createTime'),row[0].get('updateTime')
+check('LC26 时间列出串不出 null（Blob 分支）',
+      isinstance(ct,str) and len(ct)>=19 and ct[4]=='-' and ct[10]==' ' and isinstance(ut,str) and ut[4]=='-',
+      'createTime=%r updateTime=%r'%(ct,ut))
+
 print('OK %d FAIL %d'%(ok,bad))
