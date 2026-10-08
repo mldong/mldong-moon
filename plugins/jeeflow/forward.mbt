@@ -700,7 +700,13 @@ fn meta_from_ledger(
     if expanded.get(c.name) is None {
       let fm = match enriched.get(c.name) {
         Some(f) => f
-        None => @persist.FieldMeta::make(c.name, c.data_type, c.name)
+        // 没台账 ⇒ 字段名取**框架口径的驼峰**（`@core.to_camel_case`），不是列名原样：
+        // spec/10 §6 的读侧出口是「表单字段名 → 值」，而本栈业务表的列名是下划线、
+        // 表单字段名是驼峰（`generic_row_to_json` 的 UC-0318/0319 出口同理，13 栈的
+        // bizData 也一律驼峰）。这里若直接拿列名当字段名，`MetaTableReader` 组装出的
+        // bizData 键就会从驼峰翻成下划线 ⇒ 前端审批页取不到值（装配实测照出来的分叉）。
+        // 写侧不受影响：引擎 X3 那把尺子对 name/column_name 都按归一后比较。
+        None => @persist.FieldMeta::make(c.name, c.data_type, c.name, name=@core.to_camel_case(c.name))
       }
       meta.add_field(fm)
     }
