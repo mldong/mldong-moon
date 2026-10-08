@@ -83,13 +83,15 @@ test "perm_codes_of：OR 族逐条与引擎 OR_RULES 对齐" {
 }
 
 ///|
-test "descriptor：47 条路由逐条与路径同源，且放行/OR/默认三族分类不串" {
+test "descriptor：47 条 action 路由逐条与路径同源 + 1 条未知 action 兜底位，且放行/OR/默认三族分类不串" {
   let d = @moon-plugin-jeeflow.jeeflow_descriptor()
-  assert_eq(d.routes.length(), 47)
+  // 兜底位是清单外的一条（它不对应任何引擎 action，只回「未知」信封），故总数 = action 数 + 1；
+  // 三族计数只在下面对**前 47 条 action 位**统计，兜底位单独钉形状，防止它被配出权限码或被 public 放行。
+  assert_eq(d.routes.length(), 48)
   let mut login_only = 0
   let mut or_routes = 0
   let mut default_routes = 0
-  for r in d.routes {
+  for r in d.routes[:47] {
     assert_eq(r.http_method, "POST")
     assert_false(r.public)
     if r.perms.is_empty() {
@@ -110,4 +112,10 @@ test "descriptor：47 条路由逐条与路径同源，且放行/OR/默认三族
   assert_eq(login_only, 11)
   assert_eq(or_routes, 5)
   assert_eq(default_routes, 31)
+  // 兜底位（第 48 条）单独钉形状：不配权限码、不放行、路径就是 /wf/*rest——
+  // 它一旦被配上权限码或标成 public，就等于给清单外的 action 开了一条带鉴权语义的可达面
+  let tail = d.routes[47]
+  assert_eq(tail.path, "/wf/*rest")
+  assert_true(tail.perms.is_empty())
+  assert_false(tail.public)
 }

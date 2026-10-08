@@ -15,4 +15,6 @@ import {
   "mldong/jeeflow-facade" @facade,
   "mldong/jeeflow-repository-mysql/repo" @jrepo,
   "moonbitlang/moonback" @mb,
+  "moonbitstack/moondb" @moondb,
+  "moonbitstack/moonmysql/client" @client,
 }

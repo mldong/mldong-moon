@@ -20,4 +20,6 @@ import {
   "mldong/jeeflow-facade@0.1.28",
   "mldong/jeeflow-repository-mysql@0.1.28",
   "moonbitlang/moonback@0.8.6",
+  "moonbitstack/moondb@0.2.0",
+  "moonbitstack/moonmysql@0.7.3",
 }

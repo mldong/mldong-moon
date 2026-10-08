@@ -20,11 +20,64 @@ fn s_or(v : String?, fallback : String) -> String {
 }
 
 ///|
+/// 引擎墙钟基准（issues/120「宿主必须注入」在 moon 栈的落点）。
+/// MoonBit core 无时区出口 ⇒ 引擎默认臂恒 UTC；而委托时间窗、任务到期时刻这些**按墙钟串存库、
+/// 按墙钟串比对**的值，是调用方按部署环境墙钟提交/回读的（其余 13 栈 host==容器==库会话钟，天然对齐）。
+/// 不注入的后果不是"显示差 8 小时"而是功能失能：now±1h 的窗永不覆盖引擎眼中的 now ⇒
+/// 委托代理人并进不去（工作流门禁 L2-17/L2-18/L2-29 三格同时红，10-08 实测）。
+/// 基准取「数据所在库的会话墙钟 − UTC」的秒差：库在 +08 的部署里引擎随宿主，库配 UTC 的部署里
+/// 引擎仍 UTC——不写死时区，也不需要一键包新增 env（compose 结构不动）。
+/// `initialize` 是同步签名（装载器在装载事务里跑它）⇒ 取数落在首条 /wf 请求上，探测一次后缓存。
+let clock_probed : Ref[Bool] = Ref(false)
+
+async fn ensure_engine_clock(repo : @jrepo.MysqlRepository) -> Unit {
+  if clock_probed.val {
+    return ()
+  }
+  clock_probed.val = true
+  let mut offset = 0L
+  try {
+    let conn = repo.open_raw()
+    let rows = @jrepo.q(
+      conn,
+      "SELECT TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()) AS tz_off",
+      [],
+    )
+    if rows.length() > 0 {
+      match rows[0].by_name("tz_off") {
+        Some(v) =>
+          offset = match v {
+            @moondb.Int64(n) => n
+            @moondb.Int(n) => n.to_int64()
+            @moondb.Double(d) => d.to_int64()
+            @moondb.Text(s) => @core.parse_i64_lenient(s).unwrap_or(0L)
+            _ => 0L
+          }
+        None => ()
+      }
+    }
+    @client.MysqlConn::close(conn)
+  } catch {
+    // 探不到库钟就维持引擎默认（UTC）。静默回落是这台机器上最贵的一种错：
+    // 基准错了不报红、只让整条委托链静默失能，所以必须留一行。
+    e => println("[jeeflow] 库钟基准探测失败，引擎墙钟回落 UTC: " + e.message())
+  }
+  let base = offset
+  @model.set_clock(Some(fn() { @model.format_unix_utc(@model.epoch_secs() + base) }))
+  println("[jeeflow] 引擎墙钟基准＝库会话墙钟（UTC 偏移 \{offset / 3600L}h）")
+}
+
+///|
 fn wf_handler(
   facade : @facade.Facade[@jrepo.MysqlRepository, @jrepo.MysqlRepository],
+  repo : @jrepo.MysqlRepository,
   action : String,
 ) -> @mb.Handler {
   @web.wrap(async fn(request) -> Json raise @core.MldongError {
+    // 引擎墙钟基准：首条请求探一次（旁路失能不拦请求，探测失败有留痕行）
+    ensure_engine_clock(repo) catch {
+      e => println("[jeeflow] 引擎墙钟基准注入异常: \{e}")
+    }
     // body 容错：空 body 当空对象（与 jeeflow demo 同口径），坏 JSON 交 wrap 统一转 99990001
     let body = @web.json_body(request) catch { _ => @jf.empty_object() }
     let args : Map[String, Json] = match body {
@@ -240,22 +293,26 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
   ) raise @jerr.JeeflowError {
     match ev.event_type() {
       @event.ProcessTaskStart => {
-        let task_id = ev.data.get_i64_or("taskId", 0L)
+        // biz_id 记**实例 id** 不记 taskId（码 3 载荷带 instanceId 是 §11.3 的硬要求）：
+        // 消费面（消息分页按实例归堆、移动端角标、门禁 L2-11）一律按实例查，记 taskId 查不到
+        let inst_id = ev.data.get_i64_or("instanceId", 0L)
         for actor in ev.data.get_string_array("actors") {
-          notify_wf(ctx, "wf_task", "您有新的待办事项", actor, task_id, "/wf/task")
+          notify_wf(ctx, msg_todo, "您有新的待办事项", actor, inst_id, "/wf/task")
         }
       }
       @event.ProcessInstanceEnd => {
         // 码 2 的载荷只有 instanceId+state ⇒ 发起人从实例行现读（同一份引擎仓储）
         match @spi.ProcessRepository::find_instance_by_id(repo, ev.source_id()) {
           Some(inst) => notify_wf(
-            ctx, "wf_instance", "您的流程已办结", inst.operator, inst.instance_id, "/wf/instance"
+            ctx, msg_notice, "您的流程已办结", inst.operator, inst.instance_id, "/wf/instance"
           )
           None => ()
         }
       }
       @event.CcCreate => match ev.cc_actor_id() {
-        Some(actor) => notify_wf(ctx, "wf_cc", "流程抄送给您", actor, ev.source_id(), "/wf/instance")
+        Some(actor) => notify_wf(
+          ctx, msg_notice, "流程抄送给您", actor, ev.source_id(), "/wf/instance"
+        )
         None => ()
       }
       _ => ()
@@ -298,9 +355,14 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
   let facade = @facade.Facade::make(ectx5)
   // ⑤ 注册 /wf/{action} 路由（guard 链鉴权，权限码已在 policy 片段合入）
   for a in jeeflow_actions {
-    ctx.routes.route("POST", "/wf/\{a}", wf_handler(facade, a))
+    ctx.routes.route("POST", "/wf/\{a}", wf_handler(facade, repo, a))
   }
-  println("[jeeflow] 路由注册完成：\{jeeflow_actions.length()} 条 POST /wf/{action}")
+  // 未知 action 兜底位：必须排在 47 条静态位**之后**注册（moonback Trie 先静态前缀后通配，
+  // 顺序反了通配位会抢走真实 action 的命中）
+  ctx.routes.route("POST", "/wf/*rest", wf_unknown_handler())
+  println(
+    "[jeeflow] 路由注册完成：\{jeeflow_actions.length()} 条 POST /wf/{action} + 1 条未知 action 兜底",
+  )
 }
 
 ///|
@@ -373,6 +435,33 @@ fn wf_str_dict(name : String, key : String, pairs : Array[(String, String)]) -> 
 }
 
 ///|
+/// sys_message.msg_type 两档（框架枚举 sys_message_msg_type：10＝待办消息 / 20＝通知消息；
+/// 插件不依赖 moon-sys，码值在此对齐并注明出处——1＝系统通知那一档不承载 wf 流程消息）
+let msg_todo : Int = 10
+let msg_notice : Int = 20
+
+///|
+/// sys_message.biz_type 的**子分类段**，跨栈一律 "WORKFLOW"（Java 基座落 {appCode}_WORKFLOW、
+/// goframe/salvo 落裸 WORKFLOW；moon 的投递面按 ctx.app_code 自动补前缀 ⇒ 这里只交子分类，
+/// 消费侧 listByType/未读计数与门禁 L2-11 都只比子分类）
+let wf_biz_type : String = "WORKFLOW"
+
+///|
+/// 未注册 action 的统一信封兜底（gate L1-05，以及 L2-13 的 `processDefine/save|update` 两腿）。
+/// 其余 13 栈由控制器动态转发、引擎 dispatch 答「未知」；moon 是显式 47 位面，未声明即无此能力，
+/// 所以兜底位**不进引擎**——否则等于给清单外的 action 开一条"仅登录"的可达面。
+/// 文案取引擎 `UnknownAction` 原话（`未知 action: X`，码 ERR_BUSINESS=99999999），跨栈信封同形。
+fn wf_unknown_handler() -> @mb.Handler {
+  @web.wrap(fn(request) -> Json {
+    let action = match request.params.get("rest") {
+      Some(v) => v.to_owned()
+      None => ""
+    }
+    @core.fail(99999999, @jerr.UnknownAction(action).message())
+  })
+}
+
+///|
 /// 候选人行投影（IUserSearchProvider 的两个方法共用；键名＝前端候选人表口径）
 fn user_row(u : @api.SysUserDetail) -> Map[String, Json] {
   let row : Map[String, Json] = Map([])
@@ -387,7 +476,7 @@ fn user_row(u : @api.SysUserDetail) -> Map[String, Json] {
 /// 发一条 wf 站内信（接收人是字符串 id：非数字直接跳过——流程参与者可以是 applicant/角色码等占位）
 async fn notify_wf(
   ctx : @api.PluginContext,
-  biz_type : String,
+  msg_type : Int,
   title : String,
   receiver : String,
   biz_id : Int64,
@@ -401,8 +490,8 @@ async fn notify_wf(
         ctx.messages.send({
           title,
           content: None,
-          msg_type: 1, // 框架枚举 sys_message_msg_type：1＝系统通知
-          biz_type,
+          msg_type,
+          biz_type: wf_biz_type,
           biz_id: Some(biz_id),
           receiver_user_id: uid,
           url: Some(url),
@@ -411,8 +500,8 @@ async fn notify_wf(
         // 站内信是通知旁路：失败不外抛成流程错误（引擎侧逐监听器兜底已隔离）。
         // ⚠ 兜底会把这里的 raise 咽掉，所以先 println 留痕——否则"没发消息"查不到原因。
         e => {
-          println("[jeeflow] 站内信投递失败 biz_type=\{biz_type} 收件人=\{receiver} 原因=\{@core.MldongError::message(e)}")
-          raise @jerr.Internal("站内信投递失败: " + biz_type)
+          println("[jeeflow] 站内信投递失败 msg_type=\{msg_type} 收件人=\{receiver} 原因=\{@core.MldongError::message(e)}")
+          raise @jerr.Internal("站内信投递失败")
         }
       }
   }

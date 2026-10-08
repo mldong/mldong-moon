@@ -142,7 +142,10 @@ pub fn perm_codes_of(action : String) -> (Array[String], Bool) {
 }
 
 ///|
-/// descriptor —— 47 条 POST /wf/{action} 路由逐条显式权限码（主仓全显式语义不动）；
+/// descriptor —— 47 条 POST /wf/{action} 路由逐条显式权限码（主仓全显式语义不动）+ 一条
+/// `/wf/*rest` 兜底（**仅登录、不配权限码**：它只回"未知 action"信封，不经引擎，故不给任何真实
+/// 能力开门——13 栈的动态转发把未知 action 交给引擎答，moon 的显式面把"未声明即无此能力"看得更重，
+/// 两种姿势的信封结论一致：code=99999999 且 msg 含「未知」）；
 /// tables/migrations/menus 皆空集（见文件头）
 pub fn jeeflow_descriptor() -> @api.PluginDescriptor {
   let routes : Array[@api.RouteDecl] = []
@@ -156,9 +159,17 @@ pub fn jeeflow_descriptor() -> @api.PluginDescriptor {
       public: false,
     })
   }
+  // 兜底位必须排在 47 条静态位**之后**注册（moonback Trie：先静态前缀后通配，反了会抢命中）
+  routes.push({
+    http_method: "POST",
+    path: "/wf/*rest",
+    perms: [],
+    perm_or: false,
+    public: false,
+  })
   {
     name: "jeeflow",
-    plugin_version: "0.1.27", // 引擎代次（mooncakes mldong/jeeflow-*，随版更新）
+    plugin_version: "0.1.28", // 引擎代次（mooncakes mldong/jeeflow-*，随版更新）
     spec_version: 5, // 4→5：RouteDecl 增 perm_or——工作流族的 OR 语义要由声明方带
     requires: [],
     tables: [],
