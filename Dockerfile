@@ -39,4 +39,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 COPY --from=builder /usr/local/bin/mldong-moon-bin /usr/local/bin/mldong-moon-bin
 WORKDIR /app
 EXPOSE 18680
-CMD ["/usr/local/bin/mldong-moon-bin"]
+# stdbuf -oL 是必需的，不是装饰：native 二进制的 stdout 在容器里是 pipe（非 tty），
+# glibc 默认块缓冲 ⇒ 进程不退出就一条都不刷，`docker logs` 恒 0 字节（10-09 实机读到）。
+# 于是"启动日志读插件代次指纹"这条判据会静默失效；装载校验失败那类消息反而看得见（abort 退出会冲刷）。
+CMD ["stdbuf", "-oL", "/usr/local/bin/mldong-moon-bin"]
