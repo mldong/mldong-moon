@@ -1,19 +1,22 @@
-// 三方对账 + 装载期归属闸（装载收口的一次 DB 现读）。
-// 三方：代码方 = 注册进 cmd/main 的 descriptor（编译进去的就是事实）；
-//       记录方 = sys_plugin / sys_plugin_migration；
-//       库方 = information_schema.tables 的 p_<name>_% 实际存在集（黑名单现读，
-//       不照脚本文本抄数——同一内容在脚本里出现过两种写法，抄一次固化一次错）。
-// 不一致一律拒绝启动，不静默降级（静默跳过＝装坏没人知道）；消息点名缺/多的是哪一方、
-// 哪些表——唯一能让人 30 秒定位的东西。⚠ wasm 档 abort 消息不落日志，调用方（cmd/main）
+// 在册对账 + 装载期归属闸（装载收口的一次 DB 现读）。
+// 两方（10-09 owner 拍 C：装载器不带 schema 通道，与 13 栈库面重合）：
+//   代码方 = cmd/main/plugins.mbt 里注册的 descriptor（编译进去的就是事实）
+//   库方   = information_schema.tables 的本库全表集（现读，不照脚本文本抄数——
+//            同一内容在脚本里出现过两种写法，抄一次固化一次错）
+// 原第三"记录方"（sys_plugin / sys_plugin_migration 两张台账）随 schema 通道一起撤销：
+// 插件表的 DDL 归 doc/sql/mysql-schema-all.sql（与 modules 同法），装载器不建表、不记账，
+// 只判"声明合法 + 声明在册"。缺表不再自动补建 ⇒ 这正是把它砍成对账器的取舍：
+// 装坏不再可能被静默吸收，但升级要人动手改脚本。
+// 不一致一律拒绝启动，不静默降级（静默跳过＝装坏没人知道）；消息点名缺/多的是哪些表——
+// 这是唯一能让人 30 秒定位的东西。⚠ wasm 档 abort 消息不落日志，调用方（cmd/main）
 // 必须 println 后再 abort。
 
 ///|
-/// 装载校验入口：归属闸 → 三方对账 → 基线号对账。
-/// fw_max_version = __framework__ 迁移目录最高版本（装载方已保证 BASELINE_NO ≤ 它）。
+/// 装载校验入口：库方一次现读 → 契约号比对 → 归属闸 → 在册对账。
+/// contract_prefixes = 装配级契约路由前缀白名单（官方契约插件用，如 ["/wf/"]）。
 pub async fn load_check(
   config : @core.MysqlConfig,
   plugins : Array[&@api.Plugin],
-  fw_max_version : Int,
   contract_prefixes : Array[String],
 ) -> Unit raise @core.MldongError {
   let conn = @repo.open_conn(config)
@@ -22,141 +25,87 @@ pub async fn load_check(
   let rows = @repo.q(
     conn,
     // 别名必写：MySQL 8.0 的 information_schema 列标签是大写（TABLE_NAME），5.7 是小写；
-    // 这里读空 ⇒ 库方全表集为空 ⇒ 归属闸与残留表判定整个失能（10-08 一键栈实测）。
+    // 这里读空 ⇒ 库方全表集为空 ⇒ 归属闸与在册对账整个失能（10-08 一键栈实测）。
     "SELECT table_name AS table_name FROM information_schema.tables WHERE table_schema = DATABASE()",
     [],
   )
-  let all_tables : Map[String, Bool] = Map([], capacity=64)
+  let db_tables : Map[String, Bool] = Map([], capacity=64)
   for r in rows {
     let name = @repo.row_text(r, "table_name", "")
     if !name.is_empty() {
-      all_tables[name] = true
+      db_tables[name] = true
     }
   }
-  // 框架黑名单 = 全表集去掉 p_*（插件命名空间）；这是归属闸与"残留表"判定的共同输入
+  // 框架黑名单 = 全表集去掉 p_*（插件命名空间）——归属闸的输入
   let framework_tables : Array[String] = []
-  for k in all_tables.keys() {
+  for k in db_tables.keys() {
     if !(k.length() >= 2 && k[0:2].to_owned() == "p_") {
       framework_tables.push(k)
     }
   }
-  // ④ 契约号比对（卡 0：spec_version 装载期比对，不匹配拒绝启动）+ 归属闸
   let descriptors : Array[@api.PluginDescriptor] = plugins.map(fn(p) { p.descriptor() })
+  // 契约号比对（卡 0：spec_version 装载期比对，不匹配拒绝启动）
   for d in descriptors {
-    if d.spec_version != SPEC_VERSION {
+    if d.spec_version != @api.SPEC_VERSION {
       raise @core.MldongError::Business(
-        "契约号不匹配: 插件 \{d.name} spec_version=\{d.spec_version}，装载器要求 \{SPEC_VERSION}——插件与装载器版本错配，先对齐再启动",
+        "契约号不匹配: 插件 \{d.name} spec_version=\{d.spec_version}，装载器要求 \{@api.SPEC_VERSION}——插件与装载器版本错配，先对齐再启动",
       )
     }
   }
   let gate : OwnershipGate = { framework_tables, plugins: descriptors, contract_prefixes }
   gate.validate()
-  // 记录方现读：sys_plugin 全集 + 逐插件 migration 计数
-  let reg_rows = @repo.q(conn, "SELECT name FROM sys_plugin", [])
-  let registered : Map[String, Bool] = Map([], capacity=8)
-  for r in reg_rows {
-    let name = @repo.row_text(r, "name", "")
-    if !name.is_empty() {
-      registered[name] = true
-    }
-  }
-  let mig_rows = @repo.q(
-    conn,
-    "SELECT plugin, COUNT(*) AS n FROM sys_plugin_migration GROUP BY plugin",
-    [],
-  )
-  let ledger : Map[String, Int] = Map([], capacity=8)
-  for r in mig_rows {
-    let name = @repo.row_text(r, "plugin", "")
-    let n = @repo.row_i64(r, "n").to_int()
-    if !name.is_empty() {
-      ledger[name] = n
-    }
-  }
-  // 基线号对账：__framework__ 台账最高版本（apply_all 补台账后）应 == 迁移目录最高版本。
-  // 不等 = 台账被清而表在（重跑基线脚本清了台账）或目录被清——都拒绝启动。
-  let mut fw_ledger_max = 0
-  match ledger.get(FRAMEWORK) {
-    Some(_) => {
-      let vr = @repo.q(
-        conn,
-        "SELECT MAX(version) AS maxv FROM sys_plugin_migration WHERE plugin = ?",
-        @repo.to_db_values([@core.S(FRAMEWORK)]),
-      )
-      if vr.length() > 0 {
-        // MAX 空集回 NULL——先走文本读取器判 null（G：先判 null 再走类型化访问器）
-        if @repo.row_text(vr[0], "maxv", "") != "" {
-          fw_ledger_max = @repo.row_i64(vr[0], "maxv").to_int()
-        }
-      }
-    }
-    None => ()
-  }
-  if fw_ledger_max != fw_max_version {
-    raise @core.MldongError::Business(
-      "基线号对账失败: __framework__ 台账最高版本 \{fw_ledger_max} ≠ 迁移目录最高版本 \{fw_max_version}——库是拿旧脚本建的 / 台账被清而增量未补；处置 = 重跑新基线脚本后重启，或人工补台账",
-    )
-  }
-  // 三方对账规则表（五行）
+  reconcile_registered(descriptors, db_tables)
+}
+
+///|
+/// 在册对账（纯函数，零 DB 可测）：两向都必须成立——
+/// ①声明的 p_<name>_<suffix> 库里有（装载器不建表，缺表 ⇒ 拒）；
+/// ②库里每张 p_* 都在某个 descriptor 的声明集里（无主 p_ 表 ⇒ 拒，含摘注册的残留与
+///   声明被删而表留下）。所有权按"声明集全等"判，不按前缀松判——
+///   否则 tables=[] 的在册插件自己的残留表正好检不出。
+pub fn reconcile_registered(
+  descriptors : Array[@api.PluginDescriptor],
+  db_tables : Map[String, Bool],
+) -> Unit raise @core.MldongError {
+  let declared : Map[String, String] = Map([], capacity=8) // "p_<name>_<suffix>" → owner
   for d in descriptors {
-    let declared_full = d.tables.map(fn(s) { "p_\{d.name}_\{s}" })
-    let is_registered = registered.get(d.name) is Some(_)
-    // 库方：声明的 p_<name>_* 实际存在集
-    let present : Array[String] = []
-    let missing : Array[String] = []
-    for t in declared_full {
-      if all_tables.get(t) is Some(_) {
-        present.push(t)
-      } else {
-        missing.push(t)
-      }
-    }
-    if is_registered {
-      if !missing.is_empty() {
-        // 有 | 有 | 缺表 ⇒ orphan，拒绝启动
-        let ms = missing.join(",")
-        raise @core.MldongError::Business(
-          "三方对账失败（orphan）: 插件 \{d.name} 缺表 [\{ms}]——表被手工 DROP；处置 = 卸载后重装该插件",
-        )
-      }
-    } else {
-      // 有 | 无 | 有表 ⇒ 需重装，拒绝启动
-      if !present.is_empty() {
-        let ps = present.join(",")
-        raise @core.MldongError::Business(
-          "三方对账失败（需重装）: 插件 \{d.name} 注册行缺失但表已存在 [\{ps}]（多半是重跑了基线脚本清了台账）；处置 = 重装该插件",
-        )
-      }
-      // 有 | 无 | 无表 ⇒ 正常待装，继续（apply_all 会建）
+    for suffix in d.tables {
+      declared["p_\{d.name}_\{suffix}"] = d.name
     }
   }
-  // 无 | 有 ⇒ 残留，拒绝启动
-  for name in registered.keys() {
-    if name == FRAMEWORK {
-      continue
-    }
-    let mut known = false
-    for d in descriptors {
-      if d.name == name {
-        known = true
+  // ① 声明在册
+  for d in descriptors {
+    let missing : Array[String] = []
+    for suffix in d.tables {
+      let full = "p_\{d.name}_\{suffix}"
+      if db_tables.get(full) is None {
+        missing.push(full)
       }
     }
-    if !known {
-      let mig_n = match ledger.get(name) {
-        Some(n) => n
-        None => 0
-      }
-      let tables_left : Array[String] = []
-      let prefix = "p_\{name}_"
-      for k in all_tables.keys() {
-        if k.length() > prefix.length() && k[0:prefix.length()].to_owned() == prefix {
-          tables_left.push(k)
-        }
-      }
-      let ts = tables_left.join(",")
+    if !missing.is_empty() {
+      let ms = missing.join(",")
       raise @core.MldongError::Business(
-        "三方对账失败（残留）: 插件 \{name} 注册行已摘但台账 \{mig_n} 条 + 表 \{tables_left.length()} 张 [\{ts}] 仍在；处置 = 先落回注册再正常卸载",
+        "在册对账失败: 插件 \{d.name} 声明的表 [\{ms}] 在本库不存在——装载器不建表（schema 通道已撤），DDL 归 doc/sql/mysql-schema-all.sql；处置 = 把该表补进基线脚本并重建库，或从 descriptor.tables 摘掉这条声明",
       )
     }
+  }
+  // ② 无主 p_ 表
+  let orphans : Array[String] = []
+  for t in db_tables.keys() {
+    if t.length() >= 2 && t[0:2].to_owned() == "p_" && declared.get(t) is None {
+      orphans.push(t)
+    }
+  }
+  if !orphans.is_empty() {
+    let known : Array[String] = []
+    for d in descriptors {
+      known.push(d.name)
+    }
+    orphans.sort()
+    let os = orphans.join(",")
+    let ks = known.join(",")
+    raise @core.MldongError::Business(
+      "在册对账失败（残留）: 库里的插件表 [\{os}] 不属任何在册插件（在册 = [\{ks}]）；处置 = 先落回注册再按声明清表，或确认是手工建的孤儿表后整库清理",
+    )
   }
 }

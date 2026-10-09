@@ -1,8 +1,11 @@
 // jeeflow-moon 官方插件 —— 工作流引擎以插件身份进 mldong-moon（不走 base+1 集成壳）。
 // 契约：全部 POST /wf/{action}，单 handler 全转发 Facade::flow（13 栈 JeeflowFacade 动态转发的
 // moon 同位；action 含路径段，如 processTask/todoList）。
-// 表归属：wf_* 8 张框架所有（已在基线脚本）——descriptor.tables 为空集，插件无 DDL；
-// 引擎 schema 变更走 __framework__ 基线增量通道。
+// 表归属：wf_* 8 张框架所有（已在基线脚本）——descriptor.tables 为空集，插件无 DDL。
+// 引擎 schema 变更（wf_* 加列/改列）与 13 栈同法：改 java 侧编辑源 schema-mysql.sql →
+// sync-schema.sh 逐字分发（含 jeeflow-moon 那份副本，门禁＝hub jeeflow-hub/scripts/
+// check-doc-schema.py）→ 同步本仓 doc/sql/mysql-schema-all.sql 里的 wf_* 段。
+// 装载器不带 schema 通道（10-09 owner 拍 C：与 13 栈库面重合），不再自动补建。
 // 引擎装配：进程级一个 Facade，自带连接管理不经 ScopedDb（与 13 栈引擎自带连接池同构）；
 // 装配动作在 initialize（供数预载需异步查库），make 只读定配置。
 // 供数：引擎供数族 SPI 自 jeeflow-moon 0.1.28 起是 async 闭包（hub issues/146）⇒ initialize 里
@@ -170,10 +173,9 @@ pub fn jeeflow_descriptor() -> @api.PluginDescriptor {
   {
     name: "jeeflow",
     plugin_version: "0.1.34", // 引擎代次（mooncakes mldong/jeeflow-*，随版更新；与 moon.mod 的四处 pin 同批抬）
-    spec_version: 5, // 4→5：RouteDecl 增 perm_or——工作流族的 OR 语义要由声明方带
+    spec_version: @api.SPEC_VERSION, // 契约号定义单点在 plugin-api（此前这里硬编码同一个数、装载器侧再写一份 = 双写漂移）
     requires: [],
     tables: [],
-    migrations: [],
     routes,
     menus: [],
     dicts: [],

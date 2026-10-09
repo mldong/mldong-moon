@@ -14,10 +14,9 @@ impl @moon-plugin-api.Plugin for AlphaPlugin with fn descriptor(
   {
     name: "alpha",
     plugin_version: self.version,
-    spec_version: 1,
+    spec_version: @moon-plugin-api.SPEC_VERSION,
     requires: [],
     tables: ["registration"],
-    migrations: [],
     routes: [],
     menus: [],
     dicts: [],
@@ -63,15 +62,9 @@ impl @moon-plugin-api.Plugin for BetaPlugin with fn descriptor(
   {
     name: "beta",
     plugin_version: self.version,
-    spec_version: 1,
+    spec_version: @moon-plugin-api.SPEC_VERSION,
     requires: ["alpha"],
     tables: ["registration", "reply"],
-    migrations: [
-      {
-        version: 1,
-        ddl: "CREATE TABLE `p_beta_registration` (`id` bigint NOT NULL, PRIMARY KEY (`id`))",
-      },
-    ],
     routes: [{ http_method: "POST", path: "/plugin/beta/ping", perms: [], perm_or: false, public: true }],
     menus: [],
     dicts: [],
@@ -114,17 +107,10 @@ test "descriptor 验收：Array[&Plugin] 装两个异构实现并遍历 descript
   assert_eq(ps[1].descriptor().name, "beta")
   assert_eq(ps[0].descriptor().plugin_version, "1.0.0")
   assert_eq(ps[1].descriptor().tables.length(), 2)
-  assert_eq(ps[1].descriptor().migrations.length(), 1)
-  assert_eq(ps[1].descriptor().migrations[0].version, 1)
 }
 
 ///|
-test "契约类型验收：MigrationDecl/RouteDecl/MenuDecl/DictDecl 字段齐全可构造" {
-  let m : @moon-plugin-api.MigrationDecl = {
-    version: 2,
-    ddl: "ALTER TABLE `p_beta_registration` ADD COLUMN `note` varchar(255) NULL",
-  }
-  assert_eq(m.version, 2)
+test "契约类型验收：RouteDecl/MenuDecl/DictDecl 字段齐全可构造" {
   let r : @moon-plugin-api.RouteDecl = {
     http_method: "GET",
     path: "/plugin/beta/list",

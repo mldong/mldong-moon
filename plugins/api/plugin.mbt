@@ -3,13 +3,13 @@
 // 承重前提与判据：全部本机真库/真编译探针实证，依据随注释就近给出。
 
 ///|
-/// 一条 migration = 一条语句（驱动硬约束：多语句被服务端拒且零半执行），
-/// 字面量 SQL、无占位符（参数化是客户端插值，DDL 不带参数）；
-/// 表名只写业务后缀，`p_<name>_` 前缀由装载器拼（归属闸拼名，构造性不可能写错）。
-pub(all) struct MigrationDecl {
-  version : Int // 组内单调递增，从 1 起
-  ddl : String
-}
+/// 契约号：descriptor.spec_version 与装载器要求不一致 ⇒ 装载期拒绝启动；破坏性契约变更时 +1。
+/// 住在本包而不是装载器包：插件包与装载器包都只依赖本包 ⇒ 定义单点（此前插件侧硬编码同一个数、
+/// 装载器侧再写一份，是双写漂移）。
+pub const SPEC_VERSION : Int = 5 // 4→5：RouteDecl 增 perm_or——工作流族 13 栈的 OR 语义须由声明方带（moon 侧 10-08 补齐引擎 DefaultActionPermissionProvider 同位映射）
+// 3→4：PluginContext 增 messages 站内信投递面（issues/146 缺口三）
+// 2→3：PluginContext 增 dicts 自定义字典贡献面（UC-0432，10-07 集成轮）
+// 1→2：PluginContext 增 sys_query 框架查询面字段（10-07）
 
 ///|
 pub(all) struct RouteDecl {
@@ -55,13 +55,15 @@ pub(all) struct DictDecl {
 ///|
 /// 插件描述符 —— 趟一纯数据（无反射 ⇒ 声明必须是数据）；
 /// name 必须 == 包名尾段 == 路由前缀段 == 表命名空间段（四处逐字相等）。
+/// **装载器不带 schema 通道**（10-09 owner 拍 C：与 13 栈库面重合）：插件表的 DDL 归
+/// `doc/sql/mysql-schema-all.sql` 基线脚本（新增表 = 改脚本，与 modules 同法），装载器只做
+/// 归属校验与"声明表在册"对账——声明了但库里没有 ⇒ 拒绝启动，不静默补建。
 pub(all) struct PluginDescriptor {
   name : String
   plugin_version : String
   spec_version : Int // 契约号，装载期比对，不匹配拒绝启动
   requires : Array[String] // 依赖的能力包，装载期真校验（有字段就必须真校验，占位不读的字段不如没有）
   tables : Array[String] // 只写业务后缀（"registration"），装载器拼成 p_<name>_registration
-  migrations : Array[MigrationDecl]
   routes : Array[RouteDecl]
   menus : Array[MenuDecl]
   dicts : Array[DictDecl]

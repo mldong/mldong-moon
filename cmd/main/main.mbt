@@ -7,48 +7,29 @@
 ///|
 async fn main raise {
   let config = @core.MysqlConfig::from_env()
-  // ② 基线增量（先于鉴权/模块装配——插件的 DDL 可能依赖框架的新列，
-  //   且清单必须在 Guard 前被读到）：__framework__ 从
-  //   MLDONG_MIGRATIONS_DIR（默认 doc/sql/migrations，相对启动 cwd）装载并应用；
-  //   失败 = 拒绝启动，消息含组名 + version + 驱动原文
-  let migrations_dir = match @env.get_env_var("MLDONG_MIGRATIONS_DIR") {
-    Some(v) => if v.is_empty() { "doc/sql/migrations" } else { v }
-    None => "doc/sql/migrations"
-  }
-  let fw_group = @host.framework_group(migrations_dir) catch {
-    e => {
-      // ⚠ wasm 档 abort 的消息不落日志（10-06 实测 run3：只有 RuntimeError 栈）——
-      //   拒绝启动的消息必须先 println 再 abort，否则"消息点名"判据测的是空气
-      println("[plugin-host][fatal] 基线增量装载失败: \{@core.MldongError::message(e)}")
-      abort("基线增量装载失败")
-    }
-  }
   // 官方插件注册表（第一插件 = jeeflow-moon；引擎 Facade 进程级一个）
+  // 装载器不带 schema 通道（10-09 拍 C）：插件表的 DDL 归 doc/sql/mysql-schema-all.sql，
+  // 与 13 栈同法；装卸 = 改 cmd/main/plugins.mbt 注册表 + 重编译 + 重启（MoonBit 无动态加载）。
   let plugins = registry()
-  let groups : Array[@host.MigrationGroup] = [fw_group]
-  for p in plugins {
-    groups.push(@host.descriptor_group(p.descriptor()))
-  }
-  @host.apply_all(config, groups) catch {
-    e => {
-      println("[plugin-host][fatal] 基线增量应用失败: \{@core.MldongError::message(e)}")
-      abort("基线增量应用失败")
-    }
-  }
-  // 三方对账 + 归属闸（合一现读，规则与消息见 plugin-host/reconcile.mbt）：
-  //   不一致 = 拒绝启动，消息点名缺/多的是哪一方、哪些表；
+  // 在册对账 + 归属闸（合一现读，规则与消息见 plugin-host/reconcile.mbt）：
+  //   不一致 = 拒绝启动，消息点名缺/多的是哪些表；
   //   契约前缀白名单（/wf/）= 官方契约插件与 13 栈同一 URL 契约
-  let mut fw_max = 0
-  for m in fw_group.migrations {
-    if m.version > fw_max {
-      fw_max = m.version
-    }
-  }
-  @host.load_check(config, plugins, fw_max, ["/wf/"]) catch {
+  // ⚠ wasm 档 abort 的消息不落日志（10-06 实测 run3：只有 RuntimeError 栈）——
+  //   拒绝启动的消息必须先 println 再 abort，否则"消息点名"判据测的是空气
+  @host.load_check(config, plugins, ["/wf/"]) catch {
     e => {
       println("[plugin-host][fatal] 装载校验失败: \{@core.MldongError::message(e)}")
       abort("装载校验失败")
     }
+  }
+  // 插件身份指纹（装载校验通过后一行一条）——镜像轮核对"应答确实来自这个代次这套插件"
+  // 的现读入口（旧法读 sys_plugin.plugin_version，那张台账表已随 schema 通道撤销）。
+  // 插件包不依赖装载器包，契约号直接取 plugin-api 的 SPEC_VERSION。
+  for p in plugins {
+    let d = p.descriptor()
+    println(
+      "[plugin-host] 插件 \{d.name} v\{d.plugin_version} spec=\{d.spec_version} tables=\{d.tables.length()}",
+    )
   }
   // 鉴权装配（熵依赖运行时，必须在 main 内构造）
   // token_prefix="Bearer"：对齐 mldong 接口契约（token-prefix 头约定 + vben5 发 "Bearer <token>"）
