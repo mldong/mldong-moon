@@ -172,7 +172,7 @@ pub fn jeeflow_descriptor() -> @api.PluginDescriptor {
   })
   {
     name: "jeeflow",
-    plugin_version: "0.1.35", // 引擎代次（mooncakes mldong/jeeflow-*，随版更新；与 moon.mod 的四处 pin 同批抬）
+    plugin_version: "0.1.36", // 引擎代次（mooncakes mldong/jeeflow-*，随版更新；与 moon.mod 的四处 pin 同批抬）
     spec_version: @api.SPEC_VERSION, // 契约号定义单点在 plugin-api（此前这里硬编码同一个数、装载器侧再写一份 = 双写漂移）
     requires: [],
     tables: [],
