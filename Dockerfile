@@ -24,15 +24,7 @@ COPY plugins plugins
 COPY modules modules
 COPY cmd cmd
 # 只编服务端（cmd/main）；cmd/gen 是开发工装，不进镜像构建图
-# 后一支是绕行：新版 moon 硬拒第三方发布物里的旧清单 moon.mod.json（本仓经校验库 moon_zod 传递引到），
-# 拒在装依赖那一步、与本仓代码无关；上游改回新格式后 find 零结果，这一支自动空转。
-RUN moon update \
-    && ( moon build --target native cmd/main \
-      || { find .mooncakes -name moon.mod.json 2>/dev/null | while read -r f; do \
-             echo "moon: migrating legacy manifest ${f%/moon.mod.json}"; \
-             ( cd "${f%/moon.mod.json}" && moon fmt >/dev/null ); \
-           done; \
-           moon build --target native cmd/main; } )
+RUN moon update && moon build --target native cmd/main
 
 # 产物动态定位（moon build 默认落 debug 目录；find 兜底），拷为固定路径
 RUN BIN=$(find _build -type f -name 'main*' -perm -u+x 2>/dev/null | head -1) \
