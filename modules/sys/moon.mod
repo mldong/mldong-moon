@@ -20,7 +20,7 @@ import {
   "mldong/moon-token@0.1.11",
   "mldong/moon-token-moonback@0.1.11",
   "mldong/moon-token-store@0.1.11",
-  "Betterlol/moon_zod@0.8.2",
+  "Betterlol/moon_zod@0.9.0",
   "moonbitstack/moondb@0.2.0",
   "moonbitstack/moonmysql@0.7.3",
   "moonbitlang/moonback@0.8.6",

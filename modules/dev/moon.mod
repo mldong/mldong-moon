@@ -23,6 +23,6 @@ import {
   "moonbitstack/moondb@0.2.0",
   "moonbitstack/moonmysql@0.7.3",
   "moonbitlang/moonback@0.8.6",
-  "Betterlol/moon_zod@0.8.2",
+  "Betterlol/moon_zod@0.9.0",
   "moonbitlang/async@0.22.4",
 }
