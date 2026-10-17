@@ -738,5 +738,15 @@ fn meta_from_ledger(
   for f in extras {
     meta.add_field(f)
   }
+  // 出口键形统一：台账/真列两档都落驼驼峰出口；
+  // 旧台账字段名若是全小写（如 companyname），按真列名归一次驼峰。
+  for f in meta.fields {
+    if f.name.to_lower() == f.name {
+      let camel = @core.to_camel_case(f.column_name)
+      if camel != f.column_name {
+        f.name = camel
+      }
+    }
+  }
   meta
 }
