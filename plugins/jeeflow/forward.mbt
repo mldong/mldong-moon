@@ -69,7 +69,7 @@ async fn ensure_engine_clock(repo : @jrepo.MysqlRepository) -> Unit {
 
 ///|
 fn wf_handler(
-  facade : @facade.Facade[@jrepo.MysqlRepository, @jrepo.MysqlRepository],
+  ctx : @spi.Ctx[@jrepo.MysqlRepository, @jrepo.MysqlRepository],
   repo : @jrepo.MysqlRepository,
   action : String,
 ) -> @mb.Handler {
@@ -86,9 +86,28 @@ fn wf_handler(
     }
     let principal = @web.ctx_of(request)
     args["operator"] = @jf.string_of(principal.login_id)
-    facade.flow(action, args) catch {
-      // flow 出口已转 {code,msg,data} 信封；残余 raise 属未预期形状（async 隐含 Error）
-      e => raise @core.MldongError::Internal("jeeflow flow 未预期异常: \{e}")
+    // audit8 R111：一请求一仓储实例＋动作级事务；ext 与主仓共用同一派生实例，事务覆盖两条腿。
+    let r = repo.new_request()
+    let f = @facade.Facade::make(ctx.for_request(r, r))
+    let original : Ref[Json] = Ref(@jf.empty_object())
+    let rollback = Ref(false)
+    try {
+      r.execute_in_tx(async fn(_rr) {
+        let out = f.flow(action, args)
+        original.val = out
+        if @jf.get_i64(out, "code").unwrap_or(0L) != 0L {
+          rollback.val = true
+          raise @jerr.Business("rollback")
+        }
+      })
+      original.val
+    } catch {
+      _ =>
+        if rollback.val {
+          original.val
+        } else {
+          raise @core.MldongError::Internal("jeeflow flow 事务失败")
+        }
     }
   })
 }
@@ -417,10 +436,9 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
   // 引擎传进来的 tableName 请求参数不参与选路，表名取自流程定义 relTableName（签名与
   // Ctx.biz_data_reader 逐字相同 ⇒ facade 的 bizData 出口与 issues/137 泄漏纪律都不动）
   let ectx6 = ectx5.with_biz_data_reader(biz_reader.as_biz_data_reader())
-  let facade = @facade.Facade::make(ectx6)
   // ⑤ 注册 /wf/{action} 路由（guard 链鉴权，权限码已在 policy 片段合入）
   for a in jeeflow_actions {
-    ctx.routes.route("POST", "/wf/\{a}", wf_handler(facade, repo, a))
+    ctx.routes.route("POST", "/wf/\{a}", wf_handler(ectx6, repo, a))
   }
   // 未知 action 兜底位：必须排在 47 条静态位**之后**注册（moonback Trie 先静态前缀后通配，
   // 顺序反了通配位会抢走真实 action 的命中）
