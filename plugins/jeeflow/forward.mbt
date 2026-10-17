@@ -410,6 +410,12 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
   )
   let persist_itc = @persist.PersistPostInterceptor::make_from_provider(meta_provider, table_writer)
   let _ = ectx5.register_interceptor(persist_itc.as_interceptor())
+  // audit8 R91 以及连门禁问题：流程 JSON 的 postInterceptors 声明用 java 类全名，
+  // 须按名注册；只挂恒挂数组时节点级声明会报「拦截器未注册」。
+  ectx5.register_named_interceptor(
+    "com.mldong.jeeflow.persist.interceptor.PersistPostInterceptor",
+    persist_itc.as_interceptor(),
+  )
   println("[jeeflow] persist 装配：后置拦截器 1 支（元数据＝dev_query 内省）+ bizData 读侧已注册")
   // bizData 回显交给引擎 MetaTableReader（java `readByProcessInstance` 同形）：先按
   // process_instance_id 取主表单行，再按元数据反序列化——JSON 档回解、EXPAND 还原成对象且
