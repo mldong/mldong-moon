@@ -421,10 +421,22 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
   // process_instance_id 取主表单行，再按元数据反序列化——JSON 档回解、EXPAND 还原成对象且
   // 展开列不重复平铺、ONE2ONE 组装对象、ONE2MANY 按外键取多行组装数组（spec/10 §6）。
   // 无台账 ⇒ 元数据＝真列一档 ⇒ 出口形状＝原样行（字段名＝列名），与 0.1.32 同形。
+  // 动态读面返回的行键是 camelCase，而引擎 MetaTableReader 的 strict 匹配按列名（snake_case）取数；
+  // 不回转会把每一列都当“元数据外列”再小写平铺一次（bizData 出口键变 companyname）。
+  let snake_keys = fn(m : Map[String, Json]) -> Map[String, Json] {
+    let out : Map[String, Json] = Map([])
+    for k, v in m {
+      let _ = out.set(@core.to_underscore(k), v)
+    }
+    out
+  }
   let biz_fns : @persist.DynamicTableReaderFns = {
     row_by_key: async fn(k) raise @jerr.JeeflowError {
       try {
-        dev.row_by_column(k.table, k.column, k.value)
+        match dev.row_by_column(k.table, k.column, k.value) {
+          Some(m) => Some(snake_keys(m))
+          None => None
+        }
       } catch {
         // 不外泄框架原文（引擎侧统一收口成「业务数据读取失败」+ 日志），这里只留一次显式失败点
         _ => raise @jerr.Internal("dev_query.row_by_column 业务数据读取失败")
@@ -432,7 +444,10 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
     },
     rows_by_key: async fn(k) raise @jerr.JeeflowError {
       try {
-        dev.rows_by_column(k.table, k.column, k.value)
+        let rows = dev.rows_by_column(k.table, k.column, k.value)
+        let out : Array[Map[String, Json]] = []
+        for r in rows { out.push(snake_keys(r)) }
+        out
       } catch {
         _ => raise @jerr.Internal("dev_query.rows_by_column 子表数据读取失败")
       }
