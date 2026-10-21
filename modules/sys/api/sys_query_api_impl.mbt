@@ -31,7 +31,7 @@ fn sys_ctx() -> @core.Ctx {
 }
 
 ///|
-fn user_detail_of(u : @entity.User, r : @entity.UserPageRow?) -> @api.SysUserDetail {
+fn user_detail_of(u : @entity.User, r : @entity.UserPageRow?) -> @papi.SysUserDetail {
   let dept_id = u.dept_id
   let mut dept_name : String? = None
   let mut dept_code : String? = None
@@ -67,13 +67,13 @@ fn user_detail_of(u : @entity.User, r : @entity.UserPageRow?) -> @api.SysUserDet
 }
 
 ///|
-pub extend SysQueryApiImpl with @api.SysQueryApi::{user_by_id, user_page, user_list, dept_by_id, dept_list, post_list, role_user_pairs}
+pub extend SysQueryApiImpl with @papi.SysQueryApi::{user_by_id, user_page, user_list, dept_by_id, dept_list, post_list, role_user_pairs}
 
 ///|
-pub impl @api.SysQueryApi for SysQueryApiImpl with fn user_by_id(
+pub impl @papi.SysQueryApi for SysQueryApiImpl with fn user_by_id(
   self,
   id : Int64,
-) -> @api.SysUserDetail? raise @core.MldongError {
+) -> @papi.SysUserDetail? raise @core.MldongError {
   let ctx = sys_ctx()
   // service 语义 = 不存在 raise NotFound；查询面契约 = 返回 None（catch 里包 Some 统一两臂类型）
   let u_opt : Option[@entity.User] = Some(self.user_svc.find_by_id(ctx, id)) catch {
@@ -87,10 +87,10 @@ pub impl @api.SysQueryApi for SysQueryApiImpl with fn user_by_id(
 }
 
 ///|
-pub impl @api.SysQueryApi for SysQueryApiImpl with fn user_page(
+pub impl @papi.SysQueryApi for SysQueryApiImpl with fn user_page(
   self,
-  q : @api.SysUserQuery,
-) -> @api.SysUserPage raise @core.MldongError {
+  q : @papi.SysUserQuery,
+) -> @papi.SysUserPage raise @core.MldongError {
   let ctx = sys_ctx()
   let req : @dto.UserPageReq = {
     page_num: q.page,
@@ -100,7 +100,7 @@ pub impl @api.SysQueryApi for SysQueryApiImpl with fn user_page(
     search_keys: "userName,realName",
   }
   let (total, rows) = self.user_svc.page(ctx, req)
-  let out : Array[@api.SysUserDetail] = []
+  let out : Array[@papi.SysUserDetail] = []
   for row in rows {
     out.push(user_detail_of(row.user, Some(row)))
   }
@@ -108,12 +108,12 @@ pub impl @api.SysQueryApi for SysQueryApiImpl with fn user_page(
 }
 
 ///|
-pub impl @api.SysQueryApi for SysQueryApiImpl with fn user_list(
+pub impl @papi.SysQueryApi for SysQueryApiImpl with fn user_list(
   self,
-) -> Array[@api.SysUserDetail] raise @core.MldongError {
+) -> Array[@papi.SysUserDetail] raise @core.MldongError {
   let ctx = sys_ctx()
   let users = self.user_svc.list_simple(ctx)
-  let out : Array[@api.SysUserDetail] = []
+  let out : Array[@papi.SysUserDetail] = []
   for u in users {
     out.push(user_detail_of(u, None))
   }
@@ -134,7 +134,7 @@ fn split_leader_ids(s : String) -> Array[String] {
 }
 
 ///|
-fn dept_detail_of(d : @entity.Dept) -> @api.SysDeptDetail {
+fn dept_detail_of(d : @entity.Dept) -> @papi.SysDeptDetail {
   {
     id: d.id,
     name: d.name,
@@ -147,10 +147,10 @@ fn dept_detail_of(d : @entity.Dept) -> @api.SysDeptDetail {
 }
 
 ///|
-pub impl @api.SysQueryApi for SysQueryApiImpl with fn dept_by_id(
+pub impl @papi.SysQueryApi for SysQueryApiImpl with fn dept_by_id(
   self,
   id : Int64,
-) -> @api.SysDeptDetail? raise @core.MldongError {
+) -> @papi.SysDeptDetail? raise @core.MldongError {
   let ctx = sys_ctx()
   let d_opt : Option[@entity.Dept] = Some(self.dept_svc.find_by_id(ctx, id)) catch {
     @core.NotFound(_) => None
@@ -163,12 +163,12 @@ pub impl @api.SysQueryApi for SysQueryApiImpl with fn dept_by_id(
 }
 
 ///|
-pub impl @api.SysQueryApi for SysQueryApiImpl with fn dept_list(
+pub impl @papi.SysQueryApi for SysQueryApiImpl with fn dept_list(
   self,
-) -> Array[@api.SysDeptDetail] raise @core.MldongError {
+) -> Array[@papi.SysDeptDetail] raise @core.MldongError {
   let ctx = sys_ctx()
   let depts = self.dept_svc.list_all(ctx)
-  let out : Array[@api.SysDeptDetail] = []
+  let out : Array[@papi.SysDeptDetail] = []
   for d in depts {
     out.push(dept_detail_of(d))
   }
@@ -176,12 +176,12 @@ pub impl @api.SysQueryApi for SysQueryApiImpl with fn dept_list(
 }
 
 ///|
-pub impl @api.SysQueryApi for SysQueryApiImpl with fn post_list(
+pub impl @papi.SysQueryApi for SysQueryApiImpl with fn post_list(
   self,
-) -> Array[@api.SysPostDetail] raise @core.MldongError {
+) -> Array[@papi.SysPostDetail] raise @core.MldongError {
   let ctx = sys_ctx()
   let (_, posts) = self.post_svc.page(ctx, @dto.PostPageReq::{ page_num: 1, page_size: 500, m: @core.where_(), keywords: "", search_keys: "" })
-  let out : Array[@api.SysPostDetail] = []
+  let out : Array[@papi.SysPostDetail] = []
   for p in posts {
     out.push({ id: p.id, name: p.name, code: p.code, sort: p.sort })
   }
@@ -189,11 +189,11 @@ pub impl @api.SysQueryApi for SysQueryApiImpl with fn post_list(
 }
 
 ///|
-pub impl @api.SysQueryApi for SysQueryApiImpl with fn role_user_pairs(
+pub impl @papi.SysQueryApi for SysQueryApiImpl with fn role_user_pairs(
   self,
-) -> Array[@api.SysRoleUser] raise @core.MldongError {
+) -> Array[@papi.SysRoleUser] raise @core.MldongError {
   let pairs = self.rbac_dao.role_user_pairs()
-  let out : Array[@api.SysRoleUser] = []
+  let out : Array[@papi.SysRoleUser] = []
   for p in pairs {
     out.push({ role_code: p.0, user_id: p.1.to_string() })
   }

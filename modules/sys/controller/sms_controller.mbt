@@ -83,7 +83,7 @@ pub fn[
     if phone.is_empty() || biz_type == 0 {
       raise @core.MldongError::InvalidParam("phone/bizType 不能为空")
     }
-    let rand = @random.Rand::new()
+    let rand = @random.Rand()
     let code = StringBuilder()
     for _ in 0..<6 {
       code.write_char(("0123456789".get_char(rand.int(limit=10)).unwrap_or('0')))

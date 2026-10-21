@@ -16,12 +16,12 @@ pub fn DevQueryApiImpl::make(config : @core.MysqlConfig) -> DevQueryApiImpl {
 }
 
 ///|
-pub impl @api.DevQueryApi for DevQueryApiImpl with fn table_columns(
+pub impl @papi.DevQueryApi for DevQueryApiImpl with fn table_columns(
   self,
   table : String,
-) -> Array[@api.DevColumnMeta] raise @core.MldongError {
+) -> Array[@papi.DevColumnMeta] raise @core.MldongError {
   let cols = self.dao.table_columns(table)
-  let out : Array[@api.DevColumnMeta] = []
+  let out : Array[@papi.DevColumnMeta] = []
   for name, dtype in cols {
     out.push({ name, data_type: dtype })
   }
@@ -29,7 +29,7 @@ pub impl @api.DevQueryApi for DevQueryApiImpl with fn table_columns(
 }
 
 ///|
-pub impl @api.DevQueryApi for DevQueryApiImpl with fn row_by_column(
+pub impl @papi.DevQueryApi for DevQueryApiImpl with fn row_by_column(
   self,
   table : String,
   column : String,
@@ -46,7 +46,7 @@ pub impl @api.DevQueryApi for DevQueryApiImpl with fn row_by_column(
 }
 
 ///|
-pub impl @api.DevQueryApi for DevQueryApiImpl with fn rows_by_column(
+pub impl @papi.DevQueryApi for DevQueryApiImpl with fn rows_by_column(
   self,
   table : String,
   column : String,
@@ -63,11 +63,11 @@ pub impl @api.DevQueryApi for DevQueryApiImpl with fn rows_by_column(
 }
 
 ///|
-pub impl @api.DevQueryApi for DevQueryApiImpl with fn field_semantics(
+pub impl @papi.DevQueryApi for DevQueryApiImpl with fn field_semantics(
   self,
   table : String,
-) -> Array[@api.DevFieldSemantic] raise @core.MldongError {
-  let out : Array[@api.DevFieldSemantic] = []
+) -> Array[@papi.DevFieldSemantic] raise @core.MldongError {
+  let out : Array[@papi.DevFieldSemantic] = []
   for (field_name, data_type, variable) in self.dao.schema_field_semantics(table) {
     out.push({ field_name, data_type, variable })
   }
@@ -75,6 +75,6 @@ pub impl @api.DevQueryApi for DevQueryApiImpl with fn field_semantics(
 }
 
 ///|
-pub extend DevQueryApiImpl with @api.DevQueryApi::{
+pub extend DevQueryApiImpl with @papi.DevQueryApi::{
   field_semantics, row_by_column, rows_by_column, table_columns,
 }

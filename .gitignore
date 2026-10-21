@@ -4,3 +4,5 @@ _build/
 *.core
 gen-out/
 uploadfiles/
+# 新工具链 check/test 在包目录生成，不跟踪
+pkg.generated.mbti

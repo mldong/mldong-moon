@@ -17,8 +17,8 @@ mldong 快速开发框架的 **MoonBit 语言实现**（第 14 栈），与 mldo
 |---|---|---|
 | 语言 | MoonBit（moon 0.1.x + moonc v0.10.x） | 目标档位 wasm（moonrun 执行）；native 档待 CI 接入后验证 |
 | Web | [moonback](https://github.com/moonbitlang/moonback) 0.8.6 | 路由/中间件/请求响应 |
-| 权限认证 | [mldong/moon-token](https://github.com/mldong/moon-token) 0.1.10 | 登录态/会话/RBAC 标准件（逐路由守卫 + 供数端口 + extra 会话属性） |
-| 表单校验 | [moon_zod](https://github.com/Betterlol/moon_zod) 0.8.2 | strip 模式（未声明字段丢弃） |
+| 权限认证 | [mldong/moon-token](https://github.com/mldong/moon-token) 0.1.14 | 登录态/会话/RBAC 标准件（逐路由守卫 + 供数端口 + extra 会话属性） |
+| 表单校验 | [moon_zod](https://github.com/Betterlol/moon_zod) 0.9.0 | strip 模式（未声明字段丢弃） |
 | 数据库 | MySQL 5.7+，[moondb + moonmysql](https://github.com/moonbitstack/moonorm)（moonbitstack/moonorm monorepo）0.2/0.7.3 | 手写 SQL（六件套分层，见 [doc/layering.md](doc/layering.md)） |
 
 ## 快速开始

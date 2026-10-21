@@ -19,9 +19,9 @@ fn msg_sys_ctx() -> @core.Ctx {
 }
 
 ///|
-pub impl @api.PluginMessageApi for SysMessageApiImpl with fn send(
+pub impl @papi.PluginMessageApi for SysMessageApiImpl with fn send(
   self,
-  input : @api.SysMessageInput,
+  input : @papi.SysMessageInput,
 ) -> Unit raise @core.MldongError {
   let req : @dto.MessageSaveReq = {
     id: 0L,
@@ -41,4 +41,4 @@ pub impl @api.PluginMessageApi for SysMessageApiImpl with fn send(
 }
 
 ///|
-pub extend SysMessageApiImpl with @api.PluginMessageApi::{send}
+pub extend SysMessageApiImpl with @papi.PluginMessageApi::{send}

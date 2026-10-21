@@ -47,11 +47,14 @@ impl RbacService for StubRbac with fn perm_codes(self, user_id, app_code) {
 struct FixedPerms {}
 
 ///|
-/// 把可能抛错的调用收进 Result（负向断言用；成功分支断 false 即失败）
-async fn[T] as_result(f : async () -> T raise @core.MldongError) -> Result[T, @core.MldongError] {
-  // Result 必须从此处逃逸（返回值），手工 Ok/Err 包装是文档允许的形态
-  let saved : Result[T, @core.MldongError] = Ok(f()) catch { e => Err(e) }
-  saved
+/// 负向断言用：把抛错调用的错误消息收成 `Some`，成功给 `None`
+async fn[T] error_of(f : async () -> T raise @core.MldongError) -> String? {
+  try {
+    let _ = f()
+    None
+  } catch {
+    e => Some(e.message())
+  }
 }
 
 ///|
@@ -107,13 +110,13 @@ async test "A1 login_by_password 正向：凭证编排 + 签会话" {
 async test "A2 login_by_password 错密与不存在同话术（防枚举）" {
   let auth = make_auth()
   let rbac = make_rbac([make_user(1L, "alice")])
-  match as_result(async fn() raise @core.MldongError { login_by_password(auth, rbac, "alice", "wrong", []) }) {
-    Err(e) => assert_eq(e.message(), "用户名或密码错误")
-    Ok(_) => assert_true(false)
+  match error_of(async fn() raise @core.MldongError { login_by_password(auth, rbac, "alice", "wrong", []) }) {
+    Some(msg) => assert_eq(msg, "用户名或密码错误")
+    None => assert_true(false)
   }
-  match as_result(async fn() raise @core.MldongError { login_by_password(auth, rbac, "ghost", "pw123", []) }) {
-    Err(e) => assert_eq(e.message(), "用户名或密码错误")
-    Ok(_) => assert_true(false)
+  match error_of(async fn() raise @core.MldongError { login_by_password(auth, rbac, "ghost", "pw123", []) }) {
+    Some(msg) => assert_eq(msg, "用户名或密码错误")
+    None => assert_true(false)
   }
 }
 
@@ -121,9 +124,9 @@ async test "A2 login_by_password 错密与不存在同话术（防枚举）" {
 async test "A3 login_by_password 锁定拒绝" {
   let auth = make_auth()
   let rbac = make_rbac([make_user(1L, "bob", locked=true)])
-  match as_result(async fn() raise @core.MldongError { login_by_password(auth, rbac, "bob", "pw123", []) }) {
-    Err(e) => assert_eq(e.message(), "用户已锁定")
-    Ok(_) => assert_true(false)
+  match error_of(async fn() raise @core.MldongError { login_by_password(auth, rbac, "bob", "pw123", []) }) {
+    Some(msg) => assert_eq(msg, "用户已锁定")
+    None => assert_true(false)
   }
 }
 
@@ -135,9 +138,9 @@ async test "A4 play 超管守卫：非超管不能扮演超管" {
     make_user(2L, "boss", super_admin=true),
   ])
   let op = login_by_password(auth, rbac, "op", "pw123", [])
-  match as_result(async fn() raise @core.MldongError { play(auth, rbac, "1", op.token, false, 2L, []) }) {
-    Err(e) => assert_eq(e.message(), "非超级管理员不能扮演超级管理员")
-    Ok(_) => assert_true(false)
+  match error_of(async fn() raise @core.MldongError { play(auth, rbac, "1", op.token, false, 2L, []) }) {
+    Some(msg) => assert_eq(msg, "非超级管理员不能扮演超级管理员")
+    None => assert_true(false)
   }
 }
 
@@ -198,9 +201,9 @@ async test "A7 unplay 非扮演会话拒绝" {
   let auth = make_auth()
   let rbac = make_rbac([make_user(1L, "op")])
   let op = login_by_password(auth, rbac, "op", "pw123", [])
-  match as_result(async fn() raise @core.MldongError { unplay(auth, op.token) }) {
-    Err(e) => assert_eq(e.message(), "当前会话不是扮演会话")
-    Ok(_) => assert_true(false)
+  match error_of(async fn() raise @core.MldongError { unplay(auth, op.token) }) {
+    Some(msg) => assert_eq(msg, "当前会话不是扮演会话")
+    None => assert_true(false)
   }
 }
 

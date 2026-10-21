@@ -18,7 +18,7 @@ pub fn md5_hex(s : String) -> String {
 /// 8 位盐：小写字母 + 数字（boot2 同字母表）
 pub fn random_salt() -> String {
   let charset = "abcdefghijklmnopqrstuvwxyz0123456789"
-  let rand = @random.Rand::new()
+  let rand = @random.Rand()
   let buf = StringBuilder()
   for _ in 0..<8 {
     let idx = rand.int(limit=charset.length())

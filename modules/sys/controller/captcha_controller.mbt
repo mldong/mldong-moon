@@ -125,7 +125,7 @@ fn padded_hex(v : Int, width : Int) -> String {
 ///|
 /// 生成验证码：随机 4 字符 + uuid 键入存（TTL 10 分钟）→ {uuid, base64}
 fn create_captcha() -> (String, String) {
-  let rand = @random.Rand::new()
+  let rand = @random.Rand()
   let now = @core.epoch_millis()
   // 顺手清过期（量小，全量扫足够）
   let expired : Array[String] = []
