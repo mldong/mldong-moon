@@ -7,7 +7,7 @@ mldong 快速开发框架的 **MoonBit 语言实现**（第 14 栈），与 mldo
 - **全链管理面**：用户/角色/部门/岗位/配置/字典/菜单七大全链 CRUD + 授权（角色-菜单、用户-角色、数据范围）、锁定/踢人下线、扮演登录、图形验证码、在线用户
 - **低代码底座**：通用下拉 `/{module}/{table}/select` + 动态表网关 + 代码生成器（读活库元数据产 CRUD 六件套源码）
 - **配套能力**：站内信（多端隔离 + SSE 实时推送）、文件上传、操作/访问日志、短信（模板渲染）、定时任务、任务队列/历史
-- **工程化**：黑盒 e2e 回归矩阵（真库 370 用例）+ 家族契约 runner（16 组）+ 雪花 ID 全链字符串化（防 JS 精度丢失）
+- **工程化**：黑盒 e2e 回归矩阵（真库全量用例）+ 家族契约 runner（16 组）+ 雪花 ID 全链字符串化（防 JS 精度丢失）
 
 > 定位说明：本仓同时是 mldong 家族代码生成器的**模板骨架**——新增表/模块的写法以 `modules/sys` 为准。
 
@@ -18,12 +18,13 @@ mldong 快速开发框架的 **MoonBit 语言实现**（第 14 栈），与 mldo
 | 语言 | MoonBit（moon 0.1.x + moonc v0.10.x） | 目标档位 wasm（moonrun 执行）；native 档待 CI 接入后验证 |
 | Web | [moonback](https://github.com/moonbitlang/moonback) 0.8.6 | 路由/中间件/请求响应 |
 | 权限认证 | [mldong/moon-token](https://github.com/mldong/moon-token) 0.1.14 | 登录态/会话/RBAC 标准件（逐路由守卫 + 供数端口 + extra 会话属性） |
+| 会话存储 | [mldong/moon-token-store-redis](https://github.com/mldong/moon-token) 0.1.14 | Redis 5.0+；登录态跨进程/重启共享（`MLDONG_REDIS_*`） |
 | 表单校验 | [moon_zod](https://github.com/Betterlol/moon_zod) 0.9.0 | strip 模式（未声明字段丢弃） |
 | 数据库 | MySQL 5.7+，[moondb + moonmysql](https://github.com/moonbitstack/moonorm)（moonbitstack/moonorm monorepo）0.2/0.7.3 | 手写 SQL（六件套分层，见 [doc/layering.md](doc/layering.md)） |
 
 ## 快速开始
 
-**环境要求**：Git Bash（Windows）或 bash；MySQL 5.7+；[MoonBit 工具链](https://docs.moonbitlang.com)（官方安装：PowerShell 执行 `irm https://cli.moonbitlang.com/install/powershell.ps1 | iex`，Linux/macOS 用官网 unix 脚本；本机便携装于 `G:\dev-tools\moon` 时见下方备注）。
+**环境要求**：Git Bash（Windows）或 bash；MySQL 5.7+；Redis 5.0+（会话仓）；[MoonBit 工具链](https://docs.moonbitlang.com)（官方安装：PowerShell 执行 `irm https://cli.moonbitlang.com/install/powershell.ps1 | iex`，Linux/macOS 用官网 unix 脚本；本机便携装于 `G:\dev-tools\moon` 时见下方备注）。
 
 ```bash
 # 1. 工具链（官方安装脚本会配好环境；本机便携装则手动：
@@ -36,6 +37,8 @@ mysql -u root -p --default-character-set=utf8mb4 < doc/sql/mysql-schema-all.sql
 # 3. 配置（密码必须走环境变量，默认值不含密码）
 export MLDONG_DB_HOST=127.0.0.1 MLDONG_DB_PORT=3306
 export MLDONG_DB_USER=root MLDONG_DB_PWD=<密码> MLDONG_DB_NAME=mldong-moon
+export MLDONG_REDIS_HOST=127.0.0.1 MLDONG_REDIS_PORT=6379
+export MLDONG_REDIS_DB=0 MLDONG_REDIS_PWD=<密码或留空>
 
 # 4. 启动（默认 127.0.0.1:18680）
 moon run --target wasm cmd/main
@@ -55,7 +58,7 @@ curl -s -X POST http://127.0.0.1:18680/sys/user/page \
   -H "Authorization: Bearer <token>" -H 'Content-Type: application/json' \
   -d '{"pageNum":1,"pageSize":10}'
 
-# 类型检查 / 回归矩阵（十六套 370 用例，真库）
+# 类型检查 / 回归矩阵（十六套全量用例，真库 + Redis）
 moon check
 BASE=http://127.0.0.1:18680 bash e2e/run.sh
 ```
@@ -105,7 +108,7 @@ export MLDONG_DB_* && moon run --target wasm cmd/gen/main -- <表名>...
 - [ ] 登录/登出写 vis_log 行（boot2 切面语义等价物）
 - [ ] 短信真通道（provider SPI；现为 mock 渲染直落日志）
 - [ ] 事务模板（环境连接 + 嵌套复用；现为 grant 局部事务）
-- [ ] 会话存储文件/Redis 后端（moon-token 端口已预留）
+- [x] 会话存储 Redis 后端（moon-token-store-redis，多实例/重启共享）
 - [ ] `rainbow` 分页导航补齐
 - [ ] CI：GitHub Actions（wasm + native 双档）
 

@@ -12,7 +12,8 @@ mldong-moon 是 mldong 快速开发框架的 **MoonBit 语言实现**，与 mldo
 （见 [doc/adding-module.md](doc/adding-module.md)），写法漂移会让生成器模板失真。
 
 公开开源仓（GitHub `mldong/mldong-moon`，Apache-2.0）。**任何密钥/密码不得入仓**：
-数据库凭据只走 `MLDONG_DB_*` 环境变量，`core/mysql_config.mbt` 的默认值不含密码（红线）。
+数据库凭据只走 `MLDONG_DB_*` 环境变量，`core/mysql_config.mbt` 的默认值不含密码（红线）；
+会话仓的 Redis 凭据同规矩，只走 `MLDONG_REDIS_*`（`core/redis_config.mbt`）。
 
 ## 2. 仓库结构
 
@@ -33,7 +34,8 @@ mldong-moon/
 │   ├── password.mbt    #   md5(密码+盐) + 随机盐（登录密文校验）
 │   ├── op.mbt          #   SqlValue 构造（S/I/L/D/B/N）
 │   ├── enum_dict.mbt    #   枚举字典注册中心（框架件：IntVal/int_dict + DictModel/Registry，各模块装配期灌自己的声明；sys 样板 modules/sys/enums/ 逐枚举一文件）
-│   └── mysql_config.mbt #   MysqlConfig::from_env（MLDONG_DB_*）
+│   ├── mysql_config.mbt #   MysqlConfig::from_env（MLDONG_DB_*）
+│   └── redis_config.mbt #   RedisConfig::from_env（MLDONG_REDIS_*，会话仓）
 ├── core-web/            # mldong/moon-core-web —— moonback 适配层（全工程 web 依赖唯一收口）
 │   ├── common.mbt       #   wrap（统一错误转信封）+ json_body
 │   └── guard.mbt        #   merge_policy / on_error（鉴权失败恒 200+99990403 信封）/ token_of（剥 Bearer）
@@ -47,7 +49,7 @@ mldong-moon/
 ├── modules/app/         # mldong/moon-app —— APP 检查升级（免登录 UC-0610；校验失败 99999999 = core InvalidParam 新档；薄模块仅 controller）
 ├── cmd/main/            # 装配入口：鉴权 + 模块挂载 + listen :18680
 ├── cmd/gen/             # 代码生成器（读 MetadataDao 产六件套，gen-out/ 不入仓）
-├── e2e/                 # 黑盒回归矩阵（run.sh 总入口，十六套 370 用例，真库）
+├── e2e/                 # 黑盒回归矩阵（run.sh 总入口，十六套全量用例，真库+Redis）
 └── doc/                 # 深入文档（AI 上手按序读）
     ├── layering.md      #   分层规范（六件套、依赖规则、BaseDao、sqlbuilder、m_）
     ├── permissions.md   #   权限鉴权（moon-token 集成、RBAC 链、appCode）
@@ -68,17 +70,19 @@ moon check                     # 类型检查（0 errors 为绿；warnings 已�
 moon run --target wasm cmd/main  # 起服务，默认 127.0.0.1:18680
 ```
 
-启动前设库凭据（**默认值不含密码，密码必须走 env**）：
+启动前设库凭据（**默认值不含密码，密码必须走 env**）；会话仓用 Redis 5.0+：
 
 ```bash
 export MLDONG_DB_HOST=127.0.0.1 MLDONG_DB_PORT=3306
 export MLDONG_DB_USER=root MLDONG_DB_PWD=<密码> MLDONG_DB_NAME=mldong-moon
+export MLDONG_REDIS_HOST=127.0.0.1 MLDONG_REDIS_PORT=6379
+export MLDONG_REDIS_DB=0 MLDONG_REDIS_PWD=<密码或留空>
 ```
 
 首次建库：`mysql -u root -p --default-character-set=utf8mb4 < doc/sql/mysql-schema-all.sql`
 （一条命令：建库 + 全表 + 种子；utf8mb4 防中文注释乱码——会被 gen 读进生成物）。
 
-回归（服务起后，真库黑盒矩阵，十六套 370 用例）：
+回归（服务起后，真库黑盒矩阵，十六套全量用例）：
 
 ```bash
 BASE=http://127.0.0.1:18680 bash e2e/run.sh   # 汇总 "总计: OK n FAIL 0" 为绿
@@ -128,12 +132,16 @@ curl -s -X POST http://127.0.0.1:18680/sys/user/page \
 - **MySQL `--` 注释后必须跟空格**；sys_role 建表语句是单空格排版，写 SQL 对比扫描器时注意 `\s+`。
 - **TokenAuth 必须在 main 内构造**（不能顶层 `let`）：wasm 档顶层 let 在 `__moonbit_init` 阶段
   求值，那时平台熵未就绪，`opaque_style()` 当场 abort（cmd/main/main.mbt 头注同款警告）。
+- **会话仓 = moon-token RedisStore**（`moon-token-store-redis`，10-22 起）：登录态跨进程/重启共享；
+  Redis 5.0+ 为启动硬依赖，连不上先 `println` 再 `abort`（wasm 档 abort 不落日志）。
+  键布局 `{realm}:T:/A:/Z:/R:` 由 moon-token 定义，别在本仓另造会话键。
 - **豁免面端点手取 token 必须用 `@web.token_of`**（剥 `Bearer ` 前缀 + cookie 兜底），
   否则拿到带前缀的串查不到会话，logout 幂等不报错、静默失效（已踩）。
 - **模块包别名速查**（moon.pkg）：`@core`=moon-core、`@web`=moon-core-web、
   `@mb`=moonback、`@mbguard`=moon-token-moonback/guard、`@app`=moon-token/app、
   `@guard`=moon-token/guard、`@port`=moon-token-store/port、`@style`=moon-token/style、
-  `@mem`=moon-token-store/memory；模块内 `@entity/@dto/@dao/@repo/@svc/@ctrl` 指 moon-sys 子包。
+  `@mem`=moon-token-store/memory（仅单测）、`@redis_store`=moon-token-store-redis/redis（main 会话仓）；
+  模块内 `@entity/@dto/@dao/@repo/@svc/@ctrl` 指 moon-sys 子包。
 - **审计四件套**（create_time/create_user/update_time/update_user）：时间由 service/codec
   填；**操作人走框架 Ctx**——`core/ctx.mbt`（goframe ctx 显式第一参同位）：controller
   `@web.ctx_of(request)` 从登录主体装配 → **service 全方法第一参 `ctx : @core.Ctx`** →

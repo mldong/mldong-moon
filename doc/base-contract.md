@@ -1,6 +1,6 @@
 # base-verify 契约跑测 · 差异清单（2026-10-03 首轮）
 
-> 跑批报告：**`base-verify/reports/2026-10-07-moon-l3-first-run.md`（10-07 首轮 L3＝vben5 前端 Playwright 全 40 格，首跑 12/40 → 修 13 处偏差后 39/40 → 同日补齐分片四件套后 **40/40 全绿**）**；L2 同日全量复跑 `base-verify/reports/` 侧读数 16/16（带 `--with-writes --with-file-upload --no-redis`——moon 用 moon-token 内存仓，Redis 腿不适用）；上一代 L2：**`base-verify/reports/2026-10-05-moon-batch12-l2.json`（sys/dev 按需增补轮 16/16 全绿保持）**；历史：`base-verify/reports/2026-10-04-moon-dict-l2.{json,txt}`（字典轮 10/16）、`base-verify/reports/2026-10-04-moon-menu-l2.{json,txt}`（菜单轮 11/16）、`base-verify/reports/2026-10-04-moon-menu2-l2.json`（菜单缺口补齐轮 11/16 无回归）、`base-verify/reports/2026-10-05-moon-dev-l2.json`（dev 台账轮 **12/16**，UC-0303/0306/0310 收口）、`base-verify/reports/2026-10-05-moon-final-l2.json`（**收口轮 16/16 全绿**：message/fileInfo/appversion/sse 四模块落地——base 首批契约全部收口）。boot2 全量 12 端点已对齐（syncRoute 无 base 契约，仓内 e2e 隔离域覆盖）；dev 模块 boot2 22 端点已对齐（无 base 契约的进仓内 e2e matrix_dev 55 例）。
+> 跑批报告：**`base-verify/reports/2026-10-07-moon-l3-first-run.md`（10-07 首轮 L3＝vben5 前端 Playwright 全 40 格，首跑 12/40 → 修 13 处偏差后 39/40 → 同日补齐分片四件套后 **40/40 全绿**）**；L2 同日全量复跑 `base-verify/reports/` 侧读数 16/16（带 `--with-writes --with-file-upload --no-redis`——当时 moon 用 moon-token 内存仓；**10-22 起会话仓改为 Redis，复跑不再带 `--no-redis`，UC-0113 的 access 过期分支真跑**）；上一代 L2：**`base-verify/reports/2026-10-05-moon-batch12-l2.json`（sys/dev 按需增补轮 16/16 全绿保持）**；历史：`base-verify/reports/2026-10-04-moon-dict-l2.{json,txt}`（字典轮 10/16）、`base-verify/reports/2026-10-04-moon-menu-l2.{json,txt}`（菜单轮 11/16）、`base-verify/reports/2026-10-04-moon-menu2-l2.json`（菜单缺口补齐轮 11/16 无回归）、`base-verify/reports/2026-10-05-moon-dev-l2.json`（dev 台账轮 **12/16**，UC-0303/0306/0310 收口）、`base-verify/reports/2026-10-05-moon-final-l2.json`（**收口轮 16/16 全绿**：message/fileInfo/appversion/sse 四模块落地——base 首批契约全部收口）。boot2 全量 12 端点已对齐（syncRoute 无 base 契约，仓内 e2e 隔离域覆盖）；dev 模块 boot2 22 端点已对齐（无 base 契约的进仓内 e2e matrix_dev 55 例）。
 >
 > 用途：对照家族 base 契约 runner（协调仓 `scripts/contract-tests/contract_runner.py`，语言无关纯 HTTP）
 > 逐组给出 mldong-moon 的现状——**已存在端点的契约比对结论 + 未存在端点的按模块清单**。
@@ -11,12 +11,14 @@
 ```bash
 # 起服务（另窗口）
 export MLDONG_DB_HOST=... MLDONG_DB_PWD=... MLDONG_DB_NAME=mldong-moon
+export MLDONG_REDIS_HOST=... MLDONG_REDIS_PORT=... MLDONG_REDIS_DB=... MLDONG_REDIS_PWD=...
 moon run --target wasm cmd/main     # 默认 127.0.0.1:18680
 
-# 契约 runner（协调仓根；16 组用例全量覆盖）
+# 契约 runner（协调仓根；16 组用例全量覆盖）——redis 参数指向会话仓所在库
 python scripts/contract-tests/contract_runner.py \
   --base-url http://127.0.0.1:18680 --user-name superAdmin --password 123456 \
-  --no-redis --with-writes --with-file-upload \
+  --redis-host <Redis 地址> --redis-port 6379 --redis-db <会话库索引> --redis-password <密码> \
+  --with-writes --with-file-upload \
   --report base-verify/reports/2026-10-03-moon-l2.json
 ```
 

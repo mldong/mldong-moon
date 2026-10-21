@@ -1,5 +1,6 @@
 // mldong-moon 装配入口 —— 鉴权（moon-token）+ 模块自注册（每模块一行）
-// 起法：export MLDONG_DB_PWD=... && moon run --target wasm cmd/main   （默认 127.0.0.1:18680）
+// 起法：export MLDONG_DB_PWD=... MLDONG_REDIS_PWD=... && moon run --target wasm cmd/main
+//       （默认 127.0.0.1:18680；会话仓走 Redis，见 MLDONG_REDIS_* 配置）
 //
 // ⚠ TokenAuth 必须在 main 内构造（不能顶层 let）：wasm 档顶层 let 在 __moonbit_init 阶段
 //   求值，那时平台熵未装好，opaque_style() 当场 abort（wasm 档真机实测）。
@@ -36,10 +37,27 @@ async fn main raise {
   // 供数方 = sys 模块的 RBAC 真实现（码链走库：user_role → role_menu → menu.code）
   let token_cfg = @app.TokenConfig::default()
   token_cfg.token_prefix = "Bearer"
+  // 会话仓 = moon-token RedisStore：多实例/重启共享登录态（内存版只服务单进程）
+  let redis_cfg = @core.RedisConfig::from_env()
+  let session_store = @redis_store.RedisStore::open(
+    "user",
+    redis_cfg.host,
+    port=redis_cfg.port,
+    password=redis_cfg.password,
+    db=redis_cfg.db,
+  ) catch {
+    e => {
+      // wasm 档 abort 消息不落日志，先 println 再 abort（同装载校验处口径）
+      println(
+        "[auth][fatal] 会话仓 Redis 连接失败 \{redis_cfg.host}:\{redis_cfg.port.to_string()} db=\{redis_cfg.db.to_string()}: \{e.message()}",
+      )
+      abort("会话仓 Redis 连接失败")
+    }
+  }
   let auth = @app.TokenAuth::new(
     "user",
     token_cfg,
-    @mem.MemoryStore::new("user"),
+    session_store,
     @sys.rbac_provider(config),
     @style.opaque_style(),
   )

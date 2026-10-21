@@ -9,7 +9,7 @@
 | moon-token 侧 | 本仓接点 |
 |---|---|
 | `app.TokenAuth`（登录/注销/鉴权/rotate 引擎） | `cmd/main` 构造，泛型 `[TokenStore, PermissionProvider]` |
-| `store/memory.MemoryStore`（当前会话存储） | `cmd/main` 注入；文件/Redis 后端等第三方驱动稳定后切换 |
+| `store-redis.RedisStore`（当前会话存储） | `cmd/main` 注入（`MLDONG_REDIS_*`）；多实例/重启共享登录态 |
 | `store/port.PermissionProvider`（供数端口：码/角色/超管三问） | `modules/sys/service/rbac_service.mbt` 的 `RbacServiceImpl` 真实现（查库） |
 | `guard.RoutePolicy` + `Guard`（逐路由守卫） | 各 controller `policy()` 片段 → 模块聚合 → main 合并 |
 | `moon-token-moonback/guard`（moonback 适配） | `core-web` 的 `on_error`（失败信封）；controller 的 `g.post` 注册 |
@@ -37,8 +37,10 @@
 ```moonbit
 let token_cfg = @app.TokenConfig::default()
 token_cfg.token_prefix = "Bearer"                       // 对齐 mldong 框架约定（token-prefix 头约定 + vben5）
-let auth = @app.TokenAuth::new("user", token_cfg,
-  @mem.MemoryStore::new("user"),
+let rc = @core.RedisConfig::from_env()                   // MLDONG_REDIS_*
+let store = @redis_store.RedisStore::open("user", rc.host,
+  port=rc.port, password=rc.password, db=rc.db)          // 连不上即启动失败
+let auth = @app.TokenAuth::new("user", token_cfg, store,
   @sys.rbac_provider(config),                            // 供数方 = RBAC 真实现
   @style.opaque_style())
 // 总策略 = 全局豁免面 + 各模块片段聚合
@@ -182,4 +184,4 @@ RR7 登出后其 refresh 联动失效 99990410（moon-token logout 单一漏斗�
 
 ## 8. 已知 TODO
 
-- 会话存储切换文件/Redis 后端（moon-token 端口已预留，等第三方驱动库稳定）。
+- 会话存储文件后端（moon-token `store-file`，可选；当前部署统一用 Redis，未接）。
