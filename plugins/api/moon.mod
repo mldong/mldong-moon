@@ -14,6 +14,6 @@ description = "mldong-moon 插件声明 API（descriptor v0）——装载器与
 
 import {
   "mldong/moon-core@0.1.0",
-  "moonbitlang/moonback@0.8.6",
+  "moonbitlang/moonback@0.8.9",
   "moonbitstack/moondb@0.2.0",
 }

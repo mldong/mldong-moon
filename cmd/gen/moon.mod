@@ -17,5 +17,5 @@ description = "mldong-moon 代码生成器：读活库元数据（MetadataDao）
 import {
   "mldong/moon-core@0.1.0",
   "mldong/moon-dev@0.1.0",
-  "moonbitlang/async@0.22.4",
+  "moonbitlang/async@0.22.5",
 }
