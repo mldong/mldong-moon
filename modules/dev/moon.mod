@@ -17,9 +17,9 @@ description = "mldong-moon 开发工具模块（dev）：库元数据（gen 代�
 import {
   "mldong/moon-core@0.1.0",
   "mldong/moon-core-web@0.1.0",
-  "mldong/moon-token@0.1.19",
-  "mldong/moon-token-moonback@0.1.19",
-  "mldong/moon-token-store@0.1.19",
+  "mldong/moon-token@0.1.20",
+  "mldong/moon-token-moonback@0.1.20",
+  "mldong/moon-token-store@0.1.20",
   "moonbitstack/moondb@0.2.5",
   "moonbitstack/moonmysql@0.7.8",
   "moonbitlang/moonback@0.8.10",

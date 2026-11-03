@@ -17,9 +17,9 @@ description = "mldong-moon 系统管理模块（sys）：user 增删改查骨架
 import {
   "mldong/moon-core@0.1.0",
   "mldong/moon-core-web@0.1.0",
-  "mldong/moon-token@0.1.19",
-  "mldong/moon-token-moonback@0.1.19",
-  "mldong/moon-token-store@0.1.19",
+  "mldong/moon-token@0.1.20",
+  "mldong/moon-token-moonback@0.1.20",
+  "mldong/moon-token-store@0.1.20",
   "Betterlol/moon_zod@0.10.0",
   "moonbitstack/moondb@0.2.5",
   "moonbitstack/moonmysql@0.7.8",
