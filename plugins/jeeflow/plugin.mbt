@@ -48,6 +48,8 @@ pub let jeeflow_actions : Array[String] = [
   "processTask/transfer",
   "processTask/removeTaskActor",
   "processTask/latest",
+  "processTask/recall",
+  "processTask/revokeDynamicCountersign",
   "processDesign/page",
   "processDesign/detail",
   "processDesign/save",
@@ -125,6 +127,10 @@ let or_rules : Array[(String, Array[String])] = [
   ),
   ("processTask/candidatePage", ["wf:processTask:execute", "wf:processTask:candidatePage"]),
   ("processTask/jumpAbleTaskNameList", ["wf:processTask:execute"]),
+  // issues/246／247 两枚新 action 的粒度定 B 案（11-04 owner 拍）：复用 `wf:processTask:execute`，
+  // 不建 `sys_menu` 按钮种子——与 java 引擎 `DefaultActionPermissionProvider.orRules`（v1.8.60）同源。
+  ("processTask/recall", ["wf:processTask:execute"]),
+  ("processTask/revokeDynamicCountersign", ["wf:processTask:execute"]),
 ]
 
 ///|
@@ -145,7 +151,7 @@ pub fn perm_codes_of(action : String) -> (Array[String], Bool) {
 }
 
 ///|
-/// descriptor —— 47 条 POST /wf/{action} 路由逐条显式权限码（主仓全显式语义不动）+ 一条
+/// descriptor —— `jeeflow_actions` 每条 POST /wf/{action} 逐条显式权限码（主仓全显式语义不动）+ 一条
 /// `/wf/*rest` 兜底（**仅登录、不配权限码**：它只回"未知 action"信封，不经引擎，故不给任何真实
 /// 能力开门——13 栈的动态转发把未知 action 交给引擎答，moon 的显式面把"未声明即无此能力"看得更重，
 /// 两种姿势的信封结论一致：code=99999999 且 msg 含「未知」）；
@@ -162,7 +168,7 @@ pub fn jeeflow_descriptor() -> @api.PluginDescriptor {
       public: false,
     })
   }
-  // 兜底位必须排在 47 条静态位**之后**注册（moonback Trie：先静态前缀后通配，反了会抢命中）
+  // 兜底位必须排在全部 action 静态位**之后**注册（moonback Trie：先静态前缀后通配，反了会抢命中）
   routes.push({
     http_method: "POST",
     path: "/wf/*rest",

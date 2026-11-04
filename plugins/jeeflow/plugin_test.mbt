@@ -83,15 +83,18 @@ test "perm_codes_of：OR 族逐条与引擎 OR_RULES 对齐" {
 }
 
 ///|
-test "descriptor：47 条 action 路由逐条与路径同源 + 1 条未知 action 兜底位，且放行/OR/默认三族分类不串" {
+test "descriptor：每条 action 路由与清单同源 + 1 条未知 action 兜底位，且放行/OR/默认三族分类不串" {
   let d = @moon-plugin-jeeflow.jeeflow_descriptor()
   // 兜底位是清单外的一条（它不对应任何引擎 action，只回「未知」信封），故总数 = action 数 + 1；
-  // 三族计数只在下面对**前 47 条 action 位**统计，兜底位单独钉形状，防止它被配出权限码或被 public 放行。
-  assert_eq(d.routes.length(), 48)
+  // 三族计数只在下面对**前 n 条 action 位**统计（n 取清单长度，别在这儿写死号——11-04 加
+  // issues/246／247 两枚 action 时，写死的 47/48 就是第一处会漂的地方），兜底位单独钉形状，
+  // 防止它被配出权限码或被 public 放行。
+  let n = @moon-plugin-jeeflow.jeeflow_actions.length()
+  assert_eq(d.routes.length(), n + 1)
   let mut login_only = 0
   let mut or_routes = 0
   let mut default_routes = 0
-  for r in d.routes[:47] {
+  for r in d.routes[:n] {
     assert_eq(r.http_method, "POST")
     assert_false(r.public)
     if r.perms.is_empty() {
@@ -108,13 +111,32 @@ test "descriptor：47 条 action 路由逐条与路径同源 + 1 条未知 actio
       assert_eq(r.perms[0], perm_of_path(r.path))
     }
   }
-  // 三族数量与引擎那张表逐一对上：47 条里放行 11、OR 5、默认 31
+  // 三族数量与引擎那张表逐一对上：清单 49 条里放行 11、OR 7、默认 31
+  // （OR 由 5→7 是 11-04 的 B 案：`processTask/recall`／`processTask/revokeDynamicCountersign`
+  // 复用 `wf:processTask:execute`，与 java 引擎 `DefaultActionPermissionProvider` 1.8.60 同源）
   assert_eq(login_only, 11)
-  assert_eq(or_routes, 5)
+  assert_eq(or_routes, 7)
   assert_eq(default_routes, 31)
-  // 兜底位（第 48 条）单独钉形状：不配权限码、不放行、路径就是 /wf/*rest——
+  // 两枚新 action 必须真在清单上——11-04 第 14 栈门禁首跑就是把它们判红的：引擎分派表有这两枚
+  // （jeeflow-moon `facade.mbt`），插件清单没带 ⇒ 请求落到兜底位回「未知 action」，能力等于没上第 14 栈。
+  let mut seen_recall = 0
+  let mut seen_revoke = 0
+  for a in @moon-plugin-jeeflow.jeeflow_actions {
+    if a == "processTask/recall" {
+      seen_recall += 1
+    } else if a == "processTask/revokeDynamicCountersign" {
+      seen_revoke += 1
+    }
+  }
+  assert_eq(seen_recall, 1)
+  assert_eq(seen_revoke, 1)
+  assert_eq(@moon-plugin-jeeflow.perm_codes_of("processTask/recall"), (["wf:processTask:execute"], true))
+  assert_eq(
+    @moon-plugin-jeeflow.perm_codes_of("processTask/revokeDynamicCountersign"), (["wf:processTask:execute"], true),
+  )
+  // 兜底位（末条）单独钉形状：不配权限码、不放行、路径就是 /wf/*rest——
   // 它一旦被配上权限码或标成 public，就等于给清单外的 action 开了一条带鉴权语义的可达面
-  let tail = d.routes[47]
+  let tail = d.routes[n]
   assert_eq(tail.path, "/wf/*rest")
   assert_true(tail.perms.is_empty())
   assert_false(tail.public)

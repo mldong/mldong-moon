@@ -461,7 +461,7 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
   for a in jeeflow_actions {
     ctx.routes.route("POST", "/wf/\{a}", wf_handler(ectx6, repo, a))
   }
-  // 未知 action 兜底位：必须排在 47 条静态位**之后**注册（moonback Trie 先静态前缀后通配，
+  // 未知 action 兜底位：必须排在全部 action 静态位**之后**注册（moonback Trie 先静态前缀后通配，
   // 顺序反了通配位会抢走真实 action 的命中）
   ctx.routes.route("POST", "/wf/*rest", wf_unknown_handler())
   println(
