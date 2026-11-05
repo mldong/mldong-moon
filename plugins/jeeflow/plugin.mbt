@@ -67,87 +67,22 @@ pub let jeeflow_actions : Array[String] = [
 ]
 
 ///|
-/// 权限码：`wf:{action，/→:}`（boot4 `WfFlowController.checkPermission` 同规律）——
-/// 形如 `wf:processInstance:stats:overview`。**前缀必须有**：菜单种子里那 49 条 wf 按钮码全带 `wf:`
-/// （现读 `sys_menu where code like 'wf:%'`），漏掉前缀会让非超管账号即使被授了权也恒 99990406
-/// ——超管走 `is_super_admin` 豁免，所以这条只在真实授权账号上暴露，10-07 由 owner 前端走查抓出。
-pub fn perm_code(action : String) -> String {
-  let sb = StringBuilder()
-  for i in 0..<action.length() {
-    match action.get_char(i) {
-      Some(c) =>
-        if c == '/' {
-          sb.write_char(':')
-        } else {
-          sb.write_char(c)
-        }
-      None => ()
-    }
-  }
-  "wf:" + sb.to_string()
-}
-
-///|
-/// 登录即放行（不配权限码）的 action —— 引擎 `DefaultActionPermissionProvider.NO_PERM_ACTIONS`
-/// 的 moon 同位（issues/29 归纳自 boot3「无 `@SaCheckPermission` 注解＝登录即可」）。
-/// 统计那三条是 issues/103 的收口成果：分析页（概览→分析页）是人人可看的仪表盘，
-/// 早先按默认规则拼出 `wf:processInstance:stats:*` 把普通用户整页拦死、toast 刷屏，
-/// 六语言同款＝goframe `694d5b9` / fastapi `1aa5471` / salvo `58231b2` / nestjs `06e06c2` /
-/// laravel `d39ebfc`；moon 这轮补齐（10-08 owner 前端走查抓出的正是同一条）。
-let no_perm_actions : Array[String] = [
-  "processInstance/detail",
-  "processInstance/highLight",
-  "processInstance/approvalRecord",
-  "processInstance/getAssigneeTextData",
-  "processInstance/bizData",
-  "processTask/detail",
-  "processTask/addCandidate",
-  "processTask/latest",
-  "processInstance/stats/overview",
-  "processInstance/stats/trend",
-  "processInstance/stats/group",
-]
-
-///|
-/// 多码 OR（boot3 `@SaCheckPermission(value={...}, mode=OR)` 语义）：任一命中即有权。
-/// 与引擎 `OR_RULES` 逐字对齐——漏一条就把"任一即可"做成"全都要"。
-let or_rules : Array[(String, Array[String])] = [
-  ("processDefine/detail", ["wf:processDefine:detail", "wf:processDesign:listByType"]),
-  (
-    "processDefine/startAndExecute",
-    ["wf:processDefine:startAndExecute", "wf:processDesign:listByType"],
-  ),
-  (
-    "processDefine/getLastByName",
-    [
-      "wf:processDefine:detail",
-      "wf:processDesign:listByType",
-      "wf:processDefine:getLastByName",
-    ],
-  ),
-  ("processTask/candidatePage", ["wf:processTask:execute", "wf:processTask:candidatePage"]),
-  ("processTask/jumpAbleTaskNameList", ["wf:processTask:execute"]),
-  // issues/246／247 两枚新 action 的粒度定 B 案（11-04 owner 拍）：复用 `wf:processTask:execute`，
-  // 不建 `sys_menu` 按钮种子——与 java 引擎 `DefaultActionPermissionProvider.orRules`（v1.8.60）同源。
-  ("processTask/recall", ["wf:processTask:execute"]),
-  ("processTask/revokeDynamicCountersign", ["wf:processTask:execute"]),
-]
-
-///|
-/// action → (权限码集合, 是否 OR)。空集合＝只验登录：`plugin_policy` 不给它挂 rule，
-/// 主仓 `by_convention=false` 下未列端点即"仅登录"语义（与 boot3 无注解端点同形）。
+/// action → (权限码集合, 是否 OR)。**表归引擎**（hub issues/248 甲案）：三档语义直接取
+/// `mldong/jeeflow-core/spi` 的默认件——插件此前那份 `no_perm_actions`／`or_rules`／本地拼码
+/// 是同一张表的第十一处抄本，改一条要动八栈＋本插件，且只用引擎、自写集成层的客户会跨栈读出
+/// 两套码。空集合＝只验登录：`plugin_policy` 不给它挂 rule，主仓 `by_convention=false` 下
+/// 未列端点即"仅登录"语义（与 boot3 无注解端点同形）。
+/// 前缀 `wf:` 由引擎默认件给（菜单种子里 wf 按钮码全带前缀，漏前缀会让被授权的普通账号恒
+/// 99990406——10-07 owner 前端走查抓出的那条，现由引擎侧测试钉住）。
 pub fn perm_codes_of(action : String) -> (Array[String], Bool) {
-  for a in no_perm_actions {
+  let codes = @spi.default_action_permission_provider(action)
+  let mut is_or = false
+  for a in @spi.action_permission_or_actions() {
     if a == action {
-      return ([], false)
+      is_or = true
     }
   }
-  for (a, codes) in or_rules {
-    if a == action {
-      return (codes, true)
-    }
-  }
-  ([perm_code(action)], false)
+  (codes, is_or)
 }
 
 ///|

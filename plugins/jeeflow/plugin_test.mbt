@@ -18,18 +18,21 @@ fn perm_of_path(path : String) -> String {
 }
 
 ///|
-test "perm_code：默认规则带 wf: 前缀且斜杠转冒号" {
+test "默认派生族：表归引擎后仍带 wf: 前缀且逐字符转冒号（hub issues/248 甲案）" {
+  // 两条都有历史事故：漏 `wf:` 前缀 ⇒ 被授权的普通账号恒 99990406（10-07 owner 前端走查抓的）；
+  // 多段 action 只换**首枚**斜杠 ⇒ jeeflow-moon 0.1.60 修掉的 #真缺陷。判据从插件出口打，
+  // 证明消费侧（descriptor 的显式权限码）读到的就是引擎那份表，而不是插件本地又拼了一遍。
   assert_eq(
-    @moon-plugin-jeeflow.perm_code("processTask/todoList"),
-    "wf:processTask:todoList",
+    @moon-plugin-jeeflow.perm_codes_of("processTask/todoList"),
+    (["wf:processTask:todoList"], false),
   )
   assert_eq(
-    @moon-plugin-jeeflow.perm_code("processInstance/stats/overview"),
-    "wf:processInstance:stats:overview",
+    @moon-plugin-jeeflow.perm_codes_of("processInstance/stats/whatever"),
+    (["wf:processInstance:stats:whatever"], false),
   )
   assert_eq(
-    @moon-plugin-jeeflow.perm_code("processInstance/page"),
-    "wf:processInstance:page",
+    @moon-plugin-jeeflow.perm_codes_of("processInstance/page"),
+    (["wf:processInstance:page"], false),
   )
 }
 
