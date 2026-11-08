@@ -150,8 +150,13 @@ curl -s -X POST http://127.0.0.1:18680/sys/user/page \
   async 请求交错会串号（boot2 ThreadLocal 无安全对应物；goframe 的 ctx 同样是显式传参，
   不是隐式全局）。后续业务身份消费（数据权限/appCode 过滤/trace）一律扩 Ctx 字段；
   gen 模板已内置，手写表照 user_service 形状。
-- **warnings 基线 = 0**（`moon check` 0 errors 0 warnings，10-05 全量清零）：改动后出现任何
-  新告警就地修掉，常见修法——
+- **warnings 基线 = 0（只数本仓告警）**（`moon check` 0 errors；本仓自身 0 warnings，10-05 全量清零）：
+  改动后出现任何**本仓**新告警就地修掉。
+  ⚠ 依赖树里 "Warning: Package `moonbitlang/async*` depends on experimental package
+  `moonbitlang/core/async*`" 那几条（0.10.19 起官方 async 转发到 core/async 实验包）**不算本仓账**，
+  消费方 `moon.pkg` 的 `allow-experimental-packages` 压不掉、换 `core/async` 直连又会撞 moon-hutool
+  端口类型（4018）⇒ **别去"修"它们**；判零只认"剥掉这一类后剩 0 条"（同 moon-token 等仓
+  `scripts/own-warn.sh` 的口径）。常见修法——
   * `fragile_catch_all`：路由注册的 `catch { e => raise e }` 透传**直接删**（register 本身带
     raise，module.mbt 组合根统一 abort）；错误转换处绑 `e` 并转 `MldongError`；
   * `implicit_impl_as_method`：trait impl 的方法被具体类型直调时补 `pub extend Type with Trait::{..}`
