@@ -112,21 +112,6 @@ export MLDONG_DB_* && moon run --target wasm cmd/gen/main -- <表名>...
 生成面 = 标准 CRUD 五端点 + 权限码片段 + check_unique/find_by_ids；详细流程与自检清单见
 [doc/adding-module.md](doc/adding-module.md)，生成器实现见 [doc/gen-metadata.md](doc/gen-metadata.md)。
 
-## 路线图
-
-**里程碑**：sys 全链管理面 → 字典/菜单/RBAC 授权 → message/fileInfo/APP 检查/SSE
-（家族契约 runner 首批收口）→ 低代码三路由 + 日志/短信/定时任务/任务队列 + 扮演往返
-（e2e 与契约 runner 全绿收口）。
-
-**计划中**：
-
-- [ ] 登录/登出写 vis_log 行（boot2 切面语义等价物）
-- [ ] 短信真通道（provider SPI；现为 mock 渲染直落日志）
-- [ ] 事务模板（环境连接 + 嵌套复用；现为 grant 局部事务）
-- [x] 会话存储 Redis 后端（moon-token-store-redis，多实例/重启共享）
-- [ ] `rainbow` 分页导航补齐
-- [ ] CI：GitHub Actions（wasm + native 双档）
-
 ## License
 
 [Apache-2.0](./LICENSE)

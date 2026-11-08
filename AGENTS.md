@@ -176,4 +176,14 @@ curl -s -X POST http://127.0.0.1:18680/sys/user/page \
   不绕过 hook（无 `--no-verify`）。
 - **接口契约**：URL、信封、错误码、分页形状、权限码以 mldong 接口契约为准，不私造形状；
   字段名一律 camelCase（JSON）/ snake_case（DB 列）。
-- **文档同步**：改分层/权限行为时同步改 doc/ 对应篇，README 路线图勾状态。
+- **文档同步**：改分层/权限行为时同步改 doc/ 对应篇；待办只维护 §7（README 不放路线图）。
+
+## 7. 待办（内部协作向，README 不重复）
+
+> 只列**确有代码锚点**的 pending；每条改动落地时勾掉并同步 §2/§5 相应描述。
+> 状态以现读代码为准，本节是提示不是权威——动手前先 `grep`/读码核现状。
+
+- [ ] 登录/登出写 `sys_vis_log` 行（boot2 切面语义等价物）——vislog 五件套已在（controller/dao/dto/entity/service），`login_controller.mbt` 尚未调用写入
+- [ ] 短信真通道（provider SPI）——现为内存 Map 存验证码 + 模板渲染落 `sys_sms_log`，无外发
+- [ ] 事务模板（环境连接 + 嵌套复用）——现为 `dialect.mbt` 的 `tx_begin/commit/rollback` 裸工具，grant 局部事务（见 `perm_repository.mbt grant_*`）
+- [ ] CI：GitHub Actions（wasm + native 双档）——仓内暂无 `.github/`
