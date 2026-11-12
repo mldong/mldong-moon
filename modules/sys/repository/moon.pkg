@@ -8,4 +8,5 @@ import {
   "moonbitstack/moonmysql/client" @client,
   "moonbitlang/core/string" @string,
   "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/async" @async,
 }

@@ -96,11 +96,17 @@ pub impl @dao.RbacDao for RbacRepository with fn grant_roles(self, user_id, role
   }
   errdefer {
     try {
-      tx_rollback(conn)
+      @async.protect_from_cancel(async fn() {
+        try {
+          tx_rollback(conn)
+        } catch {
+          _ => ()
+        }
+        close_conn(conn)
+      })
     } catch {
       _ => ()
     }
-    close_conn(conn)
   }
   let _ = x(conn, "DELETE FROM sys_user_role WHERE user_id = ?", [@moondb.Int64(user_id)])
   for role_id in role_ids {
@@ -131,11 +137,17 @@ pub impl @dao.RbacDao for RbacRepository with fn grant_menus(self, role_id, menu
   }
   errdefer {
     try {
-      tx_rollback(conn)
+      @async.protect_from_cancel(async fn() {
+        try {
+          tx_rollback(conn)
+        } catch {
+          _ => ()
+        }
+        close_conn(conn)
+      })
     } catch {
       _ => ()
     }
-    close_conn(conn)
   }
   let _ = x(conn, "DELETE FROM sys_role_menu WHERE role_id = ?", [@moondb.Int64(role_id)])
   for menu_id in menu_ids {
@@ -328,11 +340,17 @@ pub impl @dao.RbacDao for RbacRepository with fn grant_data_scope(self, role_id,
   let conn = open_conn(self.config)
   errdefer {
     try {
-      tx_rollback(conn)
+      @async.protect_from_cancel(async fn() {
+        try {
+          tx_rollback(conn)
+        } catch {
+          _ => ()
+        }
+        close_conn(conn)
+      })
     } catch {
       _ => ()
     }
-    close_conn(conn)
   }
   tx_begin(conn)
   match data_scope {

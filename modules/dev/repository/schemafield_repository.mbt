@@ -114,11 +114,17 @@ pub impl @dao.SchemaFieldDao for SchemaFieldRepository with fn replace_schema_fi
   let conn = open_conn(self.base.config)
   errdefer {
     try {
-      tx_rollback(conn)
+      @async.protect_from_cancel(async fn() {
+        try {
+          tx_rollback(conn)
+        } catch {
+          _ => ()
+        }
+        close_conn(conn)
+      })
     } catch {
       _ => ()
     }
-    close_conn(conn)
   }
   tx_begin(conn)
   let _ = x(conn, "DELETE FROM dev_schema_field WHERE schema_id = ?", [@moondb.Int64(schema_id)])
