@@ -552,7 +552,7 @@ let wf_biz_type : String = "WORKFLOW"
 
 ///|
 /// 未注册 action 的统一信封兜底（gate L1-05，以及 L2-13 的 `processDefine/save|update` 两腿）。
-/// 其余 13 栈由控制器动态转发、引擎 dispatch 答「未知」；moon 是显式 47 位面，未声明即无此能力，
+/// 其余 13 栈由控制器动态转发、引擎 dispatch 答「未知」；moon 是显式位面，未声明即无此能力，
 /// 所以兜底位**不进引擎**——否则等于给清单外的 action 开一条"仅登录"的可达面。
 /// 文案取引擎 `UnknownAction` 原话（`未知 action: X`，码 ERR_BUSINESS=99999999），跨栈信封同形。
 fn wf_unknown_handler() -> @mb.Handler {

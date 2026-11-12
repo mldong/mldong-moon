@@ -114,25 +114,33 @@ test "descriptor：每条 action 路由与清单同源 + 1 条未知 action 兜�
       assert_eq(r.perms[0], perm_of_path(r.path))
     }
   }
-  // 三族数量与引擎那张表逐一对上：清单 49 条里放行 11、OR 7、默认 31
+  // 三族数量与引擎那张表逐一对上：清单 50 条里放行 11、OR 7、默认 32
   // （OR 由 5→7 是 11-04 的 B 案：`processTask/recall`／`processTask/revokeDynamicCountersign`
   // 复用 `wf:processTask:execute`，与 java 引擎 `DefaultActionPermissionProvider` 1.8.60 同源）
+  // issues/253 `processTask/aidant`：当前 pin 0.1.66 的引擎 spi 表尚无此条 ⇒ 走默认派生族
+  // （31→32）；引擎 HEAD 已把它定成 OR 族复用 `wf:processTask:execute`，跟版抬 pin 那批
+  // 三族计数随引擎表再同步（32/7→31/8），与 moon.mod 四处 pin 同批。
   assert_eq(login_only, 11)
   assert_eq(or_routes, 7)
-  assert_eq(default_routes, 31)
-  // 两枚新 action 必须真在清单上——11-04 第 14 栈门禁首跑就是把它们判红的：引擎分派表有这两枚
+  assert_eq(default_routes, 32)
+  // 新 action 必须真在清单上——11-04 第 14 栈门禁首跑就是把 246/247 两枚判红的：引擎分派表有它们
   // （jeeflow-moon `facade.mbt`），插件清单没带 ⇒ 请求落到兜底位回「未知 action」，能力等于没上第 14 栈。
+  // issues/253 aidant 同款（L2-63 判红「未知 action」），清单 49→50 加法补位。
   let mut seen_recall = 0
   let mut seen_revoke = 0
+  let mut seen_aidant = 0
   for a in @moon-plugin-jeeflow.jeeflow_actions {
     if a == "processTask/recall" {
       seen_recall += 1
     } else if a == "processTask/revokeDynamicCountersign" {
       seen_revoke += 1
+    } else if a == "processTask/aidant" {
+      seen_aidant += 1
     }
   }
   assert_eq(seen_recall, 1)
   assert_eq(seen_revoke, 1)
+  assert_eq(seen_aidant, 1)
   assert_eq(@moon-plugin-jeeflow.perm_codes_of("processTask/recall"), (["wf:processTask:execute"], true))
   assert_eq(
     @moon-plugin-jeeflow.perm_codes_of("processTask/revokeDynamicCountersign"), (["wf:processTask:execute"], true),

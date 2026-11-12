@@ -50,6 +50,7 @@ pub let jeeflow_actions : Array[String] = [
   "processTask/latest",
   "processTask/recall",
   "processTask/revokeDynamicCountersign",
+  "processTask/aidant",
   "processDesign/page",
   "processDesign/detail",
   "processDesign/save",
