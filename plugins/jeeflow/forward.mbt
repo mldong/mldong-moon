@@ -303,7 +303,17 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
     "com.mldong.jeeflow.interceptor.impl.OrgUserAssignmentHandlers$TaskRoleAssigneeHandler",
     @itl.task_role_assignee_handler(Some(org_fns)),
   )
-  println("[jeeflow] 内置取人 handler 注册：7 支（operator/申请部门领导×2/当前部门领导×2/formField/taskRole）")
+  // issues/254：表单指定用户（HR 代员工提交／代理申请）取**该员工**部门的经理／分管领导。
+  // 注册名＝引擎侧同一枚顶级类 FQCN（不带 $），八语言契约 §3.2 四档并集＋§3.4 失败即空不抛。
+  ectx5.register_assignment_handler(
+    "com.mldong.jeeflow.interceptor.impl.FormUserDeptLeaderAssignmentHandler",
+    @itl.form_user_dept_leader_handler(base, main=false),
+  )
+  ectx5.register_assignment_handler(
+    "com.mldong.jeeflow.interceptor.impl.FormUserDeptMainLeaderAssignmentHandler",
+    @itl.form_user_dept_leader_handler(base, main=true),
+  )
+  println("[jeeflow] 内置取人 handler 注册：9 支（operator/申请部门领导×2/当前部门领导×2/formField/taskRole/表单指定用户×2）")
   // ⑦ 站内信监听器（boot4 WfMessageProcessEventListener 那 383 行的 moon 同位；issues/146 缺口三）
   //    订阅引擎已发的三支：任务开始→提醒每位参与者、实例结束→提醒发起人、抄送创建→提醒抄送对象。
   //    这件事在 0.1.28 之前做不了：监听器是同步闭包，闭包里 await 不了写库。
