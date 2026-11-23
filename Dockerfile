@@ -9,7 +9,9 @@
 #   10-09 拍 C 之后装载器不带 schema 通道，运行期不再需要增量目录（旧 MLDONG_MIGRATIONS_DIR 作废）。
 FROM ubuntu:22.04 AS builder
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# 11-23 镜像轮实弹：apt 打境外 archive.ubuntu.com 时索引残缺（17 条 Ign: 后 update 侥幸退 0，install 报 E: Package 'gcc' has no installation candidate，build 白跑 16 分钟）。换国内源，与构建缓存有无无关。sed 分隔符用 # ——正则有 | ，用 | 会静默不替换。
+RUN sed -i 's#http://\(archive\|security\).ubuntu.com/ubuntu#http://mirrors.aliyun.com/ubuntu#g' /etc/apt/sources.list \
+    && apt-get update && apt-get install -y --no-install-recommends \
       curl ca-certificates git gcc libc-dev \
     && rm -rf /var/lib/apt/lists/*
 
@@ -34,7 +36,8 @@ RUN BIN=$(find _build -type f -name 'main*' -perm -u+x 2>/dev/null | head -1) \
 
 # ---- 运行层（瘦身：只带二进制，ubuntu 底保 glibc 一致性）----
 FROM ubuntu:22.04
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+RUN sed -i 's#http://\(archive\|security\).ubuntu.com/ubuntu#http://mirrors.aliyun.com/ubuntu#g' /etc/apt/sources.list \
+    && apt-get update && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /usr/local/bin/mldong-moon-bin /usr/local/bin/mldong-moon-bin
 WORKDIR /app
