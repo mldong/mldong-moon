@@ -17,6 +17,6 @@ import {
   "mldong/moon-plugin-api@0.1.0",
   "mldong/moon-sys@0.1.0",
   "moonbitlang/async@0.22.7",
-  "moonbitstack/moondb@0.2.5",
+  "moonbitstack/moondb@0.3.2",
 
 }

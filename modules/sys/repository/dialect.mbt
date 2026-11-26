@@ -137,6 +137,11 @@ fn value_to_text(v : @moondb.Value) -> String? {
     Int(n) => Some(n.to_string())
     Double(d) => Some(d.to_string())
     Bool(b) => Some(if b { "1" } else { "0" })
+    Time(s) => Some(s)
+    Numeric(s) => Some(s)
+    Json(s) => Some(s)
+    Uuid(_) => None
+    Array(_) => None
   }
 }
 
@@ -221,10 +226,11 @@ pub fn row_int_d(r : @moondb.Row, col : String, default : Int) -> Int {
 ///|
 /// DATETIME 文本归一："yyyy-MM-dd HH:mm:ss[.fff]" → 截 19 位
 fn norm_datetime(s : String) -> String {
-  if s.length() > 19 {
-    s[0:19].to_owned()
+  let normalized = s.replace(old="T", new=" ")
+  if normalized.length() > 19 {
+    normalized[0:19].to_owned()
   } else {
-    s
+    normalized
   }
 }
 

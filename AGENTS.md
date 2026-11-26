@@ -62,7 +62,7 @@ mldong-moon/
 
 ## 3. 工具链与本地运行
 
-MoonBit 工具链（moon 0.1.x + moonc v0.10.x），workspace 多模块，目标档位 **wasm**（moonrun 执行；
+MoonBit 工具链（版本以 `moon version --all` 现读），workspace 多模块，目标档位 **wasm**（moonrun 执行；
 native 档由 CI 承担）。所有命令在仓根执行：
 
 ```bash

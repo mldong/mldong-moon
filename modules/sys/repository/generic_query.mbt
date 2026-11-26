@@ -109,11 +109,10 @@ fn is_temporal_type(dtype : String) -> Bool {
 ///|
 /// 行 → Json（family 口径：bigint 列雪花字符串化防精度；Int/Double 数值；Text 文本）
 ///
-/// ⚠ 时间列不是 Text 回来的，是 **Blob(bytes)** 回来的（同包 `dialect.mbt` 里
-/// `value_to_text` 那句"DATETIME 走文本截 19 位"就是这件事的另一半）——旧写法把 Blob 一律丢成
-/// `Json::null()` ⇒ 低代码 `page|detail` 与引擎 `bizData` 两条出口的 create_time/update_time
-/// 全是 null（库里有时值、前端显示空）。现在按 dtype 认出时间列，Blob/Text 两路都 utf8 解串，
-/// 并截到 19 位与框架其它时间出口同形（`sys_user.createTime` 那一档）。
+/// ⚠ 时间列在旧驱动里是 **Blob(bytes)**，moonmysql 0.8.2 起是 **Time(String)**；两者都不是 Text。
+/// 旧写法把 Blob 一律丢成 `Json::null()` ⇒ 低代码 `page|detail` 与引擎 `bizData` 两条出口的
+/// create_time/update_time 全是 null（库里有时值、前端显示空）。现在按 dtype 认出时间列，
+/// Blob/Text/Time 三路都转文本并截到 19 位，与框架其它时间出口同形（`sys_user.createTime` 那一档）。
 fn generic_row_to_json(r : @moondb.Row, cols : Map[String, String]) -> Json {
   let obj : Map[String, Json] = Map([], capacity=0)
   for name, dtype in cols {
@@ -130,11 +129,21 @@ fn generic_row_to_json(r : @moondb.Row, cols : Map[String, String]) -> Json {
       Double(d) => Json::number(d)
       Bool(b) => Json::boolean(b)
       Text(s) => Json::string(if temporal { norm_datetime(s) } else { s })
+      Time(s) => Json::string(if temporal { norm_datetime(s) } else { s })
+      Numeric(s) => Json::string(s)
+      Json(s) =>
+        try {
+          @json.parse(s)
+        } catch {
+          _ => Json::string(s)
+        }
       Blob(_) =>
         match value_to_text(v) {
           Some(s) => Json::string(if temporal { norm_datetime(s) } else { s })
           None => Json::null()
         }
+      Uuid(_) => Json::null()
+      Array(_) => Json::null()
     }
     // UC-0318/0319：动态表行出口一律 camelCase（后端负责转，前端不做 snake_case 兼容）
     let _ = obj.set(@core.to_camel_case(name), j)
