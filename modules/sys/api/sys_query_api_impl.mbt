@@ -67,7 +67,7 @@ fn user_detail_of(u : @entity.User, r : @entity.UserPageRow?) -> @papi.SysUserDe
 }
 
 ///|
-pub extend SysQueryApiImpl with @papi.SysQueryApi::{user_by_id, user_page, user_list, dept_by_id, dept_list, post_list, role_user_pairs}
+pub extend SysQueryApiImpl with @papi.SysQueryApi::{user_by_id, user_page, user_list, dept_by_id, dept_list, post_list, post_by_code, role_user_pairs}
 
 ///|
 pub impl @papi.SysQueryApi for SysQueryApiImpl with fn user_by_id(
@@ -186,6 +186,18 @@ pub impl @papi.SysQueryApi for SysQueryApiImpl with fn post_list(
     out.push({ id: p.id, name: p.name, code: p.code, sort: p.sort })
   }
   out
+}
+
+///|
+pub impl @papi.SysQueryApi for SysQueryApiImpl with fn post_by_code(
+  self,
+  code : String,
+) -> @papi.SysPostDetail? raise @core.MldongError {
+  let ctx = sys_ctx()
+  match self.post_svc.find_by_code(ctx, code) {
+    None => None
+    Some(p) => Some({ id: p.id, name: p.name, code: p.code, sort: p.sort })
+  }
 }
 
 ///|

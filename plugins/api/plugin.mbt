@@ -211,6 +211,9 @@ pub(open) trait SysQueryApi {
   /// 岗位：全量在册（小表）
   async fn post_list(self : Self) -> Array[SysPostDetail] raise @core.MldongError
 
+  /// 岗位：按唯一编码精确查询；不存在返回 None（不分页）
+  async fn post_by_code(self : Self, code : String) -> Option[SysPostDetail] raise @core.MldongError
+
   /// 角色：全量角色-用户对（角色找人节点的预载数据）
   async fn role_user_pairs(self : Self) -> Array[SysRoleUser] raise @core.MldongError
 }

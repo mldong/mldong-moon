@@ -8,6 +8,7 @@ pub(open) trait PostDao {
   /// 逻辑删除（表配置驱动）
   async fn remove_by_ids(Self, Array[Int64]) -> Unit raise @core.MldongError
   async fn find_by_id(Self, Int64) -> @entity.Post? raise @core.MldongError
+  async fn find_by_code(Self, String) -> @entity.Post? raise @core.MldongError
   /// 批量按 id 查（remove 前收标识刷缓存等场景）
   async fn find_by_ids(Self, Array[Int64]) -> Array[@entity.Post] raise @core.MldongError
   /// 唯一编码校验（boot2 checkUnique 同位一行调：存在且排除自身即 Conflict）

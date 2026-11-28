@@ -229,31 +229,26 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
     },
   }
   // IPostUserProvider（issues/259）：岗位编码只认 sys_post.code，成员按 sys_user.post_id 现查。
-  // post_list 经 PostService.page → BaseDao.page/base_where，自动带 is_deleted=0
-  // （post_table.del_col=Some("is_deleted")），所以删除岗位不会命中成员查询。
-  // user_list 当前轻量投影不带 post_id（list_simple 只取 id/dept_id/real_name/admin_type），
-  // 因此改用同一 PluginContext 的只读 DevQueryApi.rows_by_column：列名过 information_schema
-  // 真列白名单、值参数化，且 sys_user 有 is_deleted 列时自动加 is_deleted=0
-  // （modules/sys/repository/generic_query.mbt::rows_by_column），与 role_user_pairs 一样只过滤
-  // 逻辑删除、不额外排除锁定账号。
+  // post_by_code 走精确唯一编码查询，不受 post_list 的 500 条分页上限影响；BaseDao 自动带
+  // is_deleted=0。user_list 当前轻量投影不带 post_id，因此成员仍走只读 DevQueryApi.rows_by_column：
+  // 列名过 information_schema 真列白名单、值参数化，且与 role_user_pairs 一样只过滤逻辑删除。
   let post_fns : @spi.PostUserProviderFns = {
     find_by_post: async fn(post_code : String) raise @jerr.JeeflowError {
       if post_code.is_empty() {
         return []
       }
       try {
-        let posts = sys.post_list()
-        match post_id_by_code(posts, post_code) {
+        match sys.post_by_code(post_code) {
           None => []
-          Some(post_id) =>
+          Some(post) =>
             post_member_ids(
               post_code,
-              posts,
-              ctx.dev_query.rows_by_column("sys_user", "post_id", post_id),
+              [post],
+              ctx.dev_query.rows_by_column("sys_user", "post_id", post.id),
             )
         }
       } catch {
-        _ => raise @jerr.Internal("sys_query.post_list/dev_query.rows_by_column 岗位供数失败")
+        _ => raise @jerr.Internal("sys_query.post_by_code/dev_query.rows_by_column 岗位供数失败")
       }
     },
   }
@@ -624,7 +619,7 @@ fn json_i64(v : Json) -> Int64? {
 }
 
 ///|
-fn post_id_by_code(posts : Array[@api.SysPostDetail], post_code : String) -> Int64? {
+pub fn post_id_by_code(posts : Array[@api.SysPostDetail], post_code : String) -> Int64? {
   for p in posts {
     if p.code == post_code {
       return Some(p.id)

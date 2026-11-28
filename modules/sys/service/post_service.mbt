@@ -7,6 +7,7 @@ pub(open) trait PostService {
   async fn update(Self, @core.Ctx, @dto.PostSaveReq) -> Unit raise @core.MldongError
   async fn remove_by_ids(Self, @core.Ctx, Array[Int64]) -> Unit raise @core.MldongError
   async fn find_by_id(Self, @core.Ctx, Int64) -> @entity.Post raise @core.MldongError
+  async fn find_by_code(Self, @core.Ctx, String) -> @entity.Post? raise @core.MldongError
   async fn page(Self, @core.Ctx, @dto.PostPageReq) -> (Int, Array[@entity.Post]) raise @core.MldongError
 }
 
@@ -83,6 +84,15 @@ pub impl[R : @dao.PostDao] PostService for PostServiceImpl[R] with fn find_by_id
 }
 
 ///|
+pub impl[R : @dao.PostDao] PostService for PostServiceImpl[R] with fn find_by_code(
+  self,
+  _ctx,
+  code,
+) {
+  self.dao.find_by_code(code)
+}
+
+///|
 pub impl[R : @dao.PostDao] PostService for PostServiceImpl[R] with fn page(self, _ctx, req) {
   let w = @core.where_()
   let _ = w.append(req.m)
@@ -95,5 +105,6 @@ pub extend PostServiceImpl with PostService::{
   remove_by_ids,
   save,
   find_by_id,
+  find_by_code,
   update,
 }

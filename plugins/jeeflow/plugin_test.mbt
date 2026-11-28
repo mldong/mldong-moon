@@ -187,9 +187,25 @@ test "issues/259：岗位编码精确命中、postId 过滤与 userId 稳定排�
 }
 
 ///|
+test "issues/259：岗位精确定位不受 500 条列表上限影响" {
+  let posts : Array[@api.SysPostDetail] = []
+  for i in 0..<501 {
+    posts.push({
+      id: (i + 1).to_int64(),
+      name: "岗位\{i}",
+      code: if i == 500 { "late_post" } else { "post_\{i}" },
+      sort: None,
+    })
+  }
+  assert_eq(@moon-plugin-jeeflow.post_id_by_code(posts, "late_post"), Some(501L))
+}
+
+///|
 test "issues/259：插件运行时注册两枚岗位 handler FQCN" {
   let ctx : @spi.Ctx[Int, Int] = @spi.Ctx::new(1, 2)
-  @moon-plugin-jeeflow.install_post_assignment_handlers(ctx, None)
+  let members : (String) -> Array[String] raise @jerr.JeeflowError = _code => ["42"]
+  let provider : @spi.PostUserProviderFnsSync = { find_by_post: members }
+  @moon-plugin-jeeflow.install_post_assignment_handlers(ctx, Some(provider.to_async()))
   assert_true(
     ctx.find_assignment_handler(
       "com.mldong.jeeflow.interceptor.impl.OrgUserAssignmentHandlers$TaskPostAssigneeHandler",

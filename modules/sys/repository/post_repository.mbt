@@ -37,6 +37,11 @@ pub impl @dao.PostDao for PostRepository with fn find_by_id(self, id) {
 }
 
 ///|
+pub impl @dao.PostDao for PostRepository with fn find_by_code(self, code) {
+  self.base.find_one(@core.where_().eq("code", S(code)))
+}
+
+///|
 pub impl @dao.PostDao for PostRepository with fn find_by_ids(self, ids) {
   let vals : Array[@core.SqlValue] = []
   for id in ids {
@@ -69,6 +74,7 @@ pub extend PostRepository with @dao.PostDao::{
   update,
   remove_by_ids,
   find_by_id,
+  find_by_code,
   find_by_ids,
   page,
   check_unique,
