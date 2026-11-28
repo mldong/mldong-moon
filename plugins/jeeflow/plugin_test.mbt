@@ -151,3 +151,53 @@ test "descriptor：每条 action 路由与清单同源 + 1 条未知 action 兜�
   assert_true(tail.perms.is_empty())
   assert_false(tail.public)
 }
+
+///|
+fn post_row(id : String, post_id : Int64) -> Map[String, Json] {
+  Map([
+    ("id", @jf.string_of(id)),
+    ("postId", @jf.string_of(post_id.to_string())),
+  ])
+}
+
+///|
+test "issues/259：岗位编码精确命中、postId 过滤与 userId 稳定排序" {
+  let posts : Array[@api.SysPostDetail] = [
+    { id: 7L, name: "办公室", code: "office", sort: None },
+    { id: 8L, name: "档案室", code: "archive", sort: None },
+  ]
+  let rows = [
+    post_row("10", 7L),
+    post_row("2", 7L),
+    post_row("1b", 7L),
+    post_row("a2", 7L),
+    post_row("3", 7L),
+    post_row("a10", 7L),
+    post_row("02", 7L),
+    post_row("99", 8L),
+  ]
+  assert_eq(
+    @moon-plugin-jeeflow.post_member_ids("office", posts, rows),
+    ["2", "02", "3", "10", "1b", "a10", "a2"],
+  )
+  // 删除/不存在岗位没有 id；编码大小写精确，不做模糊或 ID 猜测。
+  assert_eq(@moon-plugin-jeeflow.post_member_ids("deleted", posts, rows), [])
+  assert_eq(@moon-plugin-jeeflow.post_member_ids("OFFICE", posts, rows), [])
+  assert_eq(@moon-plugin-jeeflow.post_member_ids("", posts, rows), [])
+}
+
+///|
+test "issues/259：插件运行时注册两枚岗位 handler FQCN" {
+  let ctx : @spi.Ctx[Int, Int] = @spi.Ctx::new(1, 2)
+  @moon-plugin-jeeflow.install_post_assignment_handlers(ctx, None)
+  assert_true(
+    ctx.find_assignment_handler(
+      "com.mldong.jeeflow.interceptor.impl.OrgUserAssignmentHandlers$TaskPostAssigneeHandler",
+    ) is Some(_),
+  )
+  assert_true(
+    ctx.find_assignment_handler(
+      "com.mldong.jeeflow.interceptor.impl.FormPostAssignmentHandler",
+    ) is Some(_),
+  )
+}

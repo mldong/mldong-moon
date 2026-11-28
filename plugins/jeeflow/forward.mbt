@@ -1,6 +1,6 @@
-// Plugin 实现 —— descriptor 趟一（纯数据）+ initialize 趟二（供数预载 + 引擎装配 + 注册路由）。
-// initialize 时序：经 SysQueryApi 预载 user/dept/role 快照 → 组引擎 Ctx（三个同步 SPI 闭包
-// 读快照）→ Facade::make → 逐条注册 /wf/{action} 路由（handler 捕获各自 action，全转发
+// Plugin 实现 —— descriptor 趟一（纯数据）+ initialize 趟二（live 供数 + 引擎装配 + 注册路由）。
+// initialize 时序：经 SysQueryApi/DevQueryApi 现查 user/dept/role/post → 组引擎 Ctx（异步 SPI
+// 闭包读查询端口）→ Facade::make → 逐条注册 /wf/{action} 路由（handler 捕获各自 action，全转发
 // Facade::flow；operator=登录主体 login_id 注入 args）。
 
 ///|
@@ -228,7 +228,36 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
       }
     },
   }
-  let ectx4 = ectx3.with_org_user_provider(org_fns)
+  // IPostUserProvider（issues/259）：岗位编码只认 sys_post.code，成员按 sys_user.post_id 现查。
+  // post_list 经 PostService.page → BaseDao.page/base_where，自动带 is_deleted=0
+  // （post_table.del_col=Some("is_deleted")），所以删除岗位不会命中成员查询。
+  // user_list 当前轻量投影不带 post_id（list_simple 只取 id/dept_id/real_name/admin_type），
+  // 因此改用同一 PluginContext 的只读 DevQueryApi.rows_by_column：列名过 information_schema
+  // 真列白名单、值参数化，且 sys_user 有 is_deleted 列时自动加 is_deleted=0
+  // （modules/sys/repository/generic_query.mbt::rows_by_column），与 role_user_pairs 一样只过滤
+  // 逻辑删除、不额外排除锁定账号。
+  let post_fns : @spi.PostUserProviderFns = {
+    find_by_post: async fn(post_code : String) raise @jerr.JeeflowError {
+      if post_code.is_empty() {
+        return []
+      }
+      try {
+        let posts = sys.post_list()
+        match post_id_by_code(posts, post_code) {
+          None => []
+          Some(post_id) =>
+            post_member_ids(
+              post_code,
+              posts,
+              ctx.dev_query.rows_by_column("sys_user", "post_id", post_id),
+            )
+        }
+      } catch {
+        _ => raise @jerr.Internal("sys_query.post_list/dev_query.rows_by_column 岗位供数失败")
+      }
+    },
+  }
+  let ectx4 = ectx3.with_org_user_provider(org_fns).with_post_user_provider(post_fns)
   // IUserSearchProvider：候选人搜索走 user_page 真分页（关键字模糊 + 服务端分页），
   // 不再是内存全表过滤
   let ectx5 = ectx4.with_user_search_provider({
@@ -322,7 +351,8 @@ pub impl @api.Plugin for JeeflowPlugin with fn initialize(
     "com.mldong.jeeflow.interceptor.impl.FormDeptMainLeaderAssignmentHandler",
     @itl.form_dept_leader_handler(base, main=true),
   )
-  println("[jeeflow] 内置取人 handler 注册：11 支（operator/申请部门领导×2/当前部门领导×2/formField/taskRole/表单指定用户×2/表单指定部门×2）")
+  install_post_assignment_handlers(ectx5, Some(post_fns))
+  println("[jeeflow] 内置取人 handler 注册完成（含任务节点岗位与表单岗位）")
   // ⑦ 站内信监听器（boot4 WfMessageProcessEventListener 那 383 行的 moon 同位；issues/146 缺口三）
   //    订阅引擎已发的三支：任务开始→提醒每位参与者、实例结束→提醒发起人、抄送创建→提醒抄送对象。
   //    这件事在 0.1.28 之前做不了：监听器是同步闭包，闭包里 await 不了写库。
@@ -582,6 +612,104 @@ fn wf_unknown_handler() -> @mb.Handler {
     }
     @core.fail(99999999, @jerr.UnknownAction(action).message())
   })
+}
+
+///|
+fn json_i64(v : Json) -> Int64? {
+  match v {
+    Json::String(s) => @core.parse_i64_lenient(s)
+    Json::Number(_, ..) => @jf.as_i64(v)
+    _ => None
+  }
+}
+
+///|
+fn post_id_by_code(posts : Array[@api.SysPostDetail], post_code : String) -> Int64? {
+  for p in posts {
+    if p.code == post_code {
+      return Some(p.id)
+    }
+  }
+  None
+}
+
+///|
+fn row_user_id(row : Map[String, Json]) -> String? {
+  match row.get("id") {
+    Some(Json::String(s)) => {
+      let id = s.trim(chars=" \t\r\n").to_owned()
+      if id.is_empty() { None } else { Some(id) }
+    }
+    Some(Json::Number(n, ..)) => Some(n.to_string())
+    _ => None
+  }
+}
+
+///|
+/// 数字 ID 按数值排在前，非数字 ID 按字符串字典序排在后；同值保持原顺序。
+fn compare_user_ids(a : String, b : String) -> Int {
+  match (@core.parse_i64_lenient(a), @core.parse_i64_lenient(b)) {
+    (Some(x), Some(y)) => x.compare(y)
+    (Some(_), None) => -1
+    (None, Some(_)) => 1
+    (None, None) => @model.cmp_str(a, b)
+  }
+}
+
+///|
+/// 稳定插入排序：避免 wasm core sort 对 String::compare 的已知异常，同时保留同值输入顺序。
+fn sort_user_ids(ids : Array[String]) -> Unit {
+  for i in 1..<ids.length() {
+    let key = ids[i]
+    let mut j = i - 1
+    while j >= 0 && compare_user_ids(ids[j], key) > 0 {
+      ids[j + 1] = ids[j]
+      j = j - 1
+    }
+    ids[j + 1] = key
+  }
+}
+
+///|
+/// 岗位成员纯函数：先按 post.code 精确取岗位 id，再筛 row.postId，最后稳定排序 userId。
+/// rows 来自 DevQueryApi.rows_by_column，删除用户已由该查询端口过滤；这里仍复核 postId，
+/// 防止调用方误把别的岗位行交进来。公开仅为插件黑盒测试，不构成新的宿主能力。
+pub fn post_member_ids(
+  post_code : String,
+  posts : Array[@api.SysPostDetail],
+  rows : Array[Map[String, Json]],
+) -> Array[String] {
+  if post_code.is_empty() {
+    return []
+  }
+  let post_id = match post_id_by_code(posts, post_code) {
+    Some(id) => id
+    None => return []
+  }
+  let out : Array[String] = []
+  for row in rows {
+    match row.get("postId") {
+      Some(v) =>
+        if json_i64(v) == Some(post_id) {
+          match row_user_id(row) {
+            Some(uid) => out.push(uid)
+            None => ()
+          }
+        }
+      None => ()
+    }
+  }
+  sort_user_ids(out)
+  out
+}
+
+///|
+/// 插件自己的运行时注册入口：initialize 必须调它，测试才能钉住两枚 FQCN 真已落注册表。
+pub fn[R, E] install_post_assignment_handlers(
+  ctx : @spi.Ctx[R, E],
+  post : @spi.PostUserProviderFns?,
+) -> Unit {
+  @itl.register_post_assignment_handlers(ctx, post)
 }
 
 ///|
